@@ -1,0 +1,119 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Playfair Display", serif;
+  --font-body: "Inter", sans-serif;
+  --color-cream: #F8F5F0;
+  --color-gold: #D6B36A;
+  --color-gold-light: #E9D5A3;
+  --color-text-dark: #2C2C2A;
+  --color-surface: rgba(255, 255, 255, 0.7);
+  --shadow-luxury: 0 30px 60px -10px rgba(44, 44, 42, 0.05), 0 15px 25px -5px rgba(44, 44, 42, 0.03);
+  --shadow-soft: 0 10px 30px -5px rgba(44, 44, 42, 0.03), 0 4px 6px -2px rgba(44, 44, 42, 0.01);
+  --animate-drift: drift 20s linear infinite;
+  --animate-soft-pulse: softPulse 4s ease-in-out infinite;
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(30px, -30px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes softPulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-cream text-text-dark font-body antialiased selection:bg-gold selection:text-white overflow-x-hidden;
+}
+
+/* Texture */
+.bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.015;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+/* Custom Utilities for Premium Feel */
+.glass {
+  @apply bg-white/40 backdrop-blur-xl border border-white/20 shadow-luxury;
+}
+
+.radial-glow {
+  background: radial-gradient(circle at center, var(--color-gold-light) 0%, transparent 70%);
+  filter: blur(60px);
+  opacity: 0.2;
+}
+
+.light-ray {
+  background: linear-gradient(to bottom, transparent, rgba(214, 179, 106, 0.1), transparent);
+  width: 1px;
+  height: 100%;
+  transform: rotate(45deg);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes breathe {
+  0% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.03); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+
+@keyframes pulseGlow {
+  0% { text-shadow: 0 0 20px rgba(214, 179, 106, 0.2); }
+  50% { text-shadow: 0 0 40px rgba(214, 179, 106, 0.4); }
+  100% { text-shadow: 0 0 20px rgba(214, 179, 106, 0.2); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-breathe {
+  animation: breathe 10s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: pulseGlow 5s ease-in-out infinite;
+}
+
+/* Transitions */
+.section-fade-bottom {
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+
+.section-fade-top {
+  mask-image: linear-gradient(to top, black 80%, transparent 100%);
+}
+
+@keyframes breatheBackground {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+.animate-breathe-slow {
+  animation: breatheBackground 8s ease-in-out infinite;
+}
+
+.light-layer {
+  @apply fixed inset-0 pointer-events-none z-[1];
+  background: radial-gradient(circle at top, rgba(214, 179, 106, 0.1), transparent 60%);
+}
+
+.section-transition {
+  @apply h-24 w-full bg-gradient-to-b from-cream to-white;
+}
+
