@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
+import { useBookingStore } from '../../store/bookingStore';
 
 export default function Pricing() {
+  const openBooking = useBookingStore(state => state.openBooking);
   const plans = [
     {
       name: "Single Session",
@@ -82,7 +84,8 @@ export default function Pricing() {
                 </div>
                 
                 <button 
-                  className={`w-full py-5 rounded-xl text-[10px] font-bold tracking-[0.3em] uppercase transition-all duration-700 
+                  onClick={openBooking}
+                  className={`w-full py-5 rounded-xl text-[10px] font-bold tracking-[0.3em] uppercase transition-all duration-700 cursor-pointer
                     ${plan.highlighted 
                       ? 'bg-[#CBAE73] text-black shadow-xl shadow-gold/10 hover:scale-105' 
                       : 'bg-white text-text-dark border border-gold/10 hover:border-gold/40'

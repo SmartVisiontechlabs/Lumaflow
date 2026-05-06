@@ -5,12 +5,12 @@
   --font-display: "Playfair Display", serif;
   --font-body: "Inter", sans-serif;
   --color-cream: #F8F5F0;
-  --color-gold: #D6B36A;
+  --color-gold: #CBAE73;
   --color-gold-light: #E9D5A3;
-  --color-text-dark: #2C2C2A;
+  --color-text-dark: #3A3A3A;
   --color-surface: rgba(255, 255, 255, 0.7);
-  --shadow-luxury: 0 30px 60px -10px rgba(44, 44, 42, 0.05), 0 15px 25px -5px rgba(44, 44, 42, 0.03);
-  --shadow-soft: 0 10px 30px -5px rgba(44, 44, 42, 0.03), 0 4px 6px -2px rgba(44, 44, 42, 0.01);
+  --shadow-luxury: 0 30px 60px -10px rgba(58, 58, 58, 0.05), 0 15px 25px -5px rgba(58, 58, 58, 0.03);
+  --shadow-soft: 0 10px 30px -5px rgba(58, 58, 58, 0.03), 0 4px 6px -2px rgba(58, 58, 58, 0.01);
   --animate-drift: drift 20s linear infinite;
   --animate-soft-pulse: softPulse 4s ease-in-out infinite;
 }

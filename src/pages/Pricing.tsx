@@ -1,4 +1,7 @@
+import { useBookingStore } from '../store/bookingStore';
+
 export default function Pricing() {
+  const openBooking = useBookingStore(state => state.openBooking);
   return (
     <div className="pt-32 pb-24 px-6 max-w-7xl mx-auto min-h-screen relative">
       <div className="absolute top-0 right-0 w-1/2 h-96 opacity-10 -z-10 pointer-events-none">
@@ -20,7 +23,10 @@ export default function Pricing() {
             <h3 className={`font-display text-2xl mb-2 ${tier.highlighted ? 'text-white' : 'text-text-dark'}`}>{tier.title}</h3>
             <div className="text-4xl font-light mb-6">{tier.price}</div>
             <p className={`mb-8 ${tier.highlighted ? 'text-white/80' : 'text-text-dark/60'}`}>{tier.desc}</p>
-            <button className={`w-full py-3 rounded-full font-semibold tracking-wider uppercase text-sm transition-colors ${tier.highlighted ? 'bg-white text-gold hover:bg-cream' : 'bg-text-dark text-white hover:bg-gold'}`}>
+            <button 
+              onClick={openBooking}
+              className={`w-full py-3 rounded-full font-semibold tracking-wider uppercase text-sm transition-colors cursor-pointer ${tier.highlighted ? 'bg-white text-gold hover:bg-cream' : 'bg-text-dark text-white hover:bg-gold'}`}
+            >
               Select Plan
             </button>
           </div>

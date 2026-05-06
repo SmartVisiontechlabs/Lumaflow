@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
+import { useBookingStore } from '../../store/bookingStore';
 
 export default function Program() {
+  const openBooking = useBookingStore(state => state.openBooking);
   const programs = [
     {
       title: "Breathwork",
@@ -44,6 +46,7 @@ export default function Program() {
               viewport={{ once: true }}
               transition={{ duration: 1.2, delay: index * 0.2 }}
               whileHover={{ y: -10 }}
+              onClick={openBooking}
               className="glass p-16 rounded-[3rem] flex flex-col items-center text-center group cursor-pointer transition-all duration-700 hover:shadow-[0_40px_80px_-20px_rgba(214,179,106,0.3)]"
             >
               <div className="w-full h-full absolute inset-0 rounded-[3rem] radial-glow opacity-0 group-hover:opacity-10 transition-opacity duration-1000" />

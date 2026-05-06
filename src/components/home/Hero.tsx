@@ -1,9 +1,8 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import ExperienceModal from './ExperienceModal';
+import { useBookingStore } from '../../store/bookingStore';
 
 export default function Hero() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const openBooking = useBookingStore(state => state.openBooking);
 
   return (
     <section className="relative min-h-screen flex items-center justify-center px-6 overflow-hidden bg-cream section-fade-bottom">
@@ -75,7 +74,7 @@ export default function Hero() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-8">
 
               <button
-                onClick={() => setIsModalOpen(true)}
+                onClick={openBooking}
                 className="px-12 py-5 bg-[#CBAE73] text-black rounded-full text-sm font-bold tracking-[0.2em] uppercase transition-all duration-700 shadow-[0_20px_40px_rgba(203,174,115,0.4)] hover:shadow-xl hover:scale-105 relative group overflow-hidden"
               >
                 <span className="relative z-10">Book Your First Session</span>
@@ -94,9 +93,6 @@ export default function Hero() {
 
         </motion.div>
       </div>
-
-      {/* Modal */}
-      <ExperienceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
 
       {/* Bottom Light Flow */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#F8F5F0] to-transparent pointer-events-none" />

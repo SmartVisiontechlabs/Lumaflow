@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
+import { useBookingStore } from '../../store/bookingStore';
 
 export default function AboutMe() {
+  const openBooking = useBookingStore(state => state.openBooking);
   return (
     <>
       <div className="section-transition" />
@@ -58,7 +60,10 @@ export default function AboutMe() {
               </div>
 
               <div className="pt-8">
-                <button className="px-12 py-5 bg-[#CBAE73] text-black rounded-full text-[11px] font-bold uppercase tracking-[0.3em] shadow-[0_15px_30px_rgba(203,174,115,0.25)] hover:scale-105 transition-all duration-500">
+                <button 
+                  onClick={openBooking}
+                  className="px-12 py-5 bg-[#CBAE73] text-black rounded-full text-[11px] font-bold uppercase tracking-[0.3em] shadow-[0_15px_30px_rgba(203,174,115,0.25)] hover:scale-105 transition-all duration-500 cursor-pointer"
+                >
                   Begin Your Journey
                 </button>
               </div>

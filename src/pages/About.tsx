@@ -1,10 +1,9 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Wind, Heart, Sparkles, CheckCircle2, Star } from 'lucide-react';
-import ExperienceModal from '../components/home/ExperienceModal';
+import { Wind, Heart, Sparkles, Star } from 'lucide-react';
+import { useBookingStore } from '../store/bookingStore';
 
 export default function About() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const openBooking = useBookingStore(state => state.openBooking);
 
   const beliefs = [
     "Healing doesn’t require fixing",
@@ -101,8 +100,8 @@ export default function About() {
 
             <div className="pt-10">
               <button 
-                onClick={() => setIsModalOpen(true)}
-                className="px-14 py-5 bg-[#CBAE73] text-black rounded-full text-xs font-bold uppercase tracking-[0.3em] shadow-[0_20px_40px_rgba(203,174,115,0.25)] hover:shadow-[0_25px_50px_rgba(203,174,115,0.4)] hover:scale-105 transition-all duration-700"
+                onClick={openBooking}
+                className="px-14 py-5 bg-[#CBAE73] text-black rounded-full text-xs font-bold uppercase tracking-[0.3em] shadow-[0_20px_40px_rgba(203,174,115,0.25)] hover:shadow-[0_25px_50px_rgba(203,174,115,0.4)] hover:scale-105 transition-all duration-700 cursor-pointer"
               >
                 Begin Your Journey
               </button>
@@ -219,16 +218,15 @@ export default function About() {
               Every practice is a return to your original state of stillness. Join us in the space between breaths.
             </p>
             <button
-              onClick={() => setIsModalOpen(true)}
-              className="px-16 py-6 bg-[#CBAE73] text-black rounded-full text-[11px] font-bold uppercase tracking-[0.5em] shadow-[0_25px_50px_rgba(203,174,115,0.35)] hover:shadow-[0_30px_60px_rgba(203,174,115,0.5)] hover:scale-105 hover:brightness-105 transition-all duration-700"
+              onClick={openBooking}
+              className="px-16 py-6 bg-[#CBAE73] text-black rounded-full text-[11px] font-bold uppercase tracking-[0.5em] shadow-[0_25px_50px_rgba(203,174,115,0.35)] hover:shadow-[0_30px_60px_rgba(203,174,115,0.5)] hover:scale-105 hover:brightness-105 transition-all duration-700 cursor-pointer"
             >
               Book Your Session
             </button>
           </motion.div>
         </div>
       </section>
-
-      <ExperienceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
+
   );
 }

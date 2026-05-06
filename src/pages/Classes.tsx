@@ -1,10 +1,9 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Wind, Heart, Sparkles, CheckCircle2 } from 'lucide-react';
-import ExperienceModal from '../components/home/ExperienceModal';
+import { useBookingStore } from '../store/bookingStore';
 
 export default function Classes() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const openBooking = useBookingStore(state => state.openBooking);
 
   const services = [
     {
@@ -131,8 +130,8 @@ export default function Classes() {
                 </ul>
                 <div className="pt-6">
                   <button 
-                    onClick={() => setIsModalOpen(true)}
-                    className="px-10 py-4 bg-[#3A3A3A] text-white rounded-full text-xs font-bold uppercase tracking-[0.3em] shadow-2xl hover:scale-105 transition-all duration-500"
+                    onClick={openBooking}
+                    className="px-10 py-4 bg-[#3A3A3A] text-white rounded-full text-xs font-bold uppercase tracking-[0.3em] shadow-2xl hover:scale-105 transition-all duration-500 cursor-pointer"
                   >
                     Explore Session
                   </button>
@@ -161,16 +160,14 @@ export default function Classes() {
               Spaces are intentionally limited to preserve the sacred nature of each container. Reserve your spot in our next group session.
             </p>
             <button
-              onClick={() => setIsModalOpen(true)}
-              className="px-14 py-6 bg-[#CBAE73] text-black rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-[0_20px_40px_rgba(203,174,115,0.3)] hover:scale-105 transition-all duration-500"
+              onClick={openBooking}
+              className="px-14 py-6 bg-[#CBAE73] text-black rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-[0_20px_40px_rgba(203,174,115,0.3)] hover:scale-105 transition-all duration-500 cursor-pointer"
             >
               Book Your Session
             </button>
           </motion.div>
         </div>
       </section>
-
-      <ExperienceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 }

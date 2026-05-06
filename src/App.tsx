@@ -6,7 +6,6 @@ import Layout from './components/Layout';
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
 const Classes = lazy(() => import('./pages/Classes'));
-const Booking = lazy(() => import('./pages/Booking'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Contact = lazy(() => import('./pages/Contact'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -33,7 +32,6 @@ export default function App() {
             <Route index element={<Home />} />
             <Route path="about" element={<About />} />
             <Route path="classes" element={<Classes />} />
-            <Route path="book" element={<Booking />} />
             <Route path="pricing" element={<Pricing />} />
             <Route path="contact" element={<Contact />} />
             <Route path="*" element={<NotFound />} />

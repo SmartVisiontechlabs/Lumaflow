@@ -1,6 +1,9 @@
 import { motion } from 'framer-motion';
+import { useBookingStore } from '../../store/bookingStore';
 
 export default function FinalCTA() {
+  const openBooking = useBookingStore(state => state.openBooking);
+  
   return (
     <>
       <div className="section-transition" />
@@ -25,9 +28,10 @@ export default function FinalCTA() {
             </h2>
             
             <motion.button 
+              onClick={openBooking}
               whileHover={{ y: -5, scale: 1.05 }}
               whileTap={{ scale: 0.98 }}
-              className="group relative overflow-hidden bg-[#CBAE73] text-black px-16 py-7 rounded-full text-[10px] font-bold tracking-[0.4em] uppercase transition-all duration-1000 shadow-[0_30px_60px_rgba(214,179,106,0.2)] hover:shadow-[0_40px_80px_rgba(214,179,106,0.4)] flex items-center justify-center"
+              className="group relative overflow-hidden bg-[#CBAE73] text-black px-16 py-7 rounded-full text-[10px] font-bold tracking-[0.4em] uppercase transition-all duration-1000 shadow-[0_30px_60px_rgba(214,179,106,0.2)] hover:shadow-[0_40px_80px_rgba(214,179,106,0.4)] flex items-center justify-center cursor-pointer"
             >
               <span className="relative z-10">Book Your First Session</span>
               <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-700" />
