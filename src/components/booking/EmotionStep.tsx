@@ -1,10 +1,10 @@
 import React, { useEffect, useState, memo } from 'react';
 import { motion } from 'framer-motion';
-import { useBookingStore, type Emotion } from '../../store/bookingStore';
+import { useBookingFlow } from '../../hooks/useBookingFlow';
 import { cn } from '../../lib/utils';
 import StepHeading from './shared/StepHeading';
 
-const emotions: Emotion[] = [
+const emotions = [
   'Stressed',
   'Heavy',
   'Disconnected',
@@ -14,15 +14,12 @@ const emotions: Emotion[] = [
 ];
 
 const EmotionStep = () => {
-  const selectedEmotion = useBookingStore(state => state.selectedEmotion);
-  const setEmotion = useBookingStore(state => state.setEmotion);
-  const nextStep = useBookingStore(state => state.nextStep);
-  
+  const { emotionalState, setEmotionalState, nextStep } = useBookingFlow();
   const [hasSelected, setHasSelected] = useState(false);
 
-  const handleSelect = (emotion: Emotion) => {
+  const handleSelect = (emotion: string) => {
     if (hasSelected) return;
-    setEmotion(emotion);
+    setEmotionalState(emotion);
     setHasSelected(true);
   };
 
@@ -30,7 +27,7 @@ const EmotionStep = () => {
     if (hasSelected) {
       const timer = setTimeout(() => {
         nextStep();
-      }, 1000); // Optimized timing
+      }, 1000); 
       return () => clearTimeout(timer);
     }
   }, [hasSelected, nextStep]);
@@ -43,24 +40,24 @@ const EmotionStep = () => {
         subtitle="Understanding what your body needs."
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {emotions.map((emotion, index) => (
           <motion.button
             key={emotion}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: index * 0.05 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: index * 0.1 }}
             onClick={() => handleSelect(emotion)}
             disabled={hasSelected}
             className={cn(
-              "group relative p-10 rounded-[2rem] border transition-all duration-500 uppercase text-[10px] font-bold tracking-[0.3em] overflow-hidden focus:outline-none",
-              selectedEmotion === emotion
-                ? "bg-gold border-gold text-white shadow-lg"
-                : "bg-white/40 backdrop-blur-sm border-text-dark/5 text-text-dark/60 hover:border-gold/30 hover:bg-white"
+              "group relative p-12 rounded-[2.5rem] border transition-all duration-700 uppercase text-[10px] font-bold tracking-[0.4em] overflow-hidden focus:outline-none",
+              emotionalState === emotion
+                ? "bg-gold border-gold text-white shadow-luxury scale-[1.02]"
+                : "bg-white/40 backdrop-blur-md border-text-dark/5 text-text-dark/60 hover:border-gold/30 hover:bg-white hover:text-text-dark"
             )}
           >
-            {/* Shimmer Effect */}
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+            {/* Ambient Glow */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1500" />
             
             <span className="relative z-10">{emotion}</span>
           </motion.button>

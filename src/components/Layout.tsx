@@ -75,10 +75,13 @@ const Footer = memo(() => (
 export default function Layout() {
   const { pathname } = useLocation();
   const openBooking = useBookingStore(state => state.openBooking);
+  const closeBooking = useBookingStore(state => state.closeBooking);
 
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
-  }, [pathname]);
+    // CRITICAL: Force reset and close on any route change
+    closeBooking();
+  }, [pathname, closeBooking]);
 
   return (
     <div className="min-h-screen bg-cream text-text-dark font-body flex flex-col relative">

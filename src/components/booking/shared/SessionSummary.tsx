@@ -1,73 +1,78 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useBookingStore } from '../../../store/bookingStore';
+import { useBookingFlow } from '../../../hooks/useBookingFlow';
 import { Sparkles, Calendar, Clock, Heart } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO, parse } from 'date-fns';
+import { getLocalTimeForEST } from '../../../utils/bookingUtils';
 
 export default function SessionSummary() {
   const { 
-    selectedEmotion, 
-    selectedSession, 
-    selectedFormat, 
+    emotionalState, 
+    selectedRitual, 
+    sessionFormat, 
     selectedDuration,
     selectedDate,
     selectedTime
-  } = useBookingStore();
+  } = useBookingFlow();
 
-  if (!selectedEmotion) return null;
+  if (!emotionalState) return null;
+
+  const parsedDate = selectedDate ? parseISO(selectedDate) : null;
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       <div className="space-y-6">
-        <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Your Ritual Summary</p>
+        <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-gold/60">Ritual Summary</p>
         <h3 className="font-display text-4xl text-text-dark leading-tight italic">
-          “You’re creating space to reconnect with yourself.”
+          “You’re creating space to reconnect with your center.”
         </h3>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-10">
         {/* Emotion Section */}
-        <div className="flex items-center gap-5 group">
-          <div className="w-12 h-12 bg-gold/10 rounded-full flex items-center justify-center text-gold group-hover:scale-110 transition-transform duration-700">
-            <Heart className="w-5 h-5" />
+        <div className="flex items-center gap-6 group">
+          <div className="w-14 h-14 bg-gold/10 rounded-full flex items-center justify-center text-gold group-hover:scale-110 transition-transform duration-1000 border border-gold/5">
+            <Heart className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-gold/60 mb-1">Honoring your feeling</p>
-            <p className="text-base text-text-dark font-light">{selectedEmotion}</p>
+            <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold/60 mb-1.5">Internal State</p>
+            <p className="text-lg text-text-dark font-light tracking-wide">{emotionalState}</p>
           </div>
         </div>
 
-        {/* Session Section */}
-        {selectedSession && (
+        {/* Ritual Section */}
+        {selectedRitual && (
           <motion.div 
-            initial={{ opacity: 0, x: -10 }}
+            initial={{ opacity: 0, x: -15 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-5 group"
+            transition={{ duration: 0.8 }}
+            className="flex items-center gap-6 group"
           >
-            <div className="w-12 h-12 bg-gold/10 rounded-full flex items-center justify-center text-gold group-hover:scale-110 transition-transform duration-700">
-              <Sparkles className="w-5 h-5" />
+            <div className="w-14 h-14 bg-gold/10 rounded-full flex items-center justify-center text-gold group-hover:scale-110 transition-transform duration-1000 border border-gold/5">
+              <Sparkles className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-gold/60 mb-1">Recommended Path</p>
-              <p className="text-base text-text-dark font-light">{selectedSession.name}</p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold/60 mb-1.5">Healing Path</p>
+              <p className="text-lg text-text-dark font-light tracking-wide">{selectedRitual}</p>
             </div>
           </motion.div>
         )}
 
         {/* Format & Duration */}
-        {(selectedFormat || selectedDuration) && (
+        {(sessionFormat || selectedDuration) && (
           <motion.div 
-            initial={{ opacity: 0, x: -10 }}
+            initial={{ opacity: 0, x: -15 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-5 group"
+            transition={{ duration: 0.8, delay: 0.1 }}
+            className="flex items-center gap-6 group"
           >
-            <div className="w-12 h-12 bg-gold/10 rounded-full flex items-center justify-center text-gold group-hover:scale-110 transition-transform duration-700">
-              <Clock className="w-5 h-5" />
+            <div className="w-14 h-14 bg-gold/10 rounded-full flex items-center justify-center text-gold group-hover:scale-110 transition-transform duration-1000 border border-gold/5">
+              <Clock className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-gold/60 mb-1">Experience Details</p>
-              <p className="text-base text-text-dark font-light">
-                {[selectedFormat, selectedDuration].filter(Boolean).join(' • ')}
+              <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold/60 mb-1.5">The Container</p>
+              <p className="text-lg text-text-dark font-light tracking-wide">
+                {[sessionFormat, `${selectedDuration}m`].filter(Boolean).join(' • ')}
               </p>
             </div>
           </motion.div>
@@ -76,19 +81,25 @@ export default function SessionSummary() {
         {/* Date & Time */}
         {(selectedDate || selectedTime) && (
           <motion.div 
-            initial={{ opacity: 0, x: -10 }}
+            initial={{ opacity: 0, x: -15 }}
             animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-5 group"
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="flex items-center gap-6 group"
           >
-            <div className="w-12 h-12 bg-gold/10 rounded-full flex items-center justify-center text-gold group-hover:scale-110 transition-transform duration-700">
-              <Calendar className="w-5 h-5" />
+            <div className="w-14 h-14 bg-gold/10 rounded-full flex items-center justify-center text-gold group-hover:scale-110 transition-transform duration-1000 border border-gold/5">
+              <Calendar className="w-6 h-6" />
             </div>
-            <div>
-              <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-gold/60 mb-1">Scheduled Moment</p>
-              <p className="text-base text-text-dark font-light">
-                {selectedDate ? format(selectedDate, 'MMMM do, yyyy') : ''}
-                {selectedTime ? ` at ${selectedTime}` : ''}
+            <div className="flex flex-col gap-1">
+              <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold/60 mb-1.5">Scheduled Moment</p>
+              <p className="text-lg text-text-dark font-light tracking-wide">
+                {parsedDate ? format(parsedDate, 'MMMM do, yyyy') : ''}
+                {selectedTime ? ` at ${format(parse(selectedTime, 'HH:mm', new Date()), 'hh:mm a')} EST` : ''}
               </p>
+              {selectedDate && selectedTime && (
+                <p className="text-[10px] text-text-dark/30 italic">
+                  Local: {getLocalTimeForEST(selectedDate, selectedTime)}
+                </p>
+              )}
             </div>
           </motion.div>
         )}
@@ -96,8 +107,8 @@ export default function SessionSummary() {
 
       {/* Trust Trigger */}
       <div className="pt-10 border-t border-gold/10">
-        <p className="text-[9px] text-text-dark/40 uppercase tracking-[0.2em] italic">
-          “Trusted by 100+ healing journeys”
+        <p className="text-[10px] text-text-dark/30 uppercase tracking-[0.3em] italic font-display">
+          “Safely held by the LumaFlow guide network”
         </p>
       </div>
     </div>

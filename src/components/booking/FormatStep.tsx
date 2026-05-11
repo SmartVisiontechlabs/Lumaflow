@@ -1,11 +1,11 @@
 import React, { memo } from 'react';
 import { motion } from 'framer-motion';
-import { useBookingStore, type SessionFormat } from '../../store/bookingStore';
+import { useBookingFlow } from '../../hooks/useBookingFlow';
 import { ChevronLeft, Video, Users, Home as HomeIcon } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import StepHeading from './shared/StepHeading';
 
-const formats: { id: SessionFormat; title: string; description: string; benefit: string; icon: any }[] = [
+const formats = [
   {
     id: 'Virtual',
     title: 'Virtual Session',
@@ -30,64 +30,70 @@ const formats: { id: SessionFormat; title: string; description: string; benefit:
 ];
 
 const FormatStep = () => {
-  const selectedFormat = useBookingStore(state => state.selectedFormat);
-  const setFormat = useBookingStore(state => state.setFormat);
-  const nextStep = useBookingStore(state => state.nextStep);
-  const prevStep = useBookingStore(state => state.prevStep);
+  const { sessionFormat, setSessionFormat, nextStep, prevStep } = useBookingFlow();
 
-  const handleSelect = (format: SessionFormat) => {
-    setFormat(format);
-    setTimeout(nextStep, 500);
+  const handleSelect = (format: string) => {
+    setSessionFormat(format);
+    setTimeout(nextStep, 600);
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       <StepHeading 
         tag="The Container"
         title="Where shall we meet?"
         subtitle="Choose the space that feels most supportive for your journey."
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {formats.map((format, index) => (
           <motion.button
             key={format.id}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: index * 0.05 }}
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: index * 0.1 }}
             onClick={() => handleSelect(format.id)}
             className={cn(
-              "group relative p-10 rounded-[2rem] border transition-all duration-500 text-center flex flex-col items-center gap-6 overflow-hidden focus:outline-none",
-              selectedFormat === format.id
-                ? "bg-white border-gold shadow-lg"
-                : "bg-white/40 backdrop-blur-sm border-text-dark/5 hover:border-gold/30 hover:bg-white"
+              "group relative p-12 rounded-[3rem] border transition-all duration-700 text-center flex flex-col items-center gap-8 overflow-hidden focus:outline-none",
+              sessionFormat === format.id
+                ? "bg-white border-gold shadow-luxury scale-[1.02]"
+                : "bg-white/40 backdrop-blur-md border-text-dark/5 hover:border-gold/30 hover:bg-white"
             )}
           >
             <div className={cn(
-              "w-16 h-16 rounded-full flex items-center justify-center transition-all duration-500",
-              selectedFormat === format.id ? "bg-gold text-white shadow-md" : "bg-gold/10 text-gold"
+              "w-20 h-20 rounded-full flex items-center justify-center transition-all duration-700 border border-gold/5",
+              sessionFormat === format.id ? "bg-gold text-white shadow-luxury" : "bg-gold/10 text-gold group-hover:bg-gold/20"
             )}>
-              <format.icon strokeWidth={1.5} className="w-6 h-6" />
+              <format.icon strokeWidth={1.2} className="w-8 h-8" />
             </div>
 
-            <div className="space-y-4 relative z-10">
-              <div className="space-y-1">
-                <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-gold">{format.benefit}</p>
-                <h3 className="font-display text-2xl text-text-dark">{format.title}</h3>
+            <div className="space-y-5 relative z-10">
+              <div className="space-y-2">
+                <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold">{format.benefit}</p>
+                <h3 className="font-display text-3xl text-text-dark">{format.title}</h3>
               </div>
-              <p className="text-text-dark/50 font-light leading-relaxed text-sm italic">
+              <p className="text-text-dark/40 font-light leading-relaxed text-sm italic font-display">
                 “{format.description}”
               </p>
             </div>
+
+            {/* Premium selection indicator */}
+            {sessionFormat === format.id && (
+              <motion.div 
+                layoutId="format-selection"
+                className="absolute top-6 right-6 w-3 h-3 bg-gold rounded-full"
+              />
+            )}
           </motion.button>
         ))}
       </div>
 
       <button 
         onClick={prevStep}
-        className="mt-8 mx-auto flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 hover:text-gold transition-colors duration-500 focus:outline-none"
+        className="mt-12 mx-auto flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.4em] text-gold/30 hover:text-gold transition-all duration-700 focus:outline-none group cursor-pointer relative z-50"
       >
-        <ChevronLeft className="w-3 h-3" /> Back
+        <ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> 
+        Change Ritual
       </button>
     </div>
   );
