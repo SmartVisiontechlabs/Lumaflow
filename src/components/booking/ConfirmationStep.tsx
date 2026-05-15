@@ -5,12 +5,15 @@ import { useBookingFlow } from '../../hooks/useBookingFlow';
 import { CheckCircle2, Sparkles, Clock, MapPin, Calendar, Mail, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { format, parseISO, parse } from 'date-fns';
 import { bookingService } from '../../services/bookingService';
+import { paymentService } from '../../services/paymentService';
 import { getLocalTimeForEST } from '../../utils/bookingUtils';
+import { ritualJourneyMap } from '../../data/recommendationMap';
 
 const ConfirmationStep = () => {
   const { 
     emotionalState,
     selectedRitual, 
+    selectedPackage,
     selectedDate, 
     selectedTime, 
     selectedDuration,
@@ -30,13 +33,12 @@ const ConfirmationStep = () => {
   const navigate = useNavigate();
 
   const handleSecureBooking = async () => {
-    if (lastBookingReference) return; // Already booked
+    if (lastBookingReference) return;
 
     setIsSubmitting(true);
     try {
-      const booking = await bookingService.createBooking({
+      const checkoutUrl = await paymentService.createCheckoutSession({
         emotion: emotionalState,
-        recommendedPath: selectedRitual,
         selectedSession: selectedRitual,
         sessionFormat: sessionFormat as any,
         duration: selectedDuration,
@@ -45,12 +47,14 @@ const ConfirmationStep = () => {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         fullName,
         email,
-        intentions
+        intentions,
+        selectedPackage // Include package intent
       });
-      setBookingReference(booking.bookingReference);
+      
+      // Redirect to Stripe Hosted Checkout
+      window.location.href = checkoutUrl;
     } catch (error) {
-      console.error('Booking failed:', error);
-    } finally {
+      console.error('Payment initialization failed:', error);
       setIsSubmitting(false);
     }
   };
@@ -117,6 +121,22 @@ const ConfirmationStep = () => {
         {/* BOOKING SUMMARY CARD */}
         <div className="bg-white/70 backdrop-blur-3xl border border-white/50 rounded-[4rem] p-12 shadow-luxury text-left grid grid-cols-1 md:grid-cols-2 gap-10 relative overflow-hidden">
           <div className="space-y-8">
+            <div className="space-y-2 pb-6 border-b border-gold/5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Selected Plan</p>
+              <div className="flex justify-between items-start">
+                <p className="font-display text-2xl text-text-dark tracking-tight">
+                  {selectedPackage?.name || "Single Session"}
+                </p>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold/60">Amount Paid</p>
+                  <p className="text-xl font-display text-gold">${selectedPackage?.price || 45}</p>
+                </div>
+              </div>
+              <p className="text-[9px] text-text-dark/40 uppercase tracking-[0.2em] font-medium">
+                {selectedPackage?.credits || 1} {(selectedPackage?.credits || 1) === 1 ? 'Session' : 'Sessions'} Included
+              </p>
+            </div>
+
             <div className="space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Selected Ritual</p>
               <p className="font-display text-3xl text-text-dark tracking-tight">{selectedRitual}</p>
@@ -175,6 +195,38 @@ const ConfirmationStep = () => {
           <div className="absolute -bottom-20 -right-20 w-60 h-60 bg-gold/5 blur-[80px] rounded-full pointer-events-none" />
         </div>
 
+        {/* FOLLOWING RITUALS (JOURNEY RECOMMENDATION) */}
+        {lastBookingReference && ritualJourneyMap[selectedRitual] && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.5 }}
+            className="space-y-10"
+          >
+            <div className="flex flex-col items-center gap-4">
+              <span className="text-[10px] font-bold uppercase tracking-[0.5em] text-gold/60">The Journey Continues</span>
+              <h3 className="font-display text-4xl text-text-dark">Following Rituals</h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {ritualJourneyMap[selectedRitual].map((next, i) => (
+                <div key={i} className="group relative bg-white/40 border border-gold/10 rounded-[3rem] p-10 text-left hover:bg-white/80 transition-all duration-700 hover:shadow-luxury">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="w-10 h-10 bg-gold/10 rounded-full flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-gold" />
+                    </div>
+                    <span className="text-[9px] font-bold text-gold uppercase tracking-[0.3em]">{next.duration}m</span>
+                  </div>
+                  
+                  <h4 className="font-display text-2xl text-text-dark mb-3 group-hover:text-gold transition-colors">{next.ritual}</h4>
+                  <p className="text-[10px] text-text-dark/40 uppercase tracking-widest font-bold mb-4">{next.focus}</p>
+                  <p className="text-sm text-text-dark/60 font-light leading-relaxed italic border-t border-gold/5 pt-6">“{next.quote}”</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         {/* ACTIONS */}
         <div className="flex flex-col gap-8 items-center pt-6">
           <div className="flex flex-col sm:flex-row gap-6 w-full justify-center">
@@ -184,7 +236,7 @@ const ConfirmationStep = () => {
               className="px-12 py-6 bg-text-dark text-white rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-luxury hover:bg-gold transition-all duration-700 active:scale-[0.98] group flex-grow sm:flex-grow-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="flex items-center justify-center gap-2">
-                {isSubmitting ? "Securing Your Space..." : lastBookingReference ? "Booking Confirmed" : "Continue to Secure Booking"}
+                {isSubmitting ? "Opening Portal..." : lastBookingReference ? "Booking Confirmed" : "Secure & Proceed to Payment"}
                 {!isSubmitting && !lastBookingReference && <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
                 {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
               </span>

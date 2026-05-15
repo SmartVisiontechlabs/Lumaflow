@@ -1,64 +1,137 @@
-import { Outlet, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Users, LogOut } from 'lucide-react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { 
+  LayoutDashboard, 
+  Calendar, 
+  BookOpen, 
+  Users, 
+  Settings, 
+  LogOut,
+  ExternalLink,
+  ShieldCheck
+} from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function DashboardLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   
   const navItems = [
-    { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-    { name: 'Classes', path: '/admin/classes', icon: Calendar },
-    { name: 'Bookings', path: '/admin/bookings', icon: Users },
+    { name: 'Overview', path: '/admin', icon: LayoutDashboard },
+    { name: 'Bookings', path: '/admin/bookings', icon: BookOpen },
+    { name: 'Calendar', path: '/admin/calendar', icon: Calendar },
+    { name: 'Clients', path: '/admin/clients', icon: Users },
+    { name: 'Settings', path: '/admin/settings', icon: Settings },
   ];
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/admin/login');
+  };
+
+  const currentPathName = navItems.find(item => 
+    item.path === location.pathname || (item.path !== '/admin' && location.pathname.startsWith(item.path))
+  )?.name || 'Operations';
+
   return (
-    <div className="min-h-screen bg-cream flex">
+    <div className="min-h-screen bg-cream flex overflow-hidden font-sans selection:bg-gold/10 selection:text-gold">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-cream shadow-sm flex flex-col">
-        <div className="p-6 border-b border-cream">
-          <img src="/logo.png" alt="Lumaflow Admin" className="h-8 w-auto mix-blend-multiply opacity-80" />
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gold mt-2">Admin Portal</p>
+      <aside className="w-80 bg-white/60 backdrop-blur-3xl border-r border-text-dark/5 flex flex-col relative z-20">
+        <div className="p-12">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 bg-text-dark rounded-full flex items-center justify-center shadow-button">
+              <ShieldCheck className="w-4 h-4 text-gold" />
+            </div>
+            <span className="text-[11px] font-bold uppercase tracking-[0.4em] text-text-dark/40 italic">Lumaflow</span>
+          </div>
+          <h2 className="font-display text-2xl text-text-dark tracking-tight">Sanctuary Ops</h2>
         </div>
         
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex-1 px-8 space-y-2 overflow-y-auto custom-scrollbar">
+          <p className="px-4 text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 mb-4">Management</p>
           {navItems.map((item) => {
             const isActive = location.pathname === item.path || (item.path !== '/admin' && location.pathname.startsWith(item.path));
             return (
               <Link
                 key={item.name}
                 to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${
+                className={`group flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-bold uppercase tracking-[0.2em] transition-all duration-500 relative ${
                   isActive 
-                    ? 'bg-cream text-text-dark border border-gold/20 shadow-sm' 
-                    : 'text-text-dark/60 hover:bg-cream hover:text-text-dark'
+                    ? 'bg-text-dark text-white shadow-luxury' 
+                    : 'text-text-dark/40 hover:bg-white hover:text-text-dark'
                 }`}
               >
-                <item.icon className={`w-5 h-5 ${isActive ? 'text-gold' : ''}`} />
+                <item.icon className={`w-4 h-4 transition-colors duration-500 ${isActive ? 'text-gold' : 'text-text-dark/20 group-hover:text-gold/60'}`} />
                 {item.name}
+                {isActive && (
+                  <motion.div 
+                    layoutId="activeTab"
+                    className="absolute inset-0 bg-text-dark rounded-2xl -z-10"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
               </Link>
             );
           })}
         </nav>
         
-        <div className="p-4 border-t border-cream">
-          <Link to="/" className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-text-dark/60 hover:bg-cream hover:text-red-500 transition-colors">
-            <LogOut className="w-5 h-5" />
-            Exit Admin
+        <div className="p-8 space-y-3">
+          <Link 
+            to="/" 
+            target="_blank"
+            className="flex items-center justify-between w-full px-6 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] text-text-dark/40 bg-white/40 border border-text-dark/5 hover:bg-white hover:text-text-dark transition-all duration-500 group"
+          >
+            View Sanctuary
+            <ExternalLink className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 transition-opacity" />
           </Link>
+          
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-4 w-full px-6 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] text-text-dark/30 hover:text-red-400 transition-all duration-500 group"
+          >
+            <LogOut className="w-4 h-4 text-text-dark/10 group-hover:text-red-400/60 transition-colors" />
+            End Session
+          </button>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-auto">
-        <header className="bg-white border-b border-cream px-8 py-5 shadow-sm flex justify-between items-center">
-          <h1 className="font-display text-2xl text-text-dark">Admin Overview</h1>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gold text-white rounded-full flex items-center justify-center text-xs font-bold shadow-md">
-              AD
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
+        {/* Subtle Background Accents */}
+        <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[70%] bg-gold/5 blur-[150px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[40%] h-[60%] bg-gold/5 blur-[120px] rounded-full pointer-events-none" />
+
+        <header className="px-16 py-10 flex justify-between items-center relative z-10">
+          <div className="space-y-1">
+            <h1 className="font-display text-4xl text-text-dark tracking-tight">{currentPathName}</h1>
+            <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-text-dark/20 italic">Ritual Operations Center</p>
+          </div>
+          
+          <div className="flex items-center gap-8">
+            <div className="text-right hidden sm:block">
+              <p className="text-[10px] font-bold text-text-dark/60 uppercase tracking-widest mb-1">Admin Portal</p>
+              <p className="text-[9px] font-medium text-text-dark/20 uppercase tracking-widest">Alanna • New York</p>
+            </div>
+            <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-luxury border border-text-dark/5 p-1 group hover:border-gold/30 transition-all duration-700 cursor-pointer">
+              <div className="w-full h-full bg-cream rounded-full flex items-center justify-center text-[10px] font-bold text-gold tracking-widest group-hover:bg-text-dark transition-all duration-700">
+                AL
+              </div>
             </div>
           </div>
         </header>
-        <div className="p-8">
-          <Outlet />
+
+        <div className="flex-1 overflow-y-auto px-16 pb-16 custom-scrollbar relative z-10">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

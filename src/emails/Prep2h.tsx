@@ -6,7 +6,15 @@ import {
 import * as React from 'react';
 import { EmailLayout } from './Layout';
 
-export const Prep2hEmail = () => (
+interface PrepProps {
+  fullName: string;
+  timeLocal: string;
+}
+
+export const Prep2hEmail = ({
+  fullName,
+  timeLocal,
+}: PrepProps) => (
   <EmailLayout previewTextText="A gentle preparation for your session">
     <Section style={contentSection}>
       <Heading style={h1}>Soft Arrival</Heading>

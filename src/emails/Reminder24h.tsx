@@ -9,13 +9,17 @@ import { EmailLayout } from './Layout';
 interface ReminderProps {
   fullName: string;
   ritual: string;
+  date: string;
   timeEST: string;
+  timeLocal: string;
 }
 
 export const Reminder24hEmail = ({
   fullName,
   ritual,
+  date,
   timeEST,
+  timeLocal,
 }: ReminderProps) => (
   <EmailLayout previewTextText="Your sanctuary awaits tomorrow ✨">
     <Section style={contentSection}>

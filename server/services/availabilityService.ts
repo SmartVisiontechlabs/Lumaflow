@@ -1,5 +1,5 @@
 import { supabase } from '../config/supabase';
-import { getAvailableSlots, getLocalTimeForEST } from '../../src/utils/bookingUtils';
+import { getAvailableSlots, getLocalTimeForEST } from '../utils/bookingUtils';
 
 export const availabilityService = {
   /**
@@ -11,45 +11,127 @@ export const availabilityService = {
     console.log('Selected Duration:', duration);
     console.log('Server Timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
 
-    // 1. Fetch confirmed bookings for this date
-    const { data: existingBookings, error } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('selectedDate', date)
-      .neq('bookingStatus', 'cancelled');
+    // Fetch bookings + blocked slots
+    const [bookingsResponse, blockedResponse] = await Promise.all([
+      supabase
+        .from('bookings')
+        .select('*')
+        .eq('selected_date', date)
+        .neq('booking_status', 'cancelled'),
 
-    if (error) {
-      console.error('Supabase Error:', error);
-      throw error;
+      supabase
+        .from('blocked_slots')
+        .select('*')
+        .eq('blocked_date', date)
+    ]);
+
+    if (bookingsResponse.error) throw bookingsResponse.error;
+    if (blockedResponse.error) {
+      console.warn('Blocked Slots Fetch Error:', blockedResponse.error);
     }
 
-    console.log('Booked Slots from DB:', existingBookings?.length || 0);
-    if (existingBookings && existingBookings.length > 0) {
-      existingBookings.forEach(b => {
-        console.log(` - ${b.bookingReference}: ${b.selectedTimeEST} (${b.duration}m)`);
-      });
+    const rawBookings = bookingsResponse.data || [];
+    const blockedSlots = blockedResponse.data || [];
+
+    console.log('Blocked Slots:', blockedSlots);
+
+    // FULL DAY BLOCK CHECK
+    const isFullDayBlocked = blockedSlots.some((b: any) => {
+      const bt = (b.blocked_time || '').toLowerCase().trim();
+
+      return (
+        !bt ||
+        bt.includes('11:59') ||
+        bt.includes('23:59') ||
+        bt.includes('full') ||
+        bt.includes('entire') ||
+        bt.includes('whole')
+      );
+    });
+
+    if (isFullDayBlocked) {
+      console.log(`⚠️ FULL DAY BLOCKED: ${date}`);
+      return [];
     }
 
-    // 2. Use the core engine to calculate available slots
-    const generatedSlots = getAvailableSlots(date, duration, existingBookings || []);
-    console.log('Generated Slots (after filtering):', generatedSlots.length);
-    
-    // TEMPORARY DEBUG: Return hardcoded slots if engine fails
-    if (generatedSlots.length === 0) {
-      console.log('⚠️ Engine returned 0 slots. Injecting hardcoded test slots for UI validation.');
-      const testTimes = ['09:00', '11:30', '14:00', '17:00'];
-      const testSlots = testTimes.map(time => ({
-        timeEST: time,
-        timeLocal: getLocalTimeForEST(date, time),
-        isAvailable: true
-      }));
-      console.log('Returning Hardcoded Slots:', testSlots.length);
-      return testSlots;
-    }
+    // Map DB → app format
+    const existingBookings = rawBookings.map((b: any) => ({
+      ...b,
+      bookingReference: b.booking_reference,
+      selectedDate: b.selected_date,
+      selectedTime: b.selected_time,
+      bookingStatus: b.booking_status,
+      fullName: b.full_name,
+      selectedSession: b.selected_session,
+      sessionFormat: b.session_format,
+      createdAt: b.created_at,
+      updatedAt: b.updated_at
+    }));
 
-    console.log('Final Available Slots:', generatedSlots.filter(s => s.isAvailable).length);
+    console.log('Booked Slots:', existingBookings.length);
+
+    // Generate slots using core engine (handles overlaps and blocks)
+    const generatedSlots = getAvailableSlots(
+      date,
+      duration,
+      existingBookings,
+      blockedSlots
+    );
+
+    console.log(
+      'Final Available Slots:',
+      generatedSlots.filter((s: any) => s.isAvailable).length
+    );
+
     console.log('--- END BACKEND DEBUG ---\n');
 
     return generatedSlots;
+  },
+
+  /**
+   * Blocks a specific date or time range
+   */
+  async blockSlot(data: any) {
+    const { data: result, error } = await supabase
+      .from('blocked_slots')
+      .insert({
+        blocked_date: data.date,
+        blocked_time: data.time || null,
+        reason: data.reason || 'Sanctuary maintenance',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return result;
+  },
+
+  /**
+   * Unblocks a previously blocked slot
+   */
+  async unblockSlot(id: string) {
+    const { error } = await supabase
+      .from('blocked_slots')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return { success: true };
+  },
+
+  /**
+   * Retrieves all blocked slots for a period
+   */
+  async getBlockedSlots(start: string, end: string) {
+    const { data, error } = await supabase
+      .from('blocked_slots')
+      .select('*')
+      .gte('blocked_date', start)
+      .lte('blocked_date', end);
+
+    if (error) throw error;
+    return data;
   }
 };

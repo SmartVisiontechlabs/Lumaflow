@@ -1,25 +1,51 @@
-import { resend } from '../lib/resend';
+import { resend } from '../../server/config/resend';
+import { supabase } from '../lib/supabase';
 import { BookingConfirmationEmail } from '../emails/BookingConfirmation';
 import { AdminNotificationEmail } from '../emails/AdminNotification';
+import { Reminder24hEmail } from '../emails/Reminder24h';
+import { Prep2hEmail } from '../emails/Prep2h';
 import { Booking } from '../types/booking';
 import { getLocalTimeForEST } from '../utils/bookingUtils';
 import { format, parse } from 'date-fns';
 
-const FROM_EMAIL = 'Lumaflow Sanctuary <rituals@lumaflow.com>'; // Update with verified domain
-const ADMIN_EMAIL = 'admin@lumaflow.com'; // Update with admin recipient
+const FROM_EMAIL =
+  process.env.EMAIL_FROM || 'noreply@send.thelumaflow.com';
+
+const ADMIN_EMAIL =
+  process.env.ADMIN_EMAIL || 'sahushyamsvtl@gmail.com';
 
 export const emailService = {
+  /**
+   * Logs an email attempt to the database
+   */
+  async logEmail(bookingId: string | undefined, type: string, recipient: string, status: 'sent' | 'failed', error?: string) {
+    try {
+      if (!bookingId) return;
+      await supabase.from('email_logs').insert({
+        booking_id: bookingId,
+        email_type: type,
+        recipient: recipient,
+        status: status,
+        error_message: error,
+        sent_at: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.error('Failed to persist email log:', logError);
+    }
+  },
+
   /**
    * Sends the initial booking confirmation to client and admin
    */
   async sendBookingConfirmation(booking: Booking) {
+    console.log(`--- EMAIL ATTEMPT: Confirmation for ${booking.bookingReference} ---`);
     try {
       const timeLocal = getLocalTimeForEST(booking.selectedDate, booking.selectedTime);
       const timeESTFormatted = format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST';
 
       // 1. Send to Client
-      const clientEmail = await resend.emails.send({
-        from: FROM_EMAIL,
+      const clientResult = await resend.emails.send({
+        from: `LumaFlow <${FROM_EMAIL}>`,
         to: booking.email,
         subject: '✨ Your sanctuary has been reserved',
         react: BookingConfirmationEmail({
@@ -34,9 +60,16 @@ export const emailService = {
         }),
       });
 
+      if (clientResult.error) {
+        console.error('Client Email Error:', clientResult.error);
+        await this.logEmail(booking.id, 'confirmation_client', booking.email, 'failed', clientResult.error.message);
+      } else {
+        await this.logEmail(booking.id, 'confirmation_client', booking.email, 'sent');
+      }
+
       // 2. Send to Admin
-      const adminEmail = await resend.emails.send({
-        from: FROM_EMAIL,
+      const adminResult = await resend.emails.send({
+        from: `LumaFlow <${FROM_EMAIL}>`,
         to: ADMIN_EMAIL,
         subject: `New Ritual Journey: ${booking.fullName}`,
         react: AdminNotificationEmail({
@@ -52,21 +85,80 @@ export const emailService = {
         }),
       });
 
-      return { clientEmail, adminEmail };
-    } catch (error) {
-      console.error('Error sending confirmation emails:', error);
+      if (adminResult.error) {
+        console.error('Admin Email Error:', adminResult.error);
+        await this.logEmail(booking.id, 'confirmation_admin', ADMIN_EMAIL, 'failed', adminResult.error.message);
+      } else {
+        await this.logEmail(booking.id, 'confirmation_admin', ADMIN_EMAIL, 'sent');
+      }
+
+      return { clientResult, adminResult };
+    } catch (error: any) {
+      console.error('Critical Email Delivery Failure:', error);
+      await this.logEmail(booking.id, 'confirmation_critical', booking.email, 'failed', error.message);
       throw error;
     }
   },
 
   /**
-   * Placeholder for reminder logic (to be triggered by scheduler)
+   * Sends 24-hour reminder anticipation email
    */
   async sendReminder24h(booking: Booking) {
-    // Logic for 24h reminder
+    console.log(`--- EMAIL ATTEMPT: 24h Reminder for ${booking.bookingReference} ---`);
+    try {
+      const timeLocal = getLocalTimeForEST(booking.selectedDate, booking.selectedTime);
+      const timeESTFormatted = format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST';
+
+      const result = await resend.emails.send({
+        from: `LumaFlow <${FROM_EMAIL}>`,
+        to: booking.email,
+        subject: 'Your sanctuary awaits tomorrow ✨',
+        react: Reminder24hEmail({
+          fullName: booking.fullName,
+          ritual: booking.selectedSession,
+          date: format(parse(booking.selectedDate, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy'),
+          timeEST: timeESTFormatted,
+          timeLocal: timeLocal,
+        }),
+      });
+
+      if (result.error) {
+        await this.logEmail(booking.id, 'reminder_24h', booking.email, 'failed', result.error.message);
+      } else {
+        await this.logEmail(booking.id, 'reminder_24h', booking.email, 'sent');
+      }
+    } catch (error: any) {
+      console.error('Error sending 24h reminder:', error);
+      await this.logEmail(booking.id, 'reminder_24h_critical', booking.email, 'failed', error.message);
+    }
   },
 
+  /**
+   * Sends 2-hour preparation guide email
+   */
   async sendPrep2h(booking: Booking) {
-    // Logic for 2h preparation guide
+    console.log(`--- EMAIL ATTEMPT: 2h Prep for ${booking.bookingReference} ---`);
+    try {
+      const timeLocal = getLocalTimeForEST(booking.selectedDate, booking.selectedTime);
+
+      const result = await resend.emails.send({
+        from: `LumaFlow <${FROM_EMAIL}>`,
+        to: booking.email,
+        subject: 'A gentle preparation for your session',
+        react: Prep2hEmail({
+          fullName: booking.fullName,
+          timeLocal: timeLocal,
+        }),
+      });
+
+      if (result.error) {
+        await this.logEmail(booking.id, 'prep_2h', booking.email, 'failed', result.error.message);
+      } else {
+        await this.logEmail(booking.id, 'prep_2h', booking.email, 'sent');
+      }
+    } catch (error: any) {
+      console.error('Error sending 2h prep email:', error);
+      await this.logEmail(booking.id, 'prep_2h_critical', booking.email, 'failed', error.message);
+    }
   }
 };

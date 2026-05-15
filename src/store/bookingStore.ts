@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type PackageInfo = {
+  id?: string;
+  name: string;
+  credits: number;
+  price: number;
+};
+
 export type BookingState = {
   // Navigation State
   currentStep: number;
@@ -18,6 +25,9 @@ export type BookingState = {
   // Session Preferences
   sessionFormat: string;
   selectedDuration: number;
+
+  // Package Intent
+  selectedPackage: PackageInfo | null;
 
   // Scheduling
   selectedDate: string;
@@ -37,7 +47,7 @@ export type BookingState = {
   prevStep: () => void;
   goToStep: (step: number) => void;
   resetBooking: () => void;
-  openBooking: () => void;
+  openBooking: (pkg?: PackageInfo) => void;
   closeBooking: () => void;
   setShowResumePrompt: (show: boolean) => void;
   setBookingReference: (ref: string) => void;
@@ -50,6 +60,7 @@ export type BookingState = {
   setDate: (date: string) => void;
   setTime: (time: string) => void;
   setUserDetails: (details: { fullName?: string; email?: string; intentions?: string }) => void;
+  setSelectedPackage: (pkg: PackageInfo | null) => void;
 };
 
 export const useBookingStore = create<BookingState>()(
@@ -67,6 +78,7 @@ export const useBookingStore = create<BookingState>()(
       recommendationInsight: '',
       sessionFormat: '',
       selectedDuration: 60,
+      selectedPackage: null,
       selectedDate: '',
       selectedTime: '',
       fullName: '',
@@ -102,6 +114,7 @@ export const useBookingStore = create<BookingState>()(
         recommendationInsight: '',
         sessionFormat: '',
         selectedDuration: 60,
+        selectedPackage: null,
         selectedDate: '',
         selectedTime: '',
         fullName: '',
@@ -110,10 +123,36 @@ export const useBookingStore = create<BookingState>()(
         lastBookingReference: null,
         isSubmitting: false,
       }),
-      openBooking: () => {
+      openBooking: (pkg) => {
         const state = get();
         const now = Date.now();
         const timeout = 15 * 60 * 1000; // 15 minutes
+
+        // If a package is passed, it overrides everything and starts fresh
+        if (pkg) {
+          set({
+            isOpen: true,
+            showResumePrompt: false,
+            currentStep: 1,
+            emotionalState: '',
+            selectedRitual: '',
+            ritualFocus: '',
+            recommendationQuote: '',
+            recommendationInsight: '',
+            sessionFormat: '',
+            selectedDuration: 60,
+            selectedPackage: pkg,
+            selectedDate: '',
+            selectedTime: '',
+            fullName: '',
+            email: '',
+            intentions: '',
+            lastActivityTimestamp: now,
+            lastBookingReference: null,
+            isSubmitting: false,
+          });
+          return;
+        }
 
         if (state.currentStep > 1 && state.lastActivityTimestamp && (now - state.lastActivityTimestamp < timeout)) {
           // Valid session exists, show resume prompt
@@ -131,6 +170,7 @@ export const useBookingStore = create<BookingState>()(
             recommendationInsight: '',
             sessionFormat: '',
             selectedDuration: 60,
+            selectedPackage: null,
             selectedDate: '',
             selectedTime: '',
             fullName: '',
@@ -179,6 +219,10 @@ export const useBookingStore = create<BookingState>()(
         ...details,
         lastActivityTimestamp: Date.now()
       })),
+      setSelectedPackage: (pkg) => set({ 
+        selectedPackage: pkg,
+        lastActivityTimestamp: Date.now()
+      }),
     }),
     {
       name: 'lumaflow-booking-storage',

@@ -137,3 +137,10 @@ export const getAvailableSlots = (
 
   return slots;
 };
+
+/**
+ * Formats a date for calendar services (YYYYMMDDTHHMMSSZ)
+ */
+export const formatCalendarDate = (date: Date) => {
+  return formatInTimeZone(date, 'UTC', "yyyyMMdd'T'HHmmss'Z'");
+};
