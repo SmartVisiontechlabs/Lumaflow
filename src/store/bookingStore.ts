@@ -128,8 +128,12 @@ export const useBookingStore = create<BookingState>()(
         const now = Date.now();
         const timeout = 15 * 60 * 1000; // 15 minutes
 
-        // If a package is passed, it overrides everything and starts fresh
-        if (pkg) {
+        // Ensure pkg is a valid PackageInfo and not a React Event
+        const isValidPackage = pkg && typeof pkg === 'object' && 'price' in pkg && 'credits' in pkg;
+        const validPkg = isValidPackage ? pkg : null;
+
+        // If a valid package is passed, it overrides everything and starts fresh
+        if (validPkg) {
           set({
             isOpen: true,
             showResumePrompt: false,
@@ -141,7 +145,7 @@ export const useBookingStore = create<BookingState>()(
             recommendationInsight: '',
             sessionFormat: '',
             selectedDuration: 60,
-            selectedPackage: pkg,
+            selectedPackage: validPkg as PackageInfo,
             selectedDate: '',
             selectedTime: '',
             fullName: '',
