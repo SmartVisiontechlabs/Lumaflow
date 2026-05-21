@@ -16,6 +16,9 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { cmsService } from '../../services/cmsService';
+import { supabase } from '../../lib/supabase';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 import { 
   HeroContent, 
   TransformationStep, 
@@ -32,6 +35,8 @@ export default function CmsManager() {
   const [activeTab, setActiveTab] = useState<'hero' | 'steps' | 'about' | 'quotes' | 'paths' | 'matrix'>('hero');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Current Working Data States
   const [hero, setHero] = useState<HeroContent | null>(null);
@@ -81,6 +86,98 @@ export default function CmsManager() {
 
   const showToast = (message: string, type: ToastType = 'info') => {
     setToast({ message, type, isVisible: true });
+  };
+
+  const getAuthHeaders = async () => {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    try {
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      }
+    } catch (e) {
+      console.error('CMS auth token extraction error:', e);
+    }
+    return headers;
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = async () => {
+          try {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            const max_size = 1200;
+
+            if (width > height) {
+              if (width > max_size) {
+                height *= max_size / width;
+                width = max_size;
+              }
+            } else {
+              if (height > max_size) {
+                width *= max_size / height;
+                height = max_size;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error('Canvas 2D context not available');
+
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+            const headers = await getAuthHeaders();
+            const response = await fetch(`${API_URL}/cms/upload`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ image: compressedDataUrl })
+            });
+
+            if (!response.ok) {
+              const err = await response.json();
+              throw new Error(err.error || 'Failed to upload image');
+            }
+
+            const data = await response.json();
+            
+            // Set the new photo_url in state
+            setAbout(prev => prev ? { ...prev, photo_url: data.path } : null);
+            showToast('Portrait image uploaded and compressed.', 'success');
+          } catch (err: any) {
+            console.error('Processing/uploading image error:', err);
+            showToast(err.message || 'Error processing portrait image.', 'error');
+          } finally {
+            setIsUploading(false);
+          }
+        };
+        img.onerror = () => {
+          showToast('Failed to load image file.', 'error');
+          setIsUploading(false);
+        };
+        img.src = event.target?.result as string;
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('File reading error:', error);
+      showToast('Error reading selected file.', 'error');
+      setIsUploading(false);
+    }
   };
 
   // Load and map CMS data from DB
@@ -133,6 +230,7 @@ export default function CmsManager() {
 
       const mappedAbout: AboutAlanna = aboutData ? {
         id: aboutData.id,
+        name: aboutData.name || 'Alanna',
         photo_url: (aboutData as any).image_url || aboutData.photo_url,
         bio_title: (aboutData as any).title || aboutData.bio_title,
         quote: aboutData.quote,
@@ -288,26 +386,27 @@ export default function CmsManager() {
     }
   };
 
-  // Save About Alanna bio
   const handleSaveAbout = async () => {
     if (!about) return;
     setIsSaving(true);
     try {
       const dbPayload = {
+        name: about.name || 'Alanna',
         image_url: about.photo_url,
         title: about.bio_title,
         quote: about.quote,
         bio: about.bio_body,
+        credentials: about.credentials || [],
         button_label: about.cta_label,
         button_link: about.cta_link
       };
 
       await cmsService.updateAboutAlanna(about.id, dbPayload as any);
-      showToast('Founder profile synchronized.', 'success');
+      showToast('Founder profile updated', 'success');
       setPristineState(prev => ({ ...prev, about: JSON.parse(JSON.stringify(about)) }));
     } catch (e) {
       console.error(e);
-      showToast('Failed to archive profile.', 'error');
+      showToast('Unable to save founder profile', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -826,23 +925,78 @@ export default function CmsManager() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Founder Portrait Upload Component */}
+              <div className="md:col-span-2 space-y-4">
+                <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Founder Portrait</label>
+                
+                <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-white border border-text-dark/5 rounded-[2rem]">
+                  <div className="relative w-32 h-32 rounded-2xl overflow-hidden bg-cream border border-text-dark/5 flex items-center justify-center group shadow-md shrink-0">
+                    {about.photo_url ? (
+                      <img 
+                        src={about.photo_url} 
+                        alt="Founder Preview" 
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-8 h-8 text-text-dark/20" />
+                    )}
+                    
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center">
+                        <RefreshCw className="w-5 h-5 text-gold animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-3 text-center sm:text-left">
+                    <h5 className="text-xs font-semibold text-text-dark">Sanctuary Portrait</h5>
+                    <p className="text-[10px] text-text-dark/40 font-light leading-relaxed max-w-[240px]">
+                      Select a high-resolution portrait. It will be compressed to an optimized JPG for fast, high-performance loading.
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="px-6 py-2.5 bg-cream hover:bg-gold/15 text-text-dark rounded-xl text-[9px] font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {about.photo_url ? 'Replace Portrait' : 'Upload Portrait'}
+                      </button>
+                      
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        accept="image/*"
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Founder Name Input */}
               <div className="space-y-4">
-                <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Photo URL</label>
+                <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Founder Name</label>
                 <input
                   type="text"
-                  value={about.photo_url || ''}
-                  onChange={e => setAbout(prev => ({ ...prev!, photo_url: e.target.value }))}
+                  value={about.name || ''}
+                  onChange={e => setAbout(prev => ({ ...prev!, name: e.target.value }))}
                   className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
+                  placeholder="e.g. Alanna"
                 />
               </div>
 
+              {/* Bio Title Input */}
               <div className="space-y-4">
                 <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Bio Title</label>
                 <input
                   type="text"
-                  value={about.bio_title}
+                  value={about.bio_title || ''}
                   onChange={e => setAbout(prev => ({ ...prev!, bio_title: e.target.value }))}
                   className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
+                  placeholder="e.g. Meet Alanna"
                 />
               </div>
 
@@ -858,7 +1012,7 @@ export default function CmsManager() {
               <div className="space-y-4 md:col-span-2">
                 <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Bio Narrative / Body</label>
                 <textarea
-                  value={about.bio_body}
+                  value={about.bio_body || ''}
                   onChange={e => setAbout(prev => ({ ...prev!, bio_body: e.target.value }))}
                   className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none min-h-[120px]"
                 />
@@ -867,8 +1021,8 @@ export default function CmsManager() {
               <div className="space-y-4 md:col-span-2">
                 <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Credentials / Accreditations (One per line)</label>
                 <textarea
-                  value={about.credentials.join('\n')}
-                  onChange={e => setAbout(prev => ({ ...prev!, credentials: e.target.value.split('\n').filter(Boolean) }))}
+                  value={(about.credentials || []).join('\n')}
+                  onChange={e => setAbout(prev => ({ ...prev!, credentials: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) }))}
                   className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none min-h-[80px]"
                 />
               </div>
@@ -877,7 +1031,7 @@ export default function CmsManager() {
                 <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">CTA Button Label</label>
                 <input
                   type="text"
-                  value={about.cta_label}
+                  value={about.cta_label || ''}
                   onChange={e => setAbout(prev => ({ ...prev!, cta_label: e.target.value }))}
                   className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
                 />
@@ -887,7 +1041,7 @@ export default function CmsManager() {
                 <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">CTA Link</label>
                 <input
                   type="text"
-                  value={about.cta_link}
+                  value={about.cta_link || ''}
                   onChange={e => setAbout(prev => ({ ...prev!, cta_link: e.target.value }))}
                   className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
                 />
@@ -901,7 +1055,7 @@ export default function CmsManager() {
                 className="flex items-center gap-3 px-12 py-5 bg-text-dark text-white rounded-2xl text-[10px] font-bold uppercase tracking-[0.4em] shadow-button hover:bg-gold transition-all duration-700 cursor-pointer"
               >
                 <Save className="w-4 h-4 text-gold" />
-                {isSaving ? 'Archiving...' : 'Archive Bio Changes'}
+                {isSaving ? 'Saving...' : 'Save Sanctuary Updates'}
               </button>
             </div>
           </div>

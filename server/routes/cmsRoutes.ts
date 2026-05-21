@@ -18,6 +18,7 @@ router.put('/steps/:id', adminAuth, cmsController.updateStep);
 // Founder Bio routes
 router.get('/founder', cmsController.getFounder);
 router.put('/founder', adminAuth, cmsController.updateFounder);
+router.post('/upload', adminAuth, cmsController.uploadImage);
 
 // Quotes routes
 router.get('/quotes', cmsController.getQuotes);
@@ -28,8 +29,16 @@ router.delete('/quotes/:id', adminAuth, cmsController.deleteQuote);
 // Reviews routes
 router.get('/reviews', cmsController.getReviews);
 router.post('/reviews', adminAuth, cmsController.createReview);
+router.put('/reviews', adminAuth, cmsController.updateReview);
 router.put('/reviews/:id', adminAuth, cmsController.updateReview);
 router.delete('/reviews/:id', adminAuth, cmsController.deleteReview);
+
+// Testimonials alias routes
+router.get('/testimonials', cmsController.getReviews);
+router.post('/testimonials', adminAuth, cmsController.createReview);
+router.put('/testimonials', adminAuth, cmsController.updateReview);
+router.put('/testimonials/:id', adminAuth, cmsController.updateReview);
+router.delete('/testimonials/:id', adminAuth, cmsController.deleteReview);
 
 // Offerings routes
 router.get('/offerings', cmsController.getOfferings);

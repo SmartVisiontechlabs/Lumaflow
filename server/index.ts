@@ -38,7 +38,17 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+import path from 'path';
+import fs from 'fs';
+
+// Ensure uploads folder exists on startup
+const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+app.use(express.json({ limit: '10mb' }));
+app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
 
 // API Routes
 app.use('/api/bookings', bookingRoutes);

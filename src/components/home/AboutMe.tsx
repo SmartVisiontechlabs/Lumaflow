@@ -19,7 +19,7 @@ export default function AboutMe() {
     bio_title: content.title || content.name || 'Meet Alanna',
     quote: content.quote,
     bio_body: content.bio,
-    credentials: [] as string[],
+    credentials: content.credentials || [] as string[],
     cta_label: content.button_label,
     cta_link: content.button_link
   } : {

@@ -41,6 +41,7 @@ CREATE TABLE public.founder_bio (
     name TEXT NOT NULL,
     title TEXT NOT NULL,
     bio TEXT NOT NULL,
+    credentials TEXT[] DEFAULT '{}'::text[],
     quote TEXT,
     image_url TEXT,
     button_label TEXT NOT NULL,
@@ -151,11 +152,12 @@ INSERT INTO public.transformation_steps (step_number, title, subtitle, descripti
 (3, 'Restore', 'Nourish & Soften', 'Nourish your nervous system and re-align your natural frequencies. Sink into a state of deep, restorative rest.', 'Sparkles', 3, TRUE),
 (4, 'Illuminate', 'Radiate & Expand', 'Step into your natural brightness and glow. Radiate peace, vitality, and heart-centered, creative clarity.', 'Sun', 4, TRUE);
 
-INSERT INTO public.founder_bio (name, title, bio, quote, image_url, button_label, button_link) VALUES
+INSERT INTO public.founder_bio (name, title, bio, credentials, quote, image_url, button_label, button_link) VALUES
 (
     'Alanna',
     'Meet Alanna',
-    'Alanna is a somatic practitioner and guide devoted to helping you reconnect with your natural state of calm through breath, movement, and awareness. Certified Somatic & Breathwork Facilitator with 1,200+ hours of held container space.',
+    'Alanna is a somatic practitioner and guide devoted to helping you reconnect with your natural state of calm through breath, movement, and awareness.',
+    ARRAY['Certified Somatic Facilitator', 'Breathwork Practitioner (1,200+ Hours)'],
     'I created Lumaflow as a space where you don’t have to fix yourself — only remember who you are.',
     '/alanna-new.jpeg',
     'Begin Your Journey',
