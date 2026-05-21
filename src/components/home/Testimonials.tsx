@@ -9,7 +9,16 @@ export default function Testimonials() {
 
   useEffect(() => {
     cmsService.getTestimonials()
-      .then(data => setContentReviews(data.filter(t => t.is_active !== false)))
+      .then(data => {
+        const mapped = data.map(t => ({
+          name: t.client_name || (t as any).name,
+          role: t.program || (t as any).role,
+          quote: t.review_text || (t as any).quote,
+          rating: t.rating,
+          is_featured: t.is_featured
+        }));
+        setContentReviews(mapped as any[]);
+      })
       .catch(err => console.error('Failed to load testimonials:', err));
   }, []);
 

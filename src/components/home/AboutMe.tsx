@@ -14,7 +14,15 @@ export default function AboutMe() {
       .catch(err => console.error('Failed to load dynamic bio content:', err));
   }, []);
 
-  const aboutData = content || {
+  const aboutData = content ? {
+    photo_url: content.image_url || '/alanna-new.jpeg',
+    bio_title: content.title || content.name || 'Meet Alanna',
+    quote: content.quote,
+    bio_body: content.bio,
+    credentials: [] as string[],
+    cta_label: content.button_label,
+    cta_link: content.button_link
+  } : {
     photo_url: '/alanna-new.jpeg',
     bio_title: 'Meet Alanna',
     quote: 'I created Lumaflow as a space where you don’t have to fix yourself — only remember who you are.',

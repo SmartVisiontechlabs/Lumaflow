@@ -8,11 +8,14 @@ export default function Quote() {
 
   useEffect(() => {
     cmsService.getQuotes()
-      .then(data => setQuotes(data.filter(q => q.is_active !== false)))
+      .then(data => setQuotes(data))
       .catch(err => console.error('Failed to load quotes:', err));
   }, []);
 
-  const quoteData = quotes.length > 0 ? quotes[0] : {
+  const quoteData = quotes.length > 0 ? {
+    quote_text: quotes[0].quote,
+    author_text: quotes[0].author
+  } : {
     quote_text: 'Transforming negative energy into love and light.',
     author_text: 'Client Reflection'
   };

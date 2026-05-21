@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FileText, 
   Sparkles, 
@@ -12,8 +12,8 @@ import {
   Edit, 
   Trash,
   CheckCircle,
-  Eye,
-  EyeOff
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { cmsService } from '../../services/cmsService';
 import { 
@@ -33,7 +33,7 @@ export default function CmsManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Data States
+  // Current Working Data States
   const [hero, setHero] = useState<HeroContent | null>(null);
   const [steps, setSteps] = useState<TransformationStep[]>([]);
   const [about, setAbout] = useState<AboutAlanna | null>(null);
@@ -41,6 +41,25 @@ export default function CmsManager() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [paths, setPaths] = useState<HealingPath[]>([]);
   const [matrix, setMatrix] = useState<RecommendationMatrixEntry[]>([]);
+
+  // Pristine Copy for Dirty Checking
+  const [pristineState, setPristineState] = useState<{
+    hero: HeroContent | null;
+    steps: TransformationStep[];
+    about: AboutAlanna | null;
+    quotes: Quote[];
+    testimonials: Testimonial[];
+    paths: HealingPath[];
+    matrix: RecommendationMatrixEntry[];
+  }>({
+    hero: null,
+    steps: [],
+    about: null,
+    quotes: [],
+    testimonials: [],
+    paths: [],
+    matrix: []
+  });
 
   // Editing Sub-states
   const [editingStep, setEditingStep] = useState<TransformationStep | null>(null);
@@ -64,7 +83,7 @@ export default function CmsManager() {
     setToast({ message, type, isVisible: true });
   };
 
-  // Load all CMS data
+  // Load and map CMS data from DB
   const loadCmsData = async () => {
     setIsLoading(true);
     try {
@@ -86,13 +105,112 @@ export default function CmsManager() {
         cmsService.getRecommendationMatrix()
       ]);
 
-      setHero(heroData);
-      setSteps(stepsData);
-      setAbout(aboutData);
-      setQuotes(quotesData);
-      setTestimonials(testimonialsData);
-      setPaths(pathsData);
-      setMatrix(matrixData);
+      // Form input mappings
+      const mappedHero: HeroContent = heroData ? {
+        id: heroData.id,
+        headline: (heroData as any).title || heroData.headline,
+        subheadline: (heroData as any).subtitle || heroData.subheadline,
+        cta_text: (heroData as any).primary_cta_label || heroData.cta_text,
+        cta_link: (heroData as any).primary_cta_link || heroData.cta_link,
+        secondary_cta_text: (heroData as any).secondary_cta_label || heroData.secondary_cta_text,
+        secondary_cta_link: (heroData as any).secondary_cta_link || heroData.secondary_cta_link,
+        background_visual_url: heroData.background_visual_url,
+        is_active: heroData.is_active,
+        updated_at: heroData.updated_at
+      } as any : null;
+
+      const mappedSteps = stepsData.map(s => ({
+        id: s.id,
+        step_number: s.step_number,
+        title: s.title,
+        subtitle: s.subtitle,
+        description: s.description,
+        icon_name: (s as any).icon || s.icon_name,
+        is_active: s.is_active,
+        created_at: s.created_at,
+        updated_at: s.updated_at
+      }));
+
+      const mappedAbout: AboutAlanna = aboutData ? {
+        id: aboutData.id,
+        photo_url: (aboutData as any).image_url || aboutData.photo_url,
+        bio_title: (aboutData as any).title || aboutData.bio_title,
+        quote: aboutData.quote,
+        bio_body: (aboutData as any).bio || aboutData.bio_body,
+        credentials: (aboutData as any).credentials || [],
+        cta_label: (aboutData as any).button_label || aboutData.cta_label,
+        cta_link: (aboutData as any).button_link || aboutData.cta_link,
+        updated_at: aboutData.updated_at
+      } : null;
+
+      const mappedQuotes = quotesData.map(q => ({
+        id: q.id,
+        quote_text: (q as any).quote || q.quote_text,
+        author_text: (q as any).author || q.author_text,
+        is_active: (q as any).is_active !== false,
+        display_order: (q as any).sort_order || q.display_order,
+        created_at: q.created_at
+      }));
+
+      const mappedTestimonials = testimonialsData.map(t => ({
+        id: t.id,
+        name: (t as any).client_name || t.name,
+        role: (t as any).program || t.role,
+        quote: (t as any).review_text || t.quote,
+        rating: t.rating,
+        is_featured: t.is_featured,
+        is_active: (t as any).is_active !== false,
+        display_order: (t as any).sort_order || t.display_order,
+        created_at: t.created_at
+      }));
+
+      const mappedPaths = pathsData.map(p => ({
+        id: p.id,
+        title: p.title,
+        slug: (p as any).slug || p.title.toLowerCase().replace(/ /g, '-'),
+        benefit: (p as any).description || p.benefit,
+        duration_minutes: (p as any).duration || p.duration_minutes,
+        price: p.price,
+        cta_text: p.cta_text,
+        display_order: (p as any).sort_order || p.display_order,
+        is_active: p.is_active,
+        created_at: p.created_at
+      }));
+
+      const mappedMatrix = matrixData.map(m => ({
+        id: m.id,
+        journey_type: (m as any).journey || m.journey_type,
+        feeling: m.feeling,
+        recommended_ritual: m.recommended_ritual,
+        focus: m.focus,
+        duration_minutes: (m as any).duration || m.duration_minutes,
+        explanation: (m as any).recommended_plan || m.explanation,
+        quote: (m as any).quote || '',
+        confidence: (m as any).confidence_score || m.confidence,
+        confidence_reason: (m as any).confidence_reason || 'Deeply aligned with your organic somatic rhythm.',
+        alt_durations: (m as any).alt_durations || [(m as any).duration || m.duration_minutes],
+        archetype: (m as any).archetype || 'Seeker'
+      }));
+
+      setHero(mappedHero);
+      setSteps(mappedSteps);
+      setAbout(mappedAbout);
+      setQuotes(mappedQuotes);
+      setTestimonials(mappedTestimonials);
+      setPaths(mappedPaths);
+      setMatrix(mappedMatrix);
+
+      // Save baseline for dirty checking
+      setPristineState({
+        hero: JSON.parse(JSON.stringify(mappedHero)),
+        steps: JSON.parse(JSON.stringify(mappedSteps)),
+        about: JSON.parse(JSON.stringify(mappedAbout)),
+        quotes: JSON.parse(JSON.stringify(mappedQuotes)),
+        testimonials: JSON.parse(JSON.stringify(mappedTestimonials)),
+        paths: JSON.parse(JSON.stringify(mappedPaths)),
+        matrix: JSON.parse(JSON.stringify(mappedMatrix))
+      });
+
     } catch (e) {
       console.error('Error loading CMS data:', e);
       showToast('Failed to load some dashboard sections. Check console.', 'error');
@@ -105,20 +223,66 @@ export default function CmsManager() {
     loadCmsData();
   }, []);
 
+  // Dirty state checks
+  const isHeroDirty = JSON.stringify(hero) !== JSON.stringify(pristineState.hero);
+  const isAboutDirty = JSON.stringify(about) !== JSON.stringify(pristineState.about);
+  const isStepsDirty = JSON.stringify(steps) !== JSON.stringify(pristineState.steps);
+  const isQuotesDirty = JSON.stringify(quotes) !== JSON.stringify(pristineState.quotes);
+  const isTestimonialsDirty = JSON.stringify(testimonials) !== JSON.stringify(pristineState.testimonials);
+  const isPathsDirty = JSON.stringify(paths) !== JSON.stringify(pristineState.paths);
+  const isMatrixDirty = JSON.stringify(matrix) !== JSON.stringify(pristineState.matrix);
+
+  const getDirtyTabName = () => {
+    if (isHeroDirty) return 'Hero Section';
+    if (isAboutDirty) return 'Founder Bio';
+    if (isStepsDirty) return 'Steps Flow';
+    if (isQuotesDirty || isTestimonialsDirty) return 'Quotes & Reviews';
+    if (isPathsDirty) return 'Offerings';
+    if (isMatrixDirty) return 'Intelligence Matrix';
+    return null;
+  };
+
+  const isDirty = isHeroDirty || isAboutDirty || isStepsDirty || isQuotesDirty || isTestimonialsDirty || isPathsDirty || isMatrixDirty;
+
+  // Discard all changes
+  const handleDiscardChanges = () => {
+    setHero(JSON.parse(JSON.stringify(pristineState.hero)));
+    setSteps(JSON.parse(JSON.stringify(pristineState.steps)));
+    setAbout(JSON.parse(JSON.stringify(pristineState.about)));
+    setQuotes(JSON.parse(JSON.stringify(pristineState.quotes)));
+    setTestimonials(JSON.parse(JSON.stringify(pristineState.testimonials)));
+    setPaths(JSON.parse(JSON.stringify(pristineState.paths)));
+    setMatrix(JSON.parse(JSON.stringify(pristineState.matrix)));
+    setEditingStep(null);
+    setEditingPath(null);
+    setEditingMatrix(null);
+    showToast('All unsaved modifications discarded.', 'info');
+  };
+
   // Save Hero Content
   const handleSaveHero = async () => {
     if (!hero) return;
     setIsSaving(true);
     try {
-      if (hero.id) {
-        await cmsService.updateHeroContent(hero.id, hero);
-      } else {
-        await cmsService.createHeroContent(hero);
-      }
-      showToast('Hero content updated successfully', 'success');
+      const dbPayload = {
+        title: hero.headline,
+        subtitle: hero.subheadline,
+        primary_cta_label: hero.cta_text,
+        primary_cta_link: hero.cta_link,
+        secondary_cta_label: hero.secondary_cta_text,
+        secondary_cta_link: hero.secondary_cta_link
+      };
+      
+      const updated = await cmsService.updateHeroContent(hero.id, dbPayload as any);
+      
+      showToast('Hero configuration synchronized successfully.', 'success');
+      // Update pristine
+      const newHero = { ...hero, updated_at: updated.updated_at };
+      setHero(newHero);
+      setPristineState(prev => ({ ...prev, hero: JSON.parse(JSON.stringify(newHero)) }));
     } catch (e) {
       console.error(e);
-      showToast('Failed to update hero content', 'error');
+      showToast('Failed to archive hero changes.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -129,11 +293,21 @@ export default function CmsManager() {
     if (!about) return;
     setIsSaving(true);
     try {
-      await cmsService.updateAboutAlanna(about.id, about);
-      showToast('About bio updated successfully', 'success');
+      const dbPayload = {
+        image_url: about.photo_url,
+        title: about.bio_title,
+        quote: about.quote,
+        bio: about.bio_body,
+        button_label: about.cta_label,
+        button_link: about.cta_link
+      };
+
+      await cmsService.updateAboutAlanna(about.id, dbPayload as any);
+      showToast('Founder profile synchronized.', 'success');
+      setPristineState(prev => ({ ...prev, about: JSON.parse(JSON.stringify(about)) }));
     } catch (e) {
       console.error(e);
-      showToast('Failed to update bio', 'error');
+      showToast('Failed to archive profile.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -144,30 +318,55 @@ export default function CmsManager() {
     if (!editingStep) return;
     setIsSaving(true);
     try {
-      await cmsService.updateTransformationStep(editingStep.id, editingStep);
-      showToast('Transformation step updated', 'success');
-      setSteps(prev => prev.map(s => s.id === editingStep.id ? editingStep : s));
+      const dbPayload = {
+        step_number: editingStep.step_number,
+        title: editingStep.title,
+        subtitle: editingStep.subtitle,
+        description: editingStep.description,
+        icon: editingStep.icon_name,
+        is_active: editingStep.is_active
+      };
+
+      await cmsService.updateTransformationStep(editingStep.id, dbPayload as any);
+      showToast(`Transformation step ${editingStep.step_number} updated.`, 'success');
+      
+      const newSteps = steps.map(s => s.id === editingStep.id ? editingStep : s);
+      setSteps(newSteps);
+      setPristineState(prev => ({ ...prev, steps: JSON.parse(JSON.stringify(newSteps)) }));
       setEditingStep(null);
     } catch (e) {
       console.error(e);
-      showToast('Failed to update step', 'error');
+      showToast('Failed to update step.', 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // Save healing path / program details
+  // Save healing path / offering details
   const handleSavePath = async () => {
     if (!editingPath) return;
-    setIsSaving(false);
+    setIsSaving(true);
     try {
-      await cmsService.updateHealingPath(editingPath.id, editingPath);
-      showToast('Offering updated successfully', 'success');
-      setPaths(prev => prev.map(p => p.id === editingPath.id ? editingPath : p));
+      const dbPayload = {
+        title: editingPath.title,
+        description: editingPath.benefit,
+        duration: editingPath.duration_minutes,
+        price: editingPath.price,
+        is_active: editingPath.is_active
+      };
+
+      await cmsService.updateHealingPath(editingPath.id, dbPayload as any);
+      showToast('Offering changes synchronized.', 'success');
+      
+      const newPaths = paths.map(p => p.id === editingPath.id ? editingPath : p);
+      setPaths(newPaths);
+      setPristineState(prev => ({ ...prev, paths: JSON.parse(JSON.stringify(newPaths)) }));
       setEditingPath(null);
     } catch (e) {
       console.error(e);
-      showToast('Failed to update offering', 'error');
+      showToast('Failed to update offering details.', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -176,13 +375,26 @@ export default function CmsManager() {
     if (!editingMatrix || !editingMatrix.id) return;
     setIsSaving(true);
     try {
-      await cmsService.updateRecommendationMatrixEntry(editingMatrix.id, editingMatrix);
-      showToast('Recommendation matrix aligned', 'success');
-      setMatrix(prev => prev.map(m => m.id === editingMatrix.id ? editingMatrix : m));
+      const dbPayload = {
+        journey: editingMatrix.journey_type,
+        feeling: editingMatrix.feeling,
+        recommended_ritual: editingMatrix.recommended_ritual,
+        duration: editingMatrix.duration_minutes,
+        recommended_plan: editingMatrix.explanation,
+        focus: editingMatrix.focus,
+        confidence_score: editingMatrix.confidence
+      };
+
+      await cmsService.updateRecommendationMatrixEntry(editingMatrix.id, dbPayload as any);
+      showToast('Intelligence matrix aligned.', 'success');
+      
+      const newMatrix = matrix.map(m => m.id === editingMatrix.id ? editingMatrix : m);
+      setMatrix(newMatrix);
+      setPristineState(prev => ({ ...prev, matrix: JSON.parse(JSON.stringify(newMatrix)) }));
       setEditingMatrix(null);
     } catch (e) {
       console.error(e);
-      showToast('Failed to align recommendation matrix', 'error');
+      showToast('Failed to align intelligence mapping.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -191,38 +403,140 @@ export default function CmsManager() {
   // Quote actions
   const handleSaveQuote = async () => {
     if (!editingQuote || !editingQuote.quote_text) return;
+    setIsSaving(true);
     try {
+      const dbPayload = {
+        quote: editingQuote.quote_text,
+        author: editingQuote.author_text || 'Client Reflection',
+        sort_order: editingQuote.display_order || 1,
+        is_featured: true
+      };
+
       if (editingQuote.id) {
-        await cmsService.updateQuote(editingQuote.id, editingQuote);
-        setQuotes(prev => prev.map(q => q.id === editingQuote.id ? { ...q, ...editingQuote } as Quote : q));
+        const updated = await cmsService.updateQuote(editingQuote.id, dbPayload as any);
+        const mappedUpdated = {
+          id: updated.id,
+          quote_text: (updated as any).quote,
+          author_text: (updated as any).author,
+          is_active: true,
+          display_order: (updated as any).sort_order || 1,
+          created_at: updated.created_at
+        };
+        const newQuotes = quotes.map(q => q.id === editingQuote.id ? mappedUpdated : q);
+        setQuotes(newQuotes);
+        setPristineState(prev => ({ ...prev, quotes: JSON.parse(JSON.stringify(newQuotes)) }));
       } else {
-        const newQuote = await cmsService.createQuote(editingQuote as Omit<Quote, 'id' | 'created_at'>);
-        setQuotes(prev => [...prev, newQuote]);
+        const created = await cmsService.createQuote(dbPayload as any);
+        const mappedCreated = {
+          id: created.id,
+          quote_text: (created as any).quote,
+          author_text: (created as any).author,
+          is_active: true,
+          display_order: (created as any).sort_order || 1,
+          created_at: created.created_at
+        };
+        const newQuotes = [...quotes, mappedCreated];
+        setQuotes(newQuotes);
+        setPristineState(prev => ({ ...prev, quotes: JSON.parse(JSON.stringify(newQuotes)) }));
       }
-      showToast('Reflection quote archived', 'success');
+      showToast('Reflection quote archived.', 'success');
       setShowQuoteModal(false);
     } catch (e) {
       console.error(e);
-      showToast('Failed to archive quote', 'error');
+      showToast('Failed to archive quote.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteQuote = async (id: string) => {
+    if (!confirm('Are you sure you want to remove this quote from the archive?')) return;
+    setIsSaving(true);
+    try {
+      await cmsService.deleteQuote(id);
+      showToast('Quote removed successfully.', 'success');
+      const newQuotes = quotes.filter(q => q.id !== id);
+      setQuotes(newQuotes);
+      setPristineState(prev => ({ ...prev, quotes: JSON.parse(JSON.stringify(newQuotes)) }));
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to delete quote.', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   // Testimonial actions
   const handleSaveTestimonial = async () => {
     if (!editingTestimonial || !editingTestimonial.name || !editingTestimonial.quote) return;
+    setIsSaving(true);
     try {
+      const dbPayload = {
+        client_name: editingTestimonial.name,
+        program: editingTestimonial.role || 'Somatic Journey',
+        review_text: editingTestimonial.quote,
+        rating: editingTestimonial.rating || 5,
+        is_featured: editingTestimonial.is_featured || false,
+        sort_order: editingTestimonial.display_order || 1
+      };
+
       if (editingTestimonial.id) {
-        await cmsService.updateTestimonial(editingTestimonial.id, editingTestimonial);
-        setTestimonials(prev => prev.map(t => t.id === editingTestimonial.id ? { ...t, ...editingTestimonial } as Testimonial : t));
+        const updated = await cmsService.updateTestimonial(editingTestimonial.id, dbPayload as any);
+        const mappedUpdated = {
+          id: updated.id,
+          name: (updated as any).client_name,
+          role: (updated as any).program,
+          quote: (updated as any).review_text,
+          rating: updated.rating,
+          is_featured: updated.is_featured,
+          is_active: true,
+          display_order: (updated as any).sort_order || 1,
+          created_at: updated.created_at
+        };
+        const newTestimonials = testimonials.map(t => t.id === editingTestimonial.id ? mappedUpdated : t);
+        setTestimonials(newTestimonials);
+        setPristineState(prev => ({ ...prev, testimonials: JSON.parse(JSON.stringify(newTestimonials)) }));
       } else {
-        const newTest = await cmsService.createTestimonial(editingTestimonial as Omit<Testimonial, 'id' | 'created_at'>);
-        setTestimonials(prev => [...prev, newTest]);
+        const created = await cmsService.createTestimonial(dbPayload as any);
+        const mappedCreated = {
+          id: created.id,
+          name: (created as any).client_name,
+          role: (created as any).program,
+          quote: (created as any).review_text,
+          rating: created.rating,
+          is_featured: created.is_featured,
+          is_active: true,
+          display_order: (created as any).sort_order || 1,
+          created_at: created.created_at
+        };
+        const newTestimonials = [...testimonials, mappedCreated];
+        setTestimonials(newTestimonials);
+        setPristineState(prev => ({ ...prev, testimonials: JSON.parse(JSON.stringify(newTestimonials)) }));
       }
-      showToast('Testimonial archived', 'success');
+      showToast('Transformation story archived.', 'success');
       setShowTestimonialModal(false);
     } catch (e) {
       console.error(e);
-      showToast('Failed to archive testimonial', 'error');
+      showToast('Failed to archive review.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteTestimonial = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this review?')) return;
+    setIsSaving(true);
+    try {
+      await cmsService.deleteTestimonial(id);
+      showToast('Review deleted successfully.', 'success');
+      const newTestimonials = testimonials.filter(t => t.id !== id);
+      setTestimonials(newTestimonials);
+      setPristineState(prev => ({ ...prev, testimonials: JSON.parse(JSON.stringify(newTestimonials)) }));
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to delete review.', 'error');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -245,7 +559,61 @@ export default function CmsManager() {
   ] as const;
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-12 pb-24 relative">
+      
+      {/* Sticky Synchronize Bar */}
+      <AnimatePresence>
+        <motion.div 
+          initial={{ y: 50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 50, opacity: 0 }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[1000] max-w-xl w-[90%] glass border border-gold/20 px-8 py-4.5 rounded-full flex items-center justify-between shadow-luxury bg-white/80 backdrop-blur-md"
+        >
+          <div className="flex items-center gap-3">
+            {isSaving ? (
+              <RefreshCw className="w-4 h-4 text-gold animate-spin" />
+            ) : isDirty ? (
+              <AlertCircle className="w-4 h-4 text-gold animate-pulseGlow" />
+            ) : (
+              <CheckCircle className="w-4 h-4 text-gold" />
+            )}
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-dark">
+              {isSaving 
+                ? 'Archiving changes to database...' 
+                : isDirty 
+                ? `Unsaved changes in ${getDirtyTabName()}` 
+                : 'Sanctuary fully synchronized.'
+              }
+            </span>
+          </div>
+
+          {isDirty && !isSaving && (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDiscardChanges}
+                className="text-[9px] font-bold uppercase tracking-[0.25em] text-text-dark/40 hover:text-text-dark transition-colors cursor-pointer"
+              >
+                Discard
+              </button>
+              
+              <button
+                onClick={
+                  activeTab === 'hero' ? handleSaveHero :
+                  activeTab === 'about' ? handleSaveAbout :
+                  activeTab === 'steps' && editingStep ? handleSaveStep :
+                  activeTab === 'paths' && editingPath ? handleSavePath :
+                  activeTab === 'matrix' && editingMatrix ? handleSaveMatrixEntry :
+                  () => showToast('Save changes inside specific cards below.', 'info')
+                }
+                className="px-6 py-2.5 bg-text-dark text-white hover:bg-gold rounded-full text-[9px] font-bold uppercase tracking-[0.25em] transition-all cursor-pointer shadow-luxury"
+              >
+                Sync Now
+              </button>
+            </div>
+          )}
+        </motion.div>
+      </AnimatePresence>
+
       {/* Tab Selector Capsule */}
       <div className="flex flex-wrap gap-3 bg-white/40 border border-text-dark/5 p-2 rounded-3xl backdrop-blur-md">
         {tabs.map(tab => (
@@ -568,7 +936,7 @@ export default function CmsManager() {
                       <p className="font-display italic text-lg text-text-dark/95 leading-relaxed">“{q.quote_text}”</p>
                       <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold mt-4 block">— {q.author_text || 'Anonymous'}</span>
                     </div>
-                    <div className="flex gap-4 mt-6 pt-4 border-t border-text-dark/5">
+                    <div className="flex justify-between items-center mt-6 pt-4 border-t border-text-dark/5">
                       <button
                         onClick={() => {
                           setEditingQuote(q);
@@ -577,6 +945,13 @@ export default function CmsManager() {
                         className="flex items-center gap-1.5 text-[9px] font-bold text-text-dark/40 hover:text-gold uppercase tracking-widest cursor-pointer"
                       >
                         <Edit className="w-3 h-3" /> Edit
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteQuote(q.id)}
+                        className="flex items-center gap-1.5 text-[9px] font-bold text-red-400 hover:text-red-600 uppercase tracking-widest cursor-pointer"
+                      >
+                        <Trash className="w-3 h-3" /> Delete
                       </button>
                     </div>
                   </div>
@@ -628,7 +1003,7 @@ export default function CmsManager() {
                       </div>
                     </div>
 
-                    <div className="flex gap-4 mt-6 pt-4 border-t border-text-dark/5">
+                    <div className="flex justify-between items-center mt-6 pt-4 border-t border-text-dark/5">
                       <button
                         onClick={() => {
                           setEditingTestimonial(t);
@@ -637,6 +1012,13 @@ export default function CmsManager() {
                         className="flex items-center gap-1.5 text-[9px] font-bold text-text-dark/40 hover:text-gold uppercase tracking-widest cursor-pointer"
                       >
                         <Edit className="w-3 h-3" /> Edit
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteTestimonial(t.id)}
+                        className="flex items-center gap-1.5 text-[9px] font-bold text-red-400 hover:text-red-600 uppercase tracking-widest cursor-pointer"
+                      >
+                        <Trash className="w-3 h-3" /> Delete
                       </button>
                     </div>
                   </div>

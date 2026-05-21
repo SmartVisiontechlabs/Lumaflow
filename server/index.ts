@@ -11,6 +11,7 @@ import cors from 'cors';
 import bookingRoutes from './routes/bookingRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
 import paymentRoutes from './routes/paymentRoutes';
+import cmsRoutes from './routes/cmsRoutes';
 import { reminderScheduler } from './services/reminderScheduler';
 
 const app = express();
@@ -43,6 +44,7 @@ app.use(express.json());
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/cms', cmsRoutes);
 
 const PORT = process.env.PORT || 3001;
 

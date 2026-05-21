@@ -27,4 +27,27 @@ export const supabase = createClient(
   }
 );
 
+export const getSupabaseClient = (req?: any) => {
+  const authHeader = req?.headers?.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    return createClient(
+      supabaseUrl,
+      supabaseAnonKey,
+      {
+        global: {
+          fetch,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+        realtime: {
+          transport: ws as any,
+        },
+      }
+    );
+  }
+  return supabase;
+};
+
 console.log('✅ Supabase connected');

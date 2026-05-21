@@ -282,7 +282,22 @@ export const useBookingStore = create<BookingState>()(
       fetchRecommendationMatrix: async () => {
         try {
           const matrix = await cmsService.getRecommendationMatrix();
-          set({ recommendationMatrix: matrix });
+          const mappedMatrix = matrix.map(m => ({
+            id: m.id,
+            journey_type: m.journey,
+            feeling: m.feeling,
+            recommended_ritual: m.recommended_ritual,
+            focus: m.focus,
+            duration_minutes: m.duration,
+            explanation: m.recommended_plan,
+            quote: '',
+            confidence: m.confidence_score,
+            confidence_reason: 'Deeply matched with your organic somatic rhythm.',
+            alt_durations: [m.duration],
+            archetype: 'Seeker',
+            is_active: m.is_active
+          }));
+          set({ recommendationMatrix: mappedMatrix as any });
         } catch (e) {
           console.error('Failed to fetch recommendation matrix:', e);
         }

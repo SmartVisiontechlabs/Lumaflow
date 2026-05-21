@@ -12,7 +12,13 @@ export default function Program() {
 
   useEffect(() => {
     cmsService.getHealingPaths()
-      .then(data => setContentPaths(data.filter(p => p.is_active !== false)))
+      .then(data => {
+        const mapped = data.map(p => ({
+          ...p,
+          benefit: p.description || (p as any).benefit,
+        }));
+        setContentPaths(mapped as any[]);
+      })
       .catch(err => console.error('Failed to load healing paths:', err));
   }, []);
 

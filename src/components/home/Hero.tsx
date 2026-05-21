@@ -17,7 +17,14 @@ export default function Hero() {
       .catch(err => console.error('Failed to load dynamic hero content:', err));
   }, []);
 
-  const heroData = content || {
+  const heroData = content ? {
+    headline: content.title,
+    subheadline: content.subtitle,
+    cta_text: content.primary_cta_label,
+    cta_link: content.primary_cta_link,
+    secondary_cta_text: content.secondary_cta_label,
+    secondary_cta_link: content.secondary_cta_link
+  } : {
     headline: 'Illuminate your\nhealing journey\nwith LumaFlow.',
     subheadline: 'Step into a luminous sanctuary of high-frequency somatic restoration, where ancient stillness meets the cutting edge of personal transformation. Here, we don\'t fix you—we help you remember who you are.',
     cta_text: 'Begin Your Healing Journey',

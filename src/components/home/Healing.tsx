@@ -131,7 +131,7 @@ export default function Healing() {
                   
                   {/* Central Node Circle */}
                   <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center text-[#CBAE73] border border-gold/15 shadow-[0_8px_20px_rgba(203,174,115,0.06)] group-hover:shadow-[0_15px_30px_rgba(203,174,115,0.12)] group-hover:border-gold/40 group-hover:scale-105 transition-all duration-500">
-                    {iconMap[step.icon_name.toLowerCase()] || <Sparkles className="w-7 h-7 stroke-[1.1]" />}
+                    {iconMap[(step.icon || (step as any).icon_name || '').toLowerCase()] || <Sparkles className="w-7 h-7 stroke-[1.1]" />}
                   </div>
 
                   {/* Index indicator */}
