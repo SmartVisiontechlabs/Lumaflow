@@ -15,6 +15,7 @@
   --animate-sacred-breathe: sacredBreathe 12s ease-in-out infinite;
   --animate-particle-drift: particleDrift 20s linear infinite;
   --animate-glow: sacredGlow 8s ease-in-out infinite;
+  --animate-shimmer: shimmer 2.5s infinite;
 }
 
 @keyframes sacredBreathe {
@@ -47,6 +48,11 @@
 @keyframes softPulse {
   0%, 100% { opacity: 0.2; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(1.1); }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  100% { transform: translateX(150%) skewX(-20deg); }
 }
 
 html {
@@ -143,4 +149,25 @@ body {
 .section-transition {
   @apply h-24 w-full bg-gradient-to-b from-cream to-white;
 }
+
+/* Luminous Background System */
+.ambient-glow-gold {
+  background: radial-gradient(circle at center, rgba(203, 174, 115, 0.08) 0%, rgba(203, 174, 115, 0.02) 50%, transparent 100%);
+  filter: blur(100px);
+}
+
+.ambient-glow-white {
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.7) 0%, transparent 70%);
+  filter: blur(120px);
+}
+
+.sun-beam-ray {
+  background: linear-gradient(135deg, rgba(203, 174, 115, 0.04) 0%, transparent 70%);
+  clip-path: polygon(0 0, 80% 0, 40% 100%, 0 100%);
+}
+
+.glow-shimmer {
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3) 50%, transparent);
+}
+
 

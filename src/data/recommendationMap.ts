@@ -240,3 +240,97 @@ export const followUpMap: Record<string, Recommendation[]> = {
     }
   ]
 };
+
+export interface DynamicRecommendation {
+  ritual: string;
+  focus: string;
+  duration: number;
+  insight: string;
+  quote: string;
+}
+
+export const getDynamicRecommendation = (journey: string, feeling: string): DynamicRecommendation => {
+  const f = feeling.toLowerCase();
+  const j = journey.toLowerCase();
+
+  if (j.includes('breathwork')) {
+    if (f === 'heavy' || f === 'emotionally drained') {
+      return {
+        ritual: 'Deep Release Ritual',
+        focus: 'Cathartic Breath & Cellular Release',
+        duration: 90,
+        insight: 'Release deep-seated emotional stagnation. Using active pranayama and vibrational release, we flush the emotional system to restore flow.',
+        quote: "Letting go is not an action; it is a surrender."
+      };
+    } else if (f === 'stressed' || f === 'anxious') {
+      return {
+        ritual: 'Nervous System Reset',
+        focus: 'Vagal Tone & Parasympathetic Coherence',
+        duration: 60,
+        insight: 'Soothe an overactive stress response. Slow, structured breath retention techniques guide your brainwaves into deep, recovery states.',
+        quote: "Breathe in space, breathe out quiet."
+      };
+    } else { // disconnected, seeking clarity, default
+      return {
+        ritual: 'Emotional Detox',
+        focus: 'Somatic Emotional Processing',
+        duration: 90,
+        insight: 'Reconnect with your inner wisdom. Circular breathing patterns dissolve the boundaries of the mind to reveal raw clarity.',
+        quote: "The answer is not in the noise; it is in the depth of your breath."
+      };
+    }
+  } else if (j.includes('somatic')) {
+    if (f === 'heavy' || f === 'emotionally drained') {
+      return {
+        ritual: 'Vitality Restoration',
+        focus: 'Energy Body Rejuvenation & Flow',
+        duration: 120,
+        insight: 'Replenish a fully depleted system. Gentle, passive somatic release postures help your muscles and fascia store vital energy.',
+        quote: "Rest is the soil from which vitality grows."
+      };
+    } else if (f === 'stressed' || f === 'anxious') {
+      return {
+        ritual: 'Embodiment Journey',
+        focus: 'Myofascial Release & Rhythmic Flow',
+        duration: 60,
+        insight: 'Dissolve anxiety and tension locked in the tissue. Unwinding patterns and slow, rhythmic movement restore somatic harmony.',
+        quote: "Your body is the temple; movement is the prayer."
+      };
+    } else { // disconnected, seeking clarity
+      return {
+        ritual: 'Sacred Body Flow',
+        focus: 'Proprioceptive Grounding & Integration',
+        duration: 90,
+        insight: 'Ground back into physical form. Through tactile alignment and spatial awareness, we bridge the gap between mind and flesh.',
+        quote: "To inhabit the body is to walk on holy ground."
+      };
+    }
+  } else { // meditation
+    if (f === 'heavy' || f === 'emotionally drained') {
+      return {
+        ritual: 'Expansion Meditation',
+        focus: 'Transcendental Awareness & Light',
+        duration: 90,
+        insight: 'Rise above heavy physical exhaustion. Guided astral expansion and cosmic awareness restore your spiritual vitality.',
+        quote: "You are not a drop in the ocean; you are the entire ocean in a drop."
+      };
+    } else if (f === 'stressed' || f === 'anxious') {
+      return {
+        ritual: 'Stillness Ritual',
+        focus: 'Focus Anchoring & Thought Uncoupling',
+        duration: 45,
+        insight: 'Calm the racing chattering mind. We use mindfulness anchors and sound vibration to slow down rapid thought loops.',
+        quote: "Quiet the mind, and the soul will speak."
+      };
+    } else { // disconnected, seeking clarity
+      return {
+        ritual: 'Deep Stillness',
+        focus: 'Pure Consciousness & Silence',
+        duration: 60,
+        insight: 'Enter the void of absolute peace. Void meditation practices connect you back to the observer state of pure clarity.',
+        quote: "Silence is the language of clarity."
+      };
+    }
+  }
+};
+

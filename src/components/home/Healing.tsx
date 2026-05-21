@@ -1,77 +1,169 @@
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Cloud, Search, Wind, Sun } from 'lucide-react';
+import { Wind, Heart, Sparkles, Sun } from 'lucide-react';
+import { cmsService } from '../../services/cmsService';
+import { TransformationStep } from '../../types/cms';
+
+const iconMap: Record<string, React.ReactNode> = {
+  wind: <Wind className="w-7 h-7 stroke-[1.1]" />,
+  heart: <Heart className="w-7 h-7 stroke-[1.1]" />,
+  sparkles: <Sparkles className="w-7 h-7 stroke-[1.1]" />,
+  sun: <Sun className="w-7 h-7 stroke-[1.1]" />
+};
 
 export default function Healing() {
-  const steps = [
+  const [contentSteps, setContentSteps] = useState<TransformationStep[]>([]);
+
+  useEffect(() => {
+    cmsService.getTransformationSteps()
+      .then(data => {
+        // Sort steps by step_number ascending
+        const sorted = [...data].sort((a, b) => a.step_number - b.step_number);
+        setContentSteps(sorted);
+      })
+      .catch(err => console.error('Failed to load transformation steps:', err));
+  }, []);
+
+  const fallbackSteps = [
     {
-      title: "The Weight",
-      description: "Recognizing the silent tension stored in the muscles and mind.",
-      icon: <Cloud className="w-6 h-6" />
-    },
-    {
-      title: "Awareness",
-      description: "Softening the gaze inward to witness the rhythm of your breath.",
-      icon: <Search className="w-6 h-6" />
-    },
-    {
+      step_number: 1,
       title: "Release",
-      description: "Exhaling the old, creating space for new energy to flow.",
-      icon: <Wind className="w-6 h-6" />
+      subtitle: "Surrender & Empty",
+      description: "Let go of stored tension and shed the weight of expectations. Create a quiet, empty space within your body and mind.",
+      icon_name: "wind"
     },
     {
-      title: "Alignment",
-      description: "Returning to a state of profound, centered stillness.",
-      icon: <Sun className="w-6 h-6" />
+      step_number: 2,
+      title: "Reconnect",
+      subtitle: "Listen & Witness",
+      description: "Tune into the subtle rhythm of your breathing. Gently bring your awareness back to the organic wisdom of the present moment.",
+      icon_name: "heart"
+    },
+    {
+      step_number: 3,
+      title: "Restore",
+      subtitle: "Nourish & Soften",
+      description: "Nourish your nervous system and re-align your natural frequencies. Sink into a state of deep, restorative rest.",
+      icon_name: "sparkles"
+    },
+    {
+      step_number: 4,
+      title: "Illuminate",
+      subtitle: "Radiate & Expand",
+      description: "Step into your natural brightness and glow. Radiate peace, vitality, and heart-centered, creative clarity.",
+      icon_name: "sun"
     }
   ];
+
+  const stepsToRender = contentSteps.length > 0 ? contentSteps : fallbackSteps;
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.4
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 40 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 2.0, ease: [0.22, 1, 0.36, 1] }
+    }
+  };
 
   return (
     <>
       <div className="section-transition" />
-      <section className="py-48 bg-cream relative section-fade-top section-fade-bottom">
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
+      <section id="transformation-journey" className="py-40 bg-transparent relative section-fade-top section-fade-bottom overflow-hidden scroll-mt-24">
+        
+        {/* Soft Ambient glow for sacred atmosphere */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70vw] h-[70vw] radial-glow opacity-5 select-none pointer-events-none" />
+        <div className="absolute top-[10%] left-[20%] w-[30vw] h-[30vw] ambient-glow-gold opacity-[0.04] select-none pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-8 relative z-10">
+          
+          {/* Section Header */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 25 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 1.5 }}
-            className="text-center mb-32"
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 2.0, ease: [0.22, 1, 0.36, 1] }}
+            className="text-center mb-36"
           >
-            <span className="text-gold text-xs font-medium tracking-[0.3em] uppercase mb-4 block">The Journey</span>
-            <h2 className="font-display text-5xl md:text-6xl text-text-dark font-light">
-              The path to <span className="italic text-gold">transformation</span>
+            <span className="text-[#CBAE73] text-[10px] font-bold tracking-[0.4em] uppercase mb-4 block animate-glow">The Journey</span>
+            <h2 className="font-display text-4xl sm:text-5xl md:text-6xl text-text-dark font-light">
+              Path to <span className="italic text-[#CBAE73]">Transformation</span>
             </h2>
+            <div className="w-12 h-[1px] bg-[#CBAE73]/30 mx-auto mt-6" />
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-16 lg:gap-12">
-            {steps.map((step, index) => (
+          {/* Interactive Step Cards Timeline */}
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-16 lg:gap-10"
+          >
+            
+            {/* Desktop Timeline Flow Connector Line */}
+            <div className="absolute top-[48px] left-[12%] right-[12%] h-[1.5px] bg-gradient-to-r from-transparent via-[#CBAE73]/40 to-transparent hidden lg:block z-0 pointer-events-none" />
+
+            {stepsToRender.map((step, index) => (
               <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 1, delay: index * 0.2 }}
-                className="flex flex-col items-center text-center group"
+                key={step.step_number}
+                variants={itemVariants}
+                className="flex flex-col items-center text-center relative group bg-white/20 backdrop-blur-[2px] border border-[#CBAE73]/10 p-8 pt-10 rounded-3xl hover:bg-[#FAF8F5]/85 hover:border-[#CBAE73]/30 hover:shadow-[0_20px_50px_rgba(203,174,115,0.08)] hover:scale-[1.02] transition-all duration-[800ms] h-full justify-start"
               >
-                <div className="w-16 h-16 rounded-full bg-[#F8F5F0] flex items-center justify-center text-gold mb-8 shadow-sm group-hover:shadow-[0_10px_20px_rgba(0,0,0,0.05)] group-hover:scale-105 transition-all duration-500">
-                  {step.icon}
+                {/* Node Step Icon */}
+                <div className="relative mb-8 z-10">
+                  {/* Outer breathing ring */}
+                  <motion.div 
+                    animate={{ scale: [1, 1.15, 1], opacity: [0.2, 0.5, 0.2] }}
+                    transition={{ duration: 7 + index * 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="absolute -inset-5 rounded-full bg-[#FAF8F5]/80 border border-[#CBAE73]/30 blur-sm -z-10 group-hover:border-[#CBAE73]/50 group-hover:scale-120 transition-all duration-700"
+                  />
+                  
+                  {/* Central Node Circle */}
+                  <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center text-[#CBAE73] border border-gold/15 shadow-[0_8px_20px_rgba(203,174,115,0.06)] group-hover:shadow-[0_15px_30px_rgba(203,174,115,0.12)] group-hover:border-gold/40 group-hover:scale-105 transition-all duration-500">
+                    {iconMap[step.icon_name.toLowerCase()] || <Sparkles className="w-7 h-7 stroke-[1.1]" />}
+                  </div>
+
+                  {/* Index indicator */}
+                  <span className="absolute -top-1 -right-2 text-[9px] font-bold text-[#CBAE73] bg-white px-2 py-0.5 rounded-full border border-gold/10 font-body scale-90 group-hover:scale-100 transition-all duration-500">
+                    0{step.step_number}
+                  </span>
                 </div>
-                <h3 className="text-2xl font-display text-text-dark mb-4 tracking-wide">
-                  {step.title}
-                </h3>
-                <p className="text-text-dark/40 font-body font-light leading-relaxed text-sm">
-                  {step.description}
-                </p>
+
+                {/* Typography / Copy */}
+                <div className="space-y-4 max-w-xs relative z-10 mt-2 flex-grow flex flex-col justify-start">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#CBAE73]/80 group-hover:text-gold transition-colors duration-500 block">
+                    {step.subtitle}
+                  </span>
+                  
+                  <h3 className="font-display text-2xl text-text-dark tracking-wide font-light">
+                    {step.title}
+                  </h3>
+                  
+                  <p className="text-text-dark/70 font-body font-light leading-relaxed text-sm group-hover:text-text-dark/90 transition-colors duration-500">
+                    {step.description}
+                  </p>
+                </div>
+
+                {/* Mobile visual downward connector arrow */}
+                {index < stepsToRender.length - 1 && (
+                  <div className="absolute left-1/2 bottom-[-45px] -translate-x-1/2 w-[1.5px] h-10 bg-gradient-to-b from-[#CBAE73]/40 to-transparent block lg:hidden z-0 pointer-events-none" />
+                )}
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
-        
-        {/* Decorative center glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] radial-glow opacity-10 pointer-events-none" />
       </section>
     </>
   );
 }
-
-

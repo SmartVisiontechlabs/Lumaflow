@@ -88,13 +88,6 @@ const FormatStep = () => {
         ))}
       </div>
 
-      <button 
-        onClick={prevStep}
-        className="mt-12 mx-auto flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.4em] text-gold/30 hover:text-gold transition-all duration-700 focus:outline-none group cursor-pointer relative z-50"
-      >
-        <ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" /> 
-        Change Ritual
-      </button>
     </div>
   );
 };

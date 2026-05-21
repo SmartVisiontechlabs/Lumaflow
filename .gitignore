@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Scratch & debug scripts
+scratch/
+test-db*
+.vscode/

@@ -15,7 +15,8 @@ export const paymentController = {
       emotion, 
       timezone, 
       sessionFormat,
-      selectedPackage
+      selectedPackage,
+      journeyType
     } = req.body;
 
     try {
@@ -56,6 +57,7 @@ export const paymentController = {
           packageName,
           packagePrice: packagePrice.toString(),
           packageCredits: packageCredits.toString(),
+          journeyType: journeyType || '',
         },
       });
 
@@ -117,7 +119,8 @@ export const paymentController = {
         packageId: meta.packageId,
         packageName: meta.packageName,
         packagePrice: meta.packagePrice ? parseFloat(meta.packagePrice) : undefined,
-        packageCredits: meta.packageCredits ? parseInt(meta.packageCredits) : undefined
+        packageCredits: meta.packageCredits ? parseInt(meta.packageCredits) : undefined,
+        journeyType: meta.journeyType || ''
       });
 
       res.json(booking);

@@ -2,6 +2,18 @@ import { supabase } from '../config/supabase';
 import { generateBookingReference } from '../utils/bookingUtils';
 import { emailService } from './emailService';
 
+function parseIntentions(intentionsStr: string | null) {
+  if (!intentionsStr) return { journeyType: '', intentions: '' };
+  const match = intentionsStr.match(/^\[Journey:\s*([^\]]+)\]\s*(.*)/s);
+  if (match) {
+    return {
+      journeyType: match[1].trim(),
+      intentions: match[2].trim()
+    };
+  }
+  return { journeyType: '', intentions: intentionsStr };
+}
+
 export const bookingService = {
   /**
    * Retrieves all bookings from Supabase
@@ -15,19 +27,24 @@ export const bookingService = {
     if (error) throw error;
     
     // Map back to camelCase
-    return (rawData || []).map((b: any) => ({
-      ...b,
-      bookingReference: b.booking_reference,
-      selectedDate: b.selected_date,
-      selectedTime: b.selected_time,
-      bookingStatus: b.booking_status,
-      fullName: b.full_name,
-      selectedSession: b.selected_session,
-      sessionFormat: b.session_format,
-      stripe_payment_id: b.stripe_payment_id,
-      createdAt: b.created_at,
-      updatedAt: b.updated_at
-    }));
+    return (rawData || []).map((b: any) => {
+      const parsed = parseIntentions(b.intentions);
+      return {
+        ...b,
+        bookingReference: b.booking_reference,
+        selectedDate: b.selected_date,
+        selectedTime: b.selected_time,
+        bookingStatus: b.booking_status,
+        fullName: b.full_name,
+        selectedSession: b.selected_session,
+        sessionFormat: b.session_format,
+        stripe_payment_id: b.stripe_payment_id,
+        createdAt: b.created_at,
+        updatedAt: b.updated_at,
+        journeyType: parsed.journeyType,
+        intentions: parsed.intentions
+      };
+    });
   },
 
   /**
@@ -43,6 +60,7 @@ export const bookingService = {
     if (error) return { data: null, error };
     if (!data) return { data: null, error: null };
 
+    const parsed = parseIntentions(data.intentions);
     return {
       data: {
         ...data,
@@ -55,7 +73,9 @@ export const bookingService = {
         sessionFormat: data.session_format,
         stripe_payment_id: data.stripe_payment_id,
         createdAt: data.created_at,
-        updatedAt: data.updated_at
+        updatedAt: data.updated_at,
+        journeyType: parsed.journeyType,
+        intentions: parsed.intentions
       },
       error: null
     };
@@ -67,12 +87,17 @@ export const bookingService = {
   async createBooking(bookingData: any) {
     const reference = generateBookingReference();
     
+    let intentionsEnveloped = bookingData.intentions || '';
+    if (bookingData.journeyType) {
+      intentionsEnveloped = `[Journey: ${bookingData.journeyType}] ${intentionsEnveloped}`;
+    }
+
     // Map camelCase frontend data to snake_case for DB
     const dbData = {
       booking_reference: reference,
       full_name: bookingData.fullName,
       email: bookingData.email,
-      intentions: bookingData.intentions,
+      intentions: intentionsEnveloped,
       emotion: bookingData.emotion,
       selected_session: bookingData.selectedSession,
       session_format: bookingData.sessionFormat,
@@ -83,6 +108,9 @@ export const bookingService = {
       booking_status: 'confirmed',
       stripe_payment_id: bookingData.stripe_payment_id || null,
       package_id: bookingData.packageId || null,
+      package_name: bookingData.packageName || 'Single Session',
+      package_price: bookingData.packagePrice || null,
+      package_credits: bookingData.packageCredits || null,
       payment_status: 'paid',
       stripe_payment_status: 'paid',
       created_at: new Date().toISOString(),
@@ -103,6 +131,7 @@ export const bookingService = {
 
     console.log('BOOKING CREATED:', reference);
 
+    const parsedResult = parseIntentions(rawResult.intentions);
     // Map result back to camelCase
     const data = {
       ...rawResult,
@@ -114,8 +143,13 @@ export const bookingService = {
       selectedSession: rawResult.selected_session,
       sessionFormat: rawResult.session_format,
       stripe_payment_id: rawResult.stripe_payment_id,
+      packageName: rawResult.package_name,
+      packagePrice: rawResult.package_price,
+      packageCredits: rawResult.package_credits,
       createdAt: rawResult.created_at,
-      updatedAt: rawResult.updated_at
+      updatedAt: rawResult.updated_at,
+      journeyType: parsedResult.journeyType,
+      intentions: parsedResult.intentions
     };
 
     // 2. Trigger transactional email sequence

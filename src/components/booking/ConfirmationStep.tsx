@@ -1,16 +1,17 @@
-import React, { memo } from 'react';
+import React, { useState, memo } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useBookingFlow } from '../../hooks/useBookingFlow';
-import { CheckCircle2, Sparkles, Clock, MapPin, Calendar, Mail, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { CheckCircle2, Sparkles, Clock, MapPin, Calendar, Mail, ChevronLeft, ChevronRight, Loader2, User, MessageSquare } from 'lucide-react';
 import { format, parseISO, parse } from 'date-fns';
-import { bookingService } from '../../services/bookingService';
 import { paymentService } from '../../services/paymentService';
 import { getLocalTimeForEST } from '../../utils/bookingUtils';
 import { ritualJourneyMap } from '../../data/recommendationMap';
+import { cn } from '../../lib/utils';
 
 const ConfirmationStep = () => {
   const { 
+    journeyType,
     emotionalState,
     selectedRitual, 
     selectedPackage,
@@ -23,6 +24,7 @@ const ConfirmationStep = () => {
     intentions,
     lastBookingReference,
     isSubmitting,
+    setUserDetails,
     setBookingReference,
     setIsSubmitting,
     resetBooking, 
@@ -31,9 +33,12 @@ const ConfirmationStep = () => {
   } = useBookingFlow();
   
   const navigate = useNavigate();
+  const [activeField, setActiveField] = useState<string | null>(null);
+
+  const isFormValid = fullName.trim().length > 2 && email.includes('@') && email.includes('.');
 
   const handleSecureBooking = async () => {
-    if (lastBookingReference) return;
+    if (lastBookingReference || !isFormValid) return;
 
     setIsSubmitting(true);
     try {
@@ -48,7 +53,8 @@ const ConfirmationStep = () => {
         fullName,
         email,
         intentions,
-        selectedPackage // Include package intent
+        selectedPackage,
+        journeyType // Include journeyType
       });
       
       // Redirect to Stripe Hosted Checkout
@@ -118,75 +124,168 @@ const ConfirmationStep = () => {
           </div>
         </div>
 
-        {/* BOOKING SUMMARY CARD */}
-        <div className="bg-white/70 backdrop-blur-3xl border border-white/50 rounded-[4rem] p-12 shadow-luxury text-left grid grid-cols-1 md:grid-cols-2 gap-10 relative overflow-hidden">
+        {/* BOOKING SUMMARY AND DETAILS CARD */}
+        <div className="bg-white/70 backdrop-blur-3xl border border-white/50 rounded-[4rem] p-12 shadow-luxury text-left grid grid-cols-1 lg:grid-cols-2 gap-12 relative overflow-hidden">
+          {/* LEFT: SUMMARY DETAILS */}
           <div className="space-y-8">
-            <div className="space-y-2 pb-6 border-b border-gold/5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Selected Plan</p>
-              <div className="flex justify-between items-start">
-                <p className="font-display text-2xl text-text-dark tracking-tight">
+            <div className="space-y-6 pb-6 border-b border-gold/10 relative">
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/80">Selected Journey</p>
+                <p className="font-display text-3xl text-text-dark tracking-tight">
+                  {journeyType || "Breathwork"}
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/80">Healing Plan</p>
+                <p className="font-display text-2xl text-text-dark/90 tracking-tight">
                   {selectedPackage?.name || "Single Session"}
                 </p>
-                <div className="text-right">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold/60">Amount Paid</p>
-                  <p className="text-xl font-display text-gold">${selectedPackage?.price || 45}</p>
+                <div className="flex gap-8 pt-1">
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/40">Investment: </span>
+                    <span className="text-sm font-semibold text-gold">${selectedPackage?.price || 45}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/40">Sessions: </span>
+                    <span className="text-sm font-semibold text-text-dark/80">{selectedPackage?.credits || 1}</span>
+                  </div>
                 </div>
               </div>
-              <p className="text-[9px] text-text-dark/40 uppercase tracking-[0.2em] font-medium">
-                {selectedPackage?.credits || 1} {(selectedPackage?.credits || 1) === 1 ? 'Session' : 'Sessions'} Included
-              </p>
             </div>
 
-            <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Selected Ritual</p>
-              <p className="font-display text-3xl text-text-dark tracking-tight">{selectedRitual}</p>
-            </div>
-            
-            <div className="flex flex-col gap-5">
-              <div className="flex items-center gap-4 text-text-dark/70">
-                <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
-                  <MapPin className="w-4 h-4 text-gold" />
-                </div>
-                <span className="text-sm font-medium tracking-wide uppercase text-[10px]">{sessionFormat}</span>
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Recommended Ritual</p>
+                <p className="font-display text-2xl text-text-dark tracking-tight">{selectedRitual}</p>
               </div>
-              <div className="flex items-center gap-4 text-text-dark/70">
-                <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
-                  <Mail className="w-4 h-4 text-gold" />
+              
+              <div className="flex flex-wrap gap-x-8 gap-y-4 pt-2">
+                <div className="flex items-center gap-3 text-text-dark/70">
+                  <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-gold" />
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider text-[10px]">{sessionFormat}</span>
                 </div>
-                <span className="text-sm font-light tracking-wide">{email}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-8 md:border-l border-gold/10 md:pl-12">
-            <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Appointed Moment</p>
-              <p className="font-display text-3xl text-text-dark tracking-tight">
-                {parsedDate && format(parsedDate, 'MMMM do, yyyy')}
-              </p>
-            </div>
-            
-            <div className="flex flex-col gap-5">
-              <div className="flex items-center gap-4 text-text-dark/70">
-                <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
-                  <Calendar className="w-4 h-4 text-gold" />
-                </div>
-                <span className="text-sm font-light italic font-display">Preparation guide dispatched</span>
-              </div>
-              <div className="flex flex-col gap-1 text-text-dark/70">
-                <div className="flex items-center gap-4">
+                
+                <div className="flex items-center gap-3 text-text-dark/70">
                   <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
                     <Clock className="w-4 h-4 text-gold" />
                   </div>
-                  <span className="text-sm font-bold text-gold uppercase tracking-[0.4em]">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[10px]">{selectedDuration} Minutes</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4 pt-4 border-t border-gold/5">
+              <div className="space-y-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Appointed Moment</p>
+                <p className="font-display text-2xl text-text-dark tracking-tight">
+                  {parsedDate && format(parsedDate, 'MMMM do, yyyy')}
+                </p>
+              </div>
+              
+              <div className="flex flex-col gap-1 text-text-dark/70">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
+                    <Calendar className="w-4 h-4 text-gold" />
+                  </div>
+                  <span className="text-sm font-bold text-gold uppercase tracking-[0.3em]">
                     {selectedTime && format(parse(selectedTime, 'HH:mm', new Date()), 'hh:mm a')} EST
                   </span>
                 </div>
                 {selectedDate && selectedTime && (
-                  <p className="text-[10px] text-text-dark/40 italic pl-12">
+                  <p className="text-[10px] text-text-dark/40 italic pl-11">
                     Local Time: {getLocalTimeForEST(selectedDate, selectedTime)}
                   </p>
                 )}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: DETAILS INPUT FORM */}
+          <div className="space-y-6 lg:border-l border-gold/10 lg:pl-12 flex flex-col justify-center">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/80">Client Details</p>
+              <p className="text-xs font-light text-text-dark/40">Please provide your details to secure this sacred container.</p>
+            </div>
+
+            <div className="space-y-6">
+              {/* Full Name */}
+              <div className="relative">
+                <div className={cn(
+                  "absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-700",
+                  activeField === 'fullName' ? "text-gold" : "text-text-dark/10"
+                )}>
+                  <User className="w-5 h-5" />
+                </div>
+                <input 
+                  type="text" 
+                  placeholder=" "
+                  autoComplete="name"
+                  value={fullName}
+                  onFocus={() => setActiveField('fullName')}
+                  onBlur={() => setActiveField(null)}
+                  onChange={(e) => setUserDetails({ fullName: e.target.value })}
+                  className={cn(
+                    "peer w-full pl-16 pr-6 pt-7 pb-2.5 bg-white/40 border border-text-dark/5 rounded-[1.5rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark",
+                    fullName && "border-gold/20"
+                  )}
+                />
+                <label className="absolute left-16 top-2 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-xs peer-focus:top-2 peer-focus:translate-y-0 peer-focus:text-[8px]">
+                  Full Name
+                </label>
+              </div>
+
+              {/* Email Address */}
+              <div className="relative">
+                <div className={cn(
+                  "absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-700",
+                  activeField === 'email' ? "text-gold" : "text-text-dark/10"
+                )}>
+                  <Mail className="w-5 h-5" />
+                </div>
+                <input 
+                  type="email" 
+                  placeholder=" "
+                  autoComplete="email"
+                  value={email}
+                  onFocus={() => setActiveField('email')}
+                  onBlur={() => setActiveField(null)}
+                  onChange={(e) => setUserDetails({ email: e.target.value })}
+                  className={cn(
+                    "peer w-full pl-16 pr-6 pt-7 pb-2.5 bg-white/40 border border-text-dark/5 rounded-[1.5rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark",
+                    email && "border-gold/20"
+                  )}
+                />
+                <label className="absolute left-16 top-2 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-xs peer-focus:top-2 peer-focus:translate-y-0 peer-focus:text-[8px]">
+                  Email Address
+                </label>
+              </div>
+
+              {/* Intentions */}
+              <div className="relative">
+                <div className={cn(
+                  "absolute left-6 top-6 transition-colors duration-700",
+                  activeField === 'intentions' ? "text-gold" : "text-text-dark/10"
+                )}>
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <textarea 
+                  placeholder=" "
+                  rows={3}
+                  value={intentions}
+                  onFocus={() => setActiveField('intentions')}
+                  onBlur={() => setActiveField(null)}
+                  onChange={(e) => setUserDetails({ intentions: e.target.value })}
+                  className={cn(
+                    "peer w-full pl-16 pr-6 pt-9 pb-4 bg-white/40 border border-text-dark/5 rounded-[1.8rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark resize-none leading-relaxed",
+                    intentions && "border-gold/20"
+                  )}
+                />
+                <label className="absolute left-16 top-3 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-6 peer-placeholder-shown:text-xs peer-focus:top-3 peer-focus:text-[8px]">
+                  Primary Intention
+                </label>
               </div>
             </div>
           </div>
@@ -232,8 +331,8 @@ const ConfirmationStep = () => {
           <div className="flex flex-col sm:flex-row gap-6 w-full justify-center">
             <button 
               onClick={handleSecureBooking}
-              disabled={isSubmitting || !!lastBookingReference}
-              className="px-12 py-6 bg-text-dark text-white rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-luxury hover:bg-gold transition-all duration-700 active:scale-[0.98] group flex-grow sm:flex-grow-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isSubmitting || !!lastBookingReference || !isFormValid}
+              className="px-12 py-6 bg-text-dark text-white rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-luxury hover:bg-gold transition-all duration-700 active:scale-[0.98] group flex-grow sm:flex-grow-0 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <span className="flex items-center justify-center gap-2">
                 {isSubmitting ? "Opening Portal..." : lastBookingReference ? "Booking Confirmed" : "Secure & Proceed to Payment"}

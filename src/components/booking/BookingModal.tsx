@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, ChevronLeft } from 'lucide-react';
 import { useBookingFlow } from '../../hooks/useBookingFlow';
 import { stepTransition } from '../../animations/bookingTransitions';
 import BookingProgress from './BookingProgress';
@@ -36,7 +36,8 @@ export default function BookingModal() {
     closeBooking, 
     emotionalState, 
     selectedRitual,
-    showResumePrompt
+    showResumePrompt,
+    prevStep
   } = useBookingFlow();
 
   const StepComponent = useMemo(() => stepComponents[currentStep], [currentStep]);
@@ -140,6 +141,22 @@ export default function BookingModal() {
                     </div>
                   )}
                 </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* ELEGANT BACK BUTTON */}
+            <AnimatePresence>
+              {currentStep > 1 && currentStep < 8 && !showResumePrompt && (
+                <motion.button
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  onClick={prevStep}
+                  className="absolute bottom-10 left-12 flex items-center gap-3 z-50 text-[10px] font-bold uppercase tracking-[0.4em] text-text-dark/40 hover:text-gold transition-colors group focus:outline-none"
+                >
+                  <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                  Return
+                </motion.button>
               )}
             </AnimatePresence>
 

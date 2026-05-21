@@ -1,7 +1,6 @@
 import { useState, useEffect, useLayoutEffect, memo } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useBookingStore } from '../store/bookingStore';
-import BookingModal from './booking/BookingModal';
 
 const Nav = memo(({ openBooking }: { openBooking: () => void }) => (
   <nav className="fixed top-0 w-full z-[1000] bg-[#1A1A1A]/90 backdrop-blur-md border-b border-white/10 shadow-2xl transition-all duration-700 [.modal-open_&]:opacity-20 [.modal-open_&]:blur-sm">
@@ -74,29 +73,61 @@ const Footer = memo(() => (
 
 export default function Layout() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const openBooking = useBookingStore(state => state.openBooking);
   const closeBooking = useBookingStore(state => state.closeBooking);
+  const isOpen = useBookingStore(state => state.isOpen);
+
+  // Sync state: Redirect to /book when isOpen is true
+  useEffect(() => {
+    if (isOpen && pathname !== '/book') {
+      navigate('/book');
+    }
+  }, [isOpen, pathname, navigate]);
 
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
-    // CRITICAL: Force reset and close on any route change
-    closeBooking();
+    // CRITICAL: Force reset and close on any route change EXCEPT book or booking/success
+    if (pathname !== '/book' && !pathname.startsWith('/booking/')) {
+      closeBooking();
+    }
   }, [pathname, closeBooking]);
 
+  const isBookPage = pathname === '/book';
+
   return (
-    <div className="min-h-screen bg-cream text-text-dark font-body flex flex-col relative">
+    <div className="min-h-screen bg-cream text-text-dark font-body flex flex-col relative overflow-x-hidden">
       {/* Global Grain Texture Overlay */}
-      <div className="fixed inset-0 z-[100] bg-grain pointer-events-none opacity-50" />
+      <div className="fixed inset-0 z-[100] bg-grain pointer-events-none opacity-30 mix-blend-overlay" />
       
-      <Nav openBooking={openBooking} />
+      {/* Sitewide Luminous Background System */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden select-none">
+        {/* Soft radial gold glow in top center */}
+        <div className="absolute -top-[10%] left-[10%] w-[60vw] h-[60vw] rounded-full ambient-glow-gold opacity-90" />
+        
+        {/* Soft radial gold glow in middle right */}
+        <div className="absolute top-[30%] -right-[10%] w-[50vw] h-[50vw] rounded-full ambient-glow-gold opacity-70" />
+        
+        {/* Soft ambient white glow in center left */}
+        <div className="absolute top-[50%] -left-[10%] w-[60vw] h-[60vw] rounded-full ambient-glow-white opacity-60" />
 
-      <main className="flex-grow pt-[88px]">
-        <Outlet />
-      </main>
+        {/* Soft gold glow at bottom center */}
+        <div className="absolute -bottom-[10%] left-[20%] w-[50vw] h-[50vw] rounded-full ambient-glow-gold opacity-80" />
 
-      <Footer />
+        {/* Extremely subtle sun rays */}
+        <div className="absolute top-0 right-[5%] w-[40vw] h-[90vh] sun-beam-ray opacity-60 pointer-events-none" />
+        <div className="absolute top-12 right-[20%] w-[30vw] h-[75vh] sun-beam-ray opacity-30 rotate-[8deg] pointer-events-none" />
+      </div>
+      
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <Nav openBooking={openBooking} />
 
-      <BookingModal />
+        <main className="flex-grow pt-[88px] relative z-10">
+          <Outlet />
+        </main>
+
+        {!isBookPage && <Footer />}
+      </div>
     </div>
   );
 }

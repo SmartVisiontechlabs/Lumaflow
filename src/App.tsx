@@ -9,6 +9,7 @@ const Classes = lazy(() => import('./pages/Classes'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Contact = lazy(() => import('./pages/Contact'));
 const BookingSuccess = lazy(() => import('./pages/booking/BookingSuccess'));
+const BookPage = lazy(() => import('./pages/booking/BookPage.tsx'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 // Admin Imports
@@ -18,6 +19,7 @@ const DashboardOverview = lazy(() => import('./pages/admin/DashboardOverview'));
 const AdminBookings = lazy(() => import('./pages/admin/Bookings'));
 const CalendarManager = lazy(() => import('./pages/admin/CalendarManager'));
 const ClientManager = lazy(() => import('./pages/admin/ClientManager'));
+const CmsManager = lazy(() => import('./pages/admin/CmsManager'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
 
 // Protected Route Guard
@@ -63,6 +65,7 @@ export default function App() {
             <Route path="classes" element={<Classes />} />
             <Route path="pricing" element={<Pricing />} />
             <Route path="contact" element={<Contact />} />
+            <Route path="book" element={<BookPage />} />
             <Route path="booking/success" element={<BookingSuccess />} />
             <Route path="*" element={<NotFound />} />
           </Route>
@@ -76,6 +79,7 @@ export default function App() {
               <Route path="bookings" element={<AdminBookings />} />
               <Route path="calendar" element={<CalendarManager />} />
               <Route path="clients" element={<ClientManager />} />
+              <Route path="cms" element={<CmsManager />} />
               <Route path="settings" element={<AdminSettings />} />
             </Route>
           </Route>

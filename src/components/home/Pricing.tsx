@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBookingStore, PackageInfo } from '../../store/bookingStore';
 import { packageService, Package } from '../../services/packageService';
 
@@ -51,6 +52,7 @@ const fallbackPlans: PricingPlan[] = [
 
 export default function Pricing() {
   const openBooking = useBookingStore(state => state.openBooking);
+  const navigate = useNavigate();
   const [plans, setPlans] = useState<PricingPlan[]>(fallbackPlans);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -90,7 +92,8 @@ export default function Pricing() {
       credits: plan.credits,
       price: plan.priceValue
     };
-    openBooking(pkgInfo);
+    openBooking(pkgInfo, { entrySource: 'pricing' });
+    navigate('/book');
   };
 
   const trustItems = [

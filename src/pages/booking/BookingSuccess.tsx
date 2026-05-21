@@ -129,19 +129,39 @@ const BookingSuccess = () => {
         {/* Summary Card */}
         <div className="bg-white/60 backdrop-blur-3xl border border-white/50 rounded-[4rem] p-12 shadow-luxury grid grid-cols-1 md:grid-cols-2 gap-12 text-left relative overflow-hidden">
           <div className="space-y-8">
+            <div className="space-y-2 pb-6 border-b border-gold/5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Selected Package</p>
+              <div className="flex justify-between items-start">
+                <p className="font-display text-2xl text-text-dark tracking-tight">
+                  {bookingData?.packageName || "Single Session"}
+                </p>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-gold/60">Amount Paid</p>
+                  <p className="text-xl font-display text-gold">${bookingData?.packagePrice || 45}</p>
+                </div>
+              </div>
+              <p className="text-[9px] text-text-dark/40 uppercase tracking-[0.2em] font-medium mt-1">
+                {bookingData?.packageCredits || 1} {(bookingData?.packageCredits || 1) === 1 ? 'Session' : 'Sessions'} Included
+              </p>
+            </div>
+
             <div className="space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/60">Selected Ritual</p>
-              <p className="font-display text-3xl text-text-dark">{bookingData?.selectedSession}</p>
+              <p className="font-display text-3xl text-text-dark tracking-tight">{bookingData?.selectedSession}</p>
             </div>
             
-            <div className="space-y-4">
+            <div className="flex flex-col gap-5 pt-2">
               <div className="flex items-center gap-4 text-text-dark/70">
-                <Mail className="w-4 h-4 text-gold/60" />
-                <span className="text-sm font-light">{bookingData?.email}</span>
+                <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-gold" />
+                </div>
+                <span className="text-sm font-medium tracking-wide uppercase text-[10px]">{bookingData?.sessionFormat} Session</span>
               </div>
-              <div className="flex items-center gap-4 text-text-dark/70 uppercase tracking-widest text-[10px] font-bold">
-                <Sparkles className="w-4 h-4 text-gold/60" />
-                <span>{bookingData?.sessionFormat} Session</span>
+              <div className="flex items-center gap-4 text-text-dark/70">
+                <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
+                  <Mail className="w-4 h-4 text-gold" />
+                </div>
+                <span className="text-sm font-light tracking-wide">{bookingData?.email}</span>
               </div>
             </div>
           </div>
