@@ -4,15 +4,22 @@ import { availabilityService } from '../services/availabilityService';
 export const availabilityController = {
   async get(req: Request, res: Response) {
     try {
-      const { date, duration } = req.query;
+      const { date, duration, timezone } = req.query;
       
       if (!date || !duration) {
         return res.status(400).json({ error: 'Date and duration are required for attunement.' });
       }
 
+      const clientTz = (timezone as string) || 'UTC';
+      const serverTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      console.log(`[AVAILABILITY QUERY] Date: ${date}, Duration: ${duration}, Timezone: ${clientTz}`);
+      console.log(`[TIMEZONE] Server Timezone: ${serverTz}, Client Timezone: ${clientTz}`);
+
       const slots = await availabilityService.getAvailability(
         date as string, 
-        parseInt(duration as string)
+        parseInt(duration as string),
+        clientTz
       );
 
       res.json(slots);

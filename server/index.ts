@@ -12,6 +12,8 @@ import bookingRoutes from './routes/bookingRoutes';
 import availabilityRoutes from './routes/availabilityRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import cmsRoutes from './routes/cmsRoutes';
+import zoomRoutes from './routes/zoom';
+import adminRoutes from './routes/adminRoutes';
 import { reminderScheduler } from './services/reminderScheduler';
 
 const app = express();
@@ -19,18 +21,28 @@ const app = express();
 // --- PRODUCTION CORS CONFIG ---
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:3002',
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:3002',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
   process.env.FRONTEND_URL,
   'https://thelumaflow.com'
 ].filter(Boolean) as string[];
 
 app.use(cors({
   origin: (origin, callback) => {
+    // In development, allow all origins for convenience
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      console.warn(`CORS blocked origin: ${origin}`);
+      const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
       return callback(new Error(msg), false);
     }
     return callback(null, true);
@@ -55,6 +67,8 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/availability', availabilityRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/cms', cmsRoutes);
+app.use('/api/zoom', zoomRoutes);
+app.use('/api/admin', adminRoutes);
 
 const PORT = process.env.PORT || 3001;
 

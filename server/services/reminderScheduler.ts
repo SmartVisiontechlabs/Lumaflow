@@ -38,7 +38,14 @@ export const reminderScheduler = {
         selectedSession: rawBooking.selected_session,
         sessionFormat: rawBooking.session_format,
         createdAt: rawBooking.created_at,
-        updatedAt: rawBooking.updated_at
+        updatedAt: rawBooking.updated_at,
+        zoomMeetingId: rawBooking.zoom_meeting_id,
+        zoomJoinUrl: rawBooking.zoom_join_url,
+        zoomStartUrl: rawBooking.zoom_start_url,
+        meetingPassword: rawBooking.meeting_password,
+        meetingType: rawBooking.meeting_type,
+        calendarStatus: rawBooking.calendar_status,
+        reminderSent: rawBooking.reminder_sent,
       };
 
       const sessionStartTime = fromZonedTime(`${booking.selectedDate} ${booking.selectedTime}:00`, PROVIDER_TIMEZONE);
@@ -49,10 +56,22 @@ export const reminderScheduler = {
         await this.triggerEmailIfMissing(booking, 'reminder_24h', () => emailService.sendReminder24h(booking));
       }
 
-      // --- 2-HOUR PREP CHECK ---
-      const prep2hThreshold = subHours(sessionStartTime, 2);
-      if (isBefore(prep2hThreshold, now) && isBefore(now, sessionStartTime)) {
-        await this.triggerEmailIfMissing(booking, 'prep_2h', () => emailService.sendPrep2h(booking));
+      // --- 1-HOUR PREP CHECK ---
+      const prep1hThreshold = subHours(sessionStartTime, 1);
+      if (isBefore(prep1hThreshold, now) && isBefore(now, sessionStartTime)) {
+        await this.triggerEmailIfMissing(booking, 'prep_1h', () => emailService.sendPrep1h(booking));
+
+        // --- FUTURE WHATSAPP INTEGRATION PLACEHOLDER ---
+        // TODO: Once the Twilio / WhatsApp Business API credentials are set up,
+        // send an automated WhatsApp reminder to client with the join details.
+        // Expected payload example:
+        // const payload = {
+        //   to: booking.phoneNumber, // (Need to ensure phone number exists in schema/input)
+        //   template: 'prep_1h_reminder',
+        //   variables: [booking.fullName, booking.selectedSession, booking.zoomJoinUrl || 'Soho Sanctuary']
+        // };
+        // await whatsappService.send(payload);
+        console.log(`[WhatsApp Reminder Pending] WhatsApp automation placeholder for ${booking.fullName} (${booking.bookingReference})`);
       }
 
       // --- MARK AS COMPLETED CHECK ---

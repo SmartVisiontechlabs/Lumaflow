@@ -15,7 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Toast, ToastType } from '../../components/ui/Toast';
-import { supabase } from '../../lib/supabase';
+import { adminSupabase as supabase } from '../../lib/supabase';
 import { format } from 'date-fns';
 import { cn } from '../../lib/utils';
 import { TableSkeleton } from '../../components/ui/Skeleton';
@@ -431,6 +431,59 @@ const AdminBookings = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* Zoom Credentials (only if Virtual) */}
+                {selectedBooking.session_format?.toLowerCase() === 'virtual' && (
+                  <div className="space-y-4">
+                    <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/20 italic">Zoom Meeting Details</p>
+                    <div className="bg-white border border-text-dark/5 rounded-[2rem] p-8 shadow-sm space-y-6">
+                      <div className="grid grid-cols-2 gap-6 text-xs border-b border-text-dark/5 pb-4">
+                        <div>
+                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Meeting ID</span>
+                          <span className="font-mono text-text-dark font-semibold select-all">{selectedBooking.zoom_meeting_id || 'Not Provisioned'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Passcode</span>
+                          <span className="font-mono text-text-dark font-semibold select-all">{selectedBooking.meeting_password || 'None'}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6 text-xs border-b border-text-dark/5 pb-4">
+                        <div>
+                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Zoom Connection Status</span>
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider bg-gold/10 text-gold-light border border-gold/10">
+                            {selectedBooking.zoom_status || 'pending'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3 pt-2">
+                        {selectedBooking.zoom_start_url && (
+                          <a
+                            href={selectedBooking.zoom_start_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full py-4 bg-gold text-white text-center rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-text-dark transition-all duration-700 shadow-luxury flex items-center justify-center gap-2"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Start Zoom Meeting (As Host)
+                          </a>
+                        )}
+                        {selectedBooking.zoom_join_url && (
+                          <a
+                            href={selectedBooking.zoom_join_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full py-4 bg-white border border-text-dark/10 text-text-dark text-center rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-cream transition-all duration-500 flex items-center justify-center gap-2"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            Client Join Link
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Intentions */}
                 <div className="space-y-4">

@@ -54,7 +54,8 @@ export const bookingService = {
    */
   async getAvailability(date: string, duration: number): Promise<any[]> {
     try {
-      const response = await fetch(`${API_URL}/availability?date=${date}&duration=${duration}`);
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const response = await fetch(`${API_URL}/availability?date=${date}&duration=${duration}&timezone=${encodeURIComponent(tz)}`);
       if (!response.ok) throw new Error('Failed to fetch availability.');
       return await response.json();
     } catch (error) {

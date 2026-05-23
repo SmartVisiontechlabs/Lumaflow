@@ -14,7 +14,7 @@ import {
   Clock,
   Database
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { adminSupabase as supabase } from '../../lib/supabase';
 import { Toast, ToastType } from '../../components/ui/Toast';
 import { cn } from '../../lib/utils';
 

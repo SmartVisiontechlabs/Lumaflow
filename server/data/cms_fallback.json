@@ -52,16 +52,16 @@
   ],
   "founder_bio": {
     "id": "fallback-founder-id",
-    "name": "Alanna - Somatic Master",
-    "title": "Somatic Healing Guide & Breathwork Mentor",
-    "bio": "Deeply passionate about somatic integration.",
+    "name": "Alanna",
+    "title": "Meet Alanna",
+    "bio": "Alanna is a somatic practitioner and guide devoted to helping you reconnect with your natural state of calm through breath, movement, and awareness.",
     "credentials": [
-      "Somatic Level III",
-      "Breathwork (2000+ Hours)"
+      "Certified Somatic Facilitator",
+      "Breathwork Practitioner (1,200+ Hours)"
     ],
-    "quote": "Stillness is where change happens.",
-    "image_url": "/my-custom-image.jpeg",
-    "button_label": "Save Sanctuary Updates",
+    "quote": "I created Lumaflow as a space where you don’t have to fix yourself — only remember who you are.",
+    "image_url": "/alanna-new.jpeg",
+    "button_label": "Begin Your Journey",
     "button_link": "/book"
   },
   "quotes": [
@@ -99,15 +99,6 @@
       "program": "Deep Meditation Immersion",
       "is_featured": false,
       "sort_order": 3,
-      "rating": 5
-    },
-    {
-      "id": "fallback-review-1779363197537",
-      "client_name": "Test Client (Updated again via Params)",
-      "review_text": "This is a fantastic test review! - Fully Verified - Part 2",
-      "program": "Breathwork Mastery",
-      "is_featured": true,
-      "sort_order": 10,
       "rating": 5
     }
   ],

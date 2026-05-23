@@ -16,7 +16,8 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { cmsService } from '../../services/cmsService';
-import { supabase } from '../../lib/supabase';
+import { adminSupabase as supabase } from '../../lib/supabase';
+import { useCmsStore } from '../../store/cmsStore';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 import { 
@@ -202,15 +203,15 @@ export default function CmsManager() {
         cmsService.getRecommendationMatrix()
       ]);
 
-      // Form input mappings
-      const mappedHero: HeroContent = heroData ? {
+      // Form input mappings — check heroData?.id to avoid treating {} as a valid record
+      const mappedHero: HeroContent = heroData?.id ? {
         id: heroData.id,
-        headline: (heroData as any).title || heroData.headline,
-        subheadline: (heroData as any).subtitle || heroData.subheadline,
-        cta_text: (heroData as any).primary_cta_label || heroData.cta_text,
-        cta_link: (heroData as any).primary_cta_link || heroData.cta_link,
-        secondary_cta_text: (heroData as any).secondary_cta_label || heroData.secondary_cta_text,
-        secondary_cta_link: (heroData as any).secondary_cta_link || heroData.secondary_cta_link,
+        headline: (heroData as any).title || heroData.headline || '',
+        subheadline: (heroData as any).subtitle || heroData.subheadline || '',
+        cta_text: (heroData as any).primary_cta_label || heroData.cta_text || '',
+        cta_link: (heroData as any).primary_cta_link || heroData.cta_link || '/book',
+        secondary_cta_text: (heroData as any).secondary_cta_label || heroData.secondary_cta_text || '',
+        secondary_cta_link: (heroData as any).secondary_cta_link || heroData.secondary_cta_link || '#transformation-journey',
         background_visual_url: heroData.background_visual_url,
         is_active: heroData.is_active,
         updated_at: heroData.updated_at
@@ -219,25 +220,26 @@ export default function CmsManager() {
       const mappedSteps = stepsData.map(s => ({
         id: s.id,
         step_number: s.step_number,
-        title: s.title,
-        subtitle: s.subtitle,
-        description: s.description,
-        icon_name: (s as any).icon || s.icon_name,
+        title: s.title || '',
+        subtitle: s.subtitle || '',
+        description: s.description || '',
+        icon_name: (s as any).icon || s.icon_name || '',
         is_active: s.is_active,
         created_at: s.created_at,
         updated_at: s.updated_at
       }));
 
-      const mappedAbout: AboutAlanna = aboutData ? {
+      // check aboutData?.id to avoid treating {} as a valid record
+      const mappedAbout: AboutAlanna = aboutData?.id ? {
         id: aboutData.id,
         name: aboutData.name || 'Alanna',
-        photo_url: (aboutData as any).image_url || aboutData.photo_url,
-        bio_title: (aboutData as any).title || aboutData.bio_title,
-        quote: aboutData.quote,
-        bio_body: (aboutData as any).bio || aboutData.bio_body,
+        photo_url: (aboutData as any).image_url || aboutData.photo_url || '',
+        bio_title: (aboutData as any).title || aboutData.bio_title || '',
+        quote: aboutData.quote || '',
+        bio_body: (aboutData as any).bio || aboutData.bio_body || '',
         credentials: (aboutData as any).credentials || [],
-        cta_label: (aboutData as any).button_label || aboutData.cta_label,
-        cta_link: (aboutData as any).button_link || aboutData.cta_link,
+        cta_label: (aboutData as any).button_label || aboutData.cta_label || 'Begin Your Journey',
+        cta_link: (aboutData as any).button_link || aboutData.cta_link || '/book',
         updated_at: aboutData.updated_at
       } : null;
 
@@ -372,6 +374,7 @@ export default function CmsManager() {
       };
       
       const updated = await cmsService.updateHeroContent(hero.id, dbPayload as any);
+      await useCmsStore.getState().refetchCMS();
       
       showToast('Hero configuration synchronized successfully.', 'success');
       // Update pristine
@@ -402,6 +405,7 @@ export default function CmsManager() {
       };
 
       await cmsService.updateAboutAlanna(about.id, dbPayload as any);
+      await useCmsStore.getState().refetchCMS();
       showToast('Founder profile updated', 'success');
       setPristineState(prev => ({ ...prev, about: JSON.parse(JSON.stringify(about)) }));
     } catch (e) {
@@ -427,6 +431,7 @@ export default function CmsManager() {
       };
 
       await cmsService.updateTransformationStep(editingStep.id, dbPayload as any);
+      await useCmsStore.getState().refetchCMS();
       showToast(`Transformation step ${editingStep.step_number} updated.`, 'success');
       
       const newSteps = steps.map(s => s.id === editingStep.id ? editingStep : s);
@@ -455,6 +460,7 @@ export default function CmsManager() {
       };
 
       await cmsService.updateHealingPath(editingPath.id, dbPayload as any);
+      await useCmsStore.getState().refetchCMS();
       showToast('Offering changes synchronized.', 'success');
       
       const newPaths = paths.map(p => p.id === editingPath.id ? editingPath : p);
@@ -485,6 +491,7 @@ export default function CmsManager() {
       };
 
       await cmsService.updateRecommendationMatrixEntry(editingMatrix.id, dbPayload as any);
+      await useCmsStore.getState().refetchCMS();
       showToast('Intelligence matrix aligned.', 'success');
       
       const newMatrix = matrix.map(m => m.id === editingMatrix.id ? editingMatrix : m);
@@ -507,7 +514,10 @@ export default function CmsManager() {
       const dbPayload = {
         quote: editingQuote.quote_text,
         author: editingQuote.author_text || 'Client Reflection',
-        sort_order: editingQuote.display_order || 1,
+        // For new quotes: auto-increment sort_order so they appear after existing ones in the cycle
+        sort_order: editingQuote.id
+          ? (editingQuote.display_order || 1)
+          : (quotes.length + 1),
         is_featured: true
       };
 
@@ -538,6 +548,7 @@ export default function CmsManager() {
         setQuotes(newQuotes);
         setPristineState(prev => ({ ...prev, quotes: JSON.parse(JSON.stringify(newQuotes)) }));
       }
+      await useCmsStore.getState().refetchCMS();
       showToast('Reflection quote archived.', 'success');
       setShowQuoteModal(false);
     } catch (e) {
@@ -553,6 +564,7 @@ export default function CmsManager() {
     setIsSaving(true);
     try {
       await cmsService.deleteQuote(id);
+      await useCmsStore.getState().refetchCMS();
       showToast('Quote removed successfully.', 'success');
       const newQuotes = quotes.filter(q => q.id !== id);
       setQuotes(newQuotes);
@@ -567,7 +579,15 @@ export default function CmsManager() {
 
   // Testimonial actions
   const handleSaveTestimonial = async () => {
-    if (!editingTestimonial || !editingTestimonial.name || !editingTestimonial.quote) return;
+    if (!editingTestimonial) return;
+    if (!editingTestimonial.name) {
+      showToast('Client name is required.', 'error');
+      return;
+    }
+    if (!editingTestimonial.quote) {
+      showToast('Review quote text is required.', 'error');
+      return;
+    }
     setIsSaving(true);
     try {
       const dbPayload = {
@@ -612,6 +632,7 @@ export default function CmsManager() {
         setTestimonials(newTestimonials);
         setPristineState(prev => ({ ...prev, testimonials: JSON.parse(JSON.stringify(newTestimonials)) }));
       }
+      await useCmsStore.getState().refetchCMS();
       showToast('Transformation story archived.', 'success');
       setShowTestimonialModal(false);
     } catch (e) {
@@ -627,6 +648,7 @@ export default function CmsManager() {
     setIsSaving(true);
     try {
       await cmsService.deleteTestimonial(id);
+      await useCmsStore.getState().refetchCMS();
       showToast('Review deleted successfully.', 'success');
       const newTestimonials = testimonials.filter(t => t.id !== id);
       setTestimonials(newTestimonials);
@@ -1463,7 +1485,7 @@ export default function CmsManager() {
               <div className="space-y-2">
                 <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Quote Text</label>
                 <textarea
-                  value={editingQuote.quote_text}
+                  value={editingQuote.quote_text || ''}
                   onChange={e => setEditingQuote(prev => ({ ...prev, quote_text: e.target.value }))}
                   className="w-full bg-cream/30 border border-text-dark/5 p-4 rounded-xl text-xs focus:outline-none min-h-[100px]"
                 />
@@ -1507,7 +1529,7 @@ export default function CmsManager() {
                 <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Client Name</label>
                 <input
                   type="text"
-                  value={editingTestimonial.name}
+                  value={editingTestimonial.name || ''}
                   onChange={e => setEditingTestimonial(prev => ({ ...prev, name: e.target.value }))}
                   className="w-full bg-cream/30 border border-text-dark/5 p-4 rounded-xl text-xs focus:outline-none"
                 />
@@ -1524,7 +1546,7 @@ export default function CmsManager() {
               <div className="space-y-2">
                 <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Review Quote</label>
                 <textarea
-                  value={editingTestimonial.quote}
+                  value={editingTestimonial.quote || ''}
                   onChange={e => setEditingTestimonial(prev => ({ ...prev, quote: e.target.value }))}
                   className="w-full bg-cream/30 border border-text-dark/5 p-4 rounded-xl text-xs focus:outline-none min-h-[80px]"
                 />

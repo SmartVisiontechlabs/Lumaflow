@@ -1,11 +1,24 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Loader2, Sparkles, Calendar, Clock, Mail, ChevronRight } from 'lucide-react';
-import { format, parseISO, parse } from 'date-fns';
+import { CheckCircle2, Loader2, Sparkles, Calendar, Clock, Mail, ChevronRight, Copy, Check, MapPin, Video, Info } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
 import { paymentService } from '../../services/paymentService';
 import { useBookingStore } from '../../store/bookingStore';
 import { getLocalTimeForEST } from '../../utils/bookingUtils';
+
+const formatTo12Hour = (time24: string): string => {
+  if (!time24) return '';
+  try {
+    const [hoursStr, minutesStr] = time24.split(':');
+    const hours = parseInt(hoursStr, 10);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+    return `${displayHours.toString().padStart(2, '0')}:${minutesStr} ${ampm}`;
+  } catch (e) {
+    return time24;
+  }
+};
 
 const BookingSuccess = () => {
   const [searchParams] = useSearchParams();
@@ -18,12 +31,24 @@ const BookingSuccess = () => {
   const [error, setError] = useState<string | null>(null);
   const hasConfirmed = useRef(false);
 
+  const [copiedText, setCopiedText] = useState<'url' | 'password' | 'address' | null>(null);
+
+  const copyToClipboard = (text: string, type: 'url' | 'password' | 'address') => {
+    navigator.clipboard.writeText(text);
+    setCopiedText(type);
+    setTimeout(() => setCopiedText(null), 2000);
+  };
+
   useEffect(() => {
     const confirmBooking = async () => {
+      console.log("SUCCESS PAGE PARAMS");
+      console.log("searchParams", searchParams.toString());
+      console.log("sessionId", sessionId);
+
       if (!sessionId || hasConfirmed.current) {
         if (!sessionId) {
           setStatus('error');
-          setError('Missing session information.');
+          setError('Missing session information. Please verify your Stripe payment session.');
         }
         return;
       }
@@ -31,7 +56,10 @@ const BookingSuccess = () => {
       hasConfirmed.current = true;
 
       try {
-        const booking = await paymentService.confirmPayment(sessionId);
+        const response = await paymentService.confirmPayment(sessionId);
+        console.log("payment confirmation response:", response);
+        const booking = response.booking || response;
+        console.log("extracted booking object:", booking);
         setBookingData(booking);
         setBookingReference(booking.bookingReference);
         setStatus('success');
@@ -45,7 +73,7 @@ const BookingSuccess = () => {
     };
 
     confirmBooking();
-  }, [sessionId, setBookingReference]);
+  }, [sessionId, setBookingReference, searchParams]);
 
   if (status === 'loading') {
     return (
@@ -53,8 +81,8 @@ const BookingSuccess = () => {
         <div className="text-center space-y-8">
           <Loader2 className="w-16 h-16 text-gold animate-spin mx-auto" />
           <div className="space-y-4">
-            <h2 className="font-display text-4xl text-text-dark italic">Securing your sanctuary...</h2>
-            <p className="text-text-dark/40 uppercase tracking-[0.4em] text-[10px] font-bold">Aligning the celestial frequencies</p>
+            <h2 className="font-display text-4xl text-text-dark italic">Preparing Your Sanctuary Experience</h2>
+            <p className="text-text-dark/40 uppercase tracking-[0.4em] text-[10px] font-bold">Aligning your session, confirmation, and sacred details.</p>
           </div>
         </div>
       </div>
@@ -179,7 +207,7 @@ const BookingSuccess = () => {
                 <div className="flex items-center gap-4">
                   <Clock className="w-4 h-4 text-gold/60" />
                   <span className="text-sm font-bold text-gold uppercase tracking-[0.3em]">
-                    {bookingData?.selectedTime && format(parse(bookingData.selectedTime, 'HH:mm', new Date()), 'hh:mm a')} EST
+                    {bookingData?.selectedTime && formatTo12Hour(bookingData.selectedTime)} EST
                   </span>
                 </div>
                 {bookingData?.selectedDate && bookingData?.selectedTime && (
@@ -195,6 +223,141 @@ const BookingSuccess = () => {
             </div>
           </div>
         </div>
+
+        {/* Format Specific Details (Zoom or Location) */}
+        {bookingData && (
+          <div className="bg-white/50 backdrop-blur-xl border border-gold/15 rounded-[3rem] p-10 shadow-luxury max-w-2xl mx-auto space-y-6 text-left">
+            {bookingData.sessionFormat?.toLowerCase() === 'virtual' ? (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 border-b border-gold/10 pb-4">
+                  <Video className="w-6 h-6 text-gold" />
+                  <h3 className="font-display text-2xl text-text-dark">Virtual Sanctuary Credentials</h3>
+                </div>
+                
+                <div className="space-y-4">
+                  <p className="text-xs text-text-dark/60 leading-relaxed font-light">
+                    Your live session will take place in our virtual healing space via Zoom. Use the button below to join when it is time for your ritual.
+                  </p>
+
+                  {bookingData.zoomJoinUrl ? (
+                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                      <a
+                        href={bookingData.zoomJoinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-4 bg-gold text-white text-center rounded-full text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-text-dark transition-all duration-700 shadow-luxury flex items-center justify-center gap-2"
+                      >
+                        <Video className="w-4 h-4" />
+                        Enter Virtual Sanctuary
+                      </a>
+                      <button
+                        onClick={() => copyToClipboard(bookingData.zoomJoinUrl, 'url')}
+                        className="px-6 py-4 border border-gold/30 hover:border-gold rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-text-dark flex items-center justify-center gap-2 transition-all duration-500"
+                      >
+                        {copiedText === 'url' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                        {copiedText === 'url' ? 'Copied' : 'Copy Link'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-gold/5 rounded-2xl border border-gold/10 flex items-start gap-3">
+                      <Info className="w-5 h-5 text-gold shrink-0 mt-0.5" />
+                      <p className="text-[11px] text-text-dark/70 font-light">
+                        Zoom details are being provisioned and will be sent to your email (<span className="font-medium">{bookingData.email}</span>) shortly.
+                      </p>
+                    </div>
+                  )}
+
+                  {bookingData.zoomMeetingId && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-cream/40 p-5 rounded-2xl border border-gold/5 text-xs">
+                      <div>
+                        <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Meeting ID</span>
+                        <span className="font-mono text-text-dark font-medium">{bookingData.zoomMeetingId}</span>
+                      </div>
+                      {bookingData.meetingPassword && (
+                        <div className="relative">
+                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Password</span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-text-dark font-medium">{bookingData.meetingPassword}</span>
+                            <button
+                              onClick={() => copyToClipboard(bookingData.meetingPassword, 'password')}
+                              className="text-gold hover:text-text-dark transition-colors p-1"
+                              title="Copy Password"
+                            >
+                              {copiedText === 'password' ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Checklist */}
+                <div className="pt-4 border-t border-gold/5 space-y-3">
+                  <p className="text-[9px] font-bold text-gold uppercase tracking-[0.3em]">Virtual Checklist</p>
+                  <ul className="space-y-2">
+                    {[
+                      'Find a quiet, private space where you will not be disturbed',
+                      'Use high-quality headphones for the optimal soundscape and voice clarity',
+                      'Wear loose, comfortable clothing to allow unrestricted breath flow',
+                      'Ensure a stable internet connection and place your camera to see your upper body'
+                    ].map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-3 text-xs text-text-dark/70 font-light">
+                        <span className="text-gold shrink-0 mt-1">✦</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 border-b border-gold/10 pb-4">
+                  <MapPin className="w-6 h-6 text-gold" />
+                  <h3 className="font-display text-2xl text-text-dark">Sanctuary Location</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <p className="text-xs text-text-dark/60 leading-relaxed font-light">
+                    Your physical session will take place at our Soho sanctuary. Please arrive early to settle in.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                    <div className="flex-1 p-5 bg-cream/40 rounded-2xl border border-gold/5 flex flex-col justify-center">
+                      <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Address</span>
+                      <span className="text-sm text-text-dark font-medium">LumaFlow Sanctuary • Soho, Manhattan, NY</span>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard('LumaFlow Sanctuary, Soho, Manhattan, NY', 'address')}
+                      className="px-6 py-4 border border-gold/30 hover:border-gold rounded-full text-[10px] font-bold uppercase tracking-[0.2em] text-text-dark flex items-center justify-center gap-2 transition-all duration-500"
+                    >
+                      {copiedText === 'address' ? <Check className="w-4 h-4 text-green-600" /> : <Copy className="w-4 h-4" />}
+                      {copiedText === 'address' ? 'Address Copied' : 'Copy Address'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Checklist */}
+                <div className="pt-4 border-t border-gold/5 space-y-3">
+                  <p className="text-[9px] font-bold text-gold uppercase tracking-[0.3em]">Sanctuary Arrival Checklist</p>
+                  <ul className="space-y-2">
+                    {[
+                      'Wear comfortable, loose-fitting clothing suitable for deep breathing and movement',
+                      'Please arrive 10 minutes prior to your scheduled time to settle into the space',
+                      'Refrain from heavy meals for 2 hours preceding your ritual',
+                      'Press the LumaFlow buzzer at the entrance, and our sanctuary guide will receive you'
+                    ].map((item, idx) => (
+                      <li key={idx} className="flex items-start gap-3 text-xs text-text-dark/70 font-light">
+                        <span className="text-gold shrink-0 mt-1">✦</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
         {/* SECTION: Prepare For Your Session */}
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500 fill-mode-both">
@@ -219,10 +382,45 @@ const BookingSuccess = () => {
                               endHour.toString().padStart(2, '0') + 
                               endMin.toString().padStart(2, '0') + '00';
 
+                const isVirtual = bookingData.sessionFormat?.toLowerCase() === 'virtual';
+                const locationStr = isVirtual 
+                  ? (bookingData.zoomJoinUrl || 'Zoom link details to be sent')
+                  : 'LumaFlow Sanctuary, Soho, Manhattan, NY';
+
+                const rawDetails = isVirtual ? `
+Client: ${bookingData.fullName || 'Valued Guest'}
+Ritual: ${bookingData.selectedSession}
+Reference: ${bookingData.bookingReference}
+
+Zoom Join Link: ${bookingData.zoomJoinUrl || 'Provisioning details will be sent shortly'}
+Meeting ID: ${bookingData.zoomMeetingId || 'N/A'}
+Password: ${bookingData.meetingPassword || 'N/A'}
+
+Preparation Checklist:
+- Find a quiet, private space
+- Water/herbal tea nearby
+- Comfortable, loose clothing
+- High-quality headphones recommended
+- Test your internet and camera setup
+`.trim() : `
+Client: ${bookingData.fullName || 'Valued Guest'}
+Ritual: ${bookingData.selectedSession}
+Reference: ${bookingData.bookingReference}
+
+Location: LumaFlow Sanctuary • Soho, Manhattan, NY
+
+Preparation Checklist:
+- Wear loose-fitting clothing
+- Arrive 10 minutes early to settle in
+- Refrain from heavy meals 2h prior
+- Press the LumaFlow buzzer at the entrance
+`.trim();
+
                 const calendarTitle = encodeURIComponent('LumaFlow Healing Session');
-                const calendarDetails = encodeURIComponent(`Ritual: ${bookingData.selectedSession}\nBooking Reference: ${bookingData.bookingReference}\n\nPreparation Notes: Please arrive hydrated, comfortable, and in a quiet space.`);
+                const calendarDetails = encodeURIComponent(rawDetails);
+                const calendarLocation = encodeURIComponent(locationStr);
                 
-                const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${calendarTitle}&dates=${startTime}/${endTime}&details=${calendarDetails}&ctz=America/New_York`;
+                const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${calendarTitle}&dates=${startTime}/${endTime}&details=${calendarDetails}&location=${calendarLocation}&ctz=America/New_York`;
                 
                 window.open(googleCalendarUrl, '_blank');
               }}

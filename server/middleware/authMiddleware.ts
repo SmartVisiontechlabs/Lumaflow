@@ -17,8 +17,20 @@ export const adminAuth = async (req: Request, res: Response, next: NextFunction)
       return res.status(401).json({ error: 'Invalid or expired sanctuary token' });
     }
 
-    // Attach user to request
+    // Check user_profiles for role = admin
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError || !profile || profile.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied: Administrative privileges required' });
+    }
+
+    // Attach user and profile to request
     (req as any).user = user;
+    (req as any).profile = profile;
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Sanctuary authentication failed' });

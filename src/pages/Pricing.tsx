@@ -15,17 +15,33 @@ export default function Pricing() {
 
       <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto animate-fade-in delay-200">
         {[
-          { title: "Drop-in", price: "$35", desc: "Single class access" },
-          { title: "Monthly", price: "$150", desc: "Unlimited classes", highlighted: true },
-          { title: "10-Class Pass", price: "$300", desc: "Valid for 6 months" }
+          { 
+            title: "Drop-in", 
+            price: "$45", 
+            desc: "Single session access", 
+            pkg: { id: '772407fa-1b48-4f0f-80d5-1b343ada98c1', name: 'Single Session', credits: 1, price: 45 } 
+          },
+          { 
+            title: "Starter Journey", 
+            price: "$99", 
+            desc: "Starter Healing Journey (3 sessions)", 
+            highlighted: true, 
+            pkg: { id: 'e69dfd27-1da5-4584-b410-72b1ea76c48f', name: 'Starter Healing Journey', credits: 3, price: 99 } 
+          },
+          { 
+            title: "10-Class Pass", 
+            price: "$350", 
+            desc: "Valid for 6 months (10 sessions)", 
+            pkg: { id: 'ecca0c9b-42c6-4fbe-aec5-a1651ab6a29b', name: '10-Class Package', credits: 10, price: 350 } 
+          }
         ].map((tier, idx) => (
-          <div key={idx} className={`p-10 rounded-3xl transition-transform hover:-translate-y-2 ${tier.highlighted ? 'bg-gold text-white shadow-2xl scale-105' : 'glass border border-gold/20'}`}>
-            <h3 className={`font-display text-2xl mb-2 ${tier.highlighted ? 'text-white' : 'text-text-dark'}`}>{tier.title}</h3>
+          <div key={idx} className={`p-10 rounded-3xl transition-transform hover:-translate-y-2 ${tier.highlighted ? 'bg-[#CBAE73] text-black shadow-2xl scale-105' : 'glass border border-[#CBAE73]/20'}`}>
+            <h3 className={`font-display text-2xl mb-2 ${tier.highlighted ? 'text-black' : 'text-text-dark'}`}>{tier.title}</h3>
             <div className="text-4xl font-light mb-6">{tier.price}</div>
-            <p className={`mb-8 ${tier.highlighted ? 'text-white/80' : 'text-text-dark/60'}`}>{tier.desc}</p>
+            <p className={`mb-8 ${tier.highlighted ? 'text-black/80' : 'text-text-dark/60'}`}>{tier.desc}</p>
             <button 
-              onClick={openBooking}
-              className={`w-full py-3 rounded-full font-semibold tracking-wider uppercase text-sm transition-colors cursor-pointer ${tier.highlighted ? 'bg-white text-gold hover:bg-cream' : 'bg-text-dark text-white hover:bg-gold'}`}
+              onClick={() => openBooking(tier.pkg, { entrySource: 'pricing' })}
+              className={`w-full py-3 rounded-full font-semibold tracking-wider uppercase text-sm transition-colors cursor-pointer ${tier.highlighted ? 'bg-black text-[#CBAE73] hover:bg-zinc-900' : 'bg-text-dark text-white hover:bg-gold'}`}
             >
               Select Plan
             </button>

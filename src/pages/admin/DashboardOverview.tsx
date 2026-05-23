@@ -8,7 +8,7 @@ import {
   ArrowUpRight,
   ChevronRight
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { adminSupabase as supabase } from '../../lib/supabase';
 import { format } from 'date-fns';
 
 const DashboardOverview = () => {

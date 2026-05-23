@@ -25,7 +25,7 @@ import {
   isBefore,
   startOfToday
 } from 'date-fns';
-import { supabase } from '../../lib/supabase';
+import { adminSupabase as supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { Toast, ToastType } from '../../components/ui/Toast';
 

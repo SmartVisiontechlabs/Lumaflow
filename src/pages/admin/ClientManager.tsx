@@ -13,7 +13,7 @@ import {
   Calendar,
   CheckCircle2
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { adminSupabase as supabase } from '../../lib/supabase';
 import { format } from 'date-fns';
 import { cn } from '../../lib/utils';
 import { Skeleton } from '../../components/ui/Skeleton';

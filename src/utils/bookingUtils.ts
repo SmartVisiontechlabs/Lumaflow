@@ -33,8 +33,8 @@ export const formatESTTime = (timeStr: string) => {
 /**
  * Gets user's local time for an EST slot
  */
-export const getLocalTimeForEST = (dateStr: string, timeStr: string) => {
-  const userTimezone = typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
+export const getLocalTimeForEST = (dateStr: string, timeStr: string, timezone?: string) => {
+  const userTimezone = timezone || (typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC');
   
   // Create a UTC date from the EST time string
   const utcDate = fromZonedTime(`${dateStr} ${timeStr}:00`, PROVIDER_TIMEZONE);
@@ -51,21 +51,22 @@ export const getAvailableSlots = (
   dateStr: string, // YYYY-MM-DD
   duration: number,
   existingBookings: Booking[],
-  blockedSlots: any[] = []
+  blockedSlots: any[] = [],
+  timezone?: string
 ): AvailabilitySlot[] => {
   const slots: AvailabilitySlot[] = [];
-  const userTimezone = typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
+  const userTimezone = timezone || (typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC');
 
   console.log('--- UTILS DEBUG: getAvailableSlots ---');
-  console.log('Input Date:', dateStr);
-  console.log('Input Duration:', duration);
-  console.log('System Timezone:', userTimezone);
+  console.log('[AVAILABILITY QUERY] Input Date:', dateStr);
+  console.log('[AVAILABILITY QUERY] Input Duration:', duration);
+  console.log('[TIMEZONE] Resolved User Timezone:', userTimezone);
 
-  // 1. Check for Sunday
+  // 1. Check for Sunday using a timezone-safe UTC check
   const [year, month, day] = dateStr.split('-').map(Number);
-  const refDate = new Date(year, month - 1, day);
-  if (getDay(refDate) === 0) {
-    console.log('Sunday detected. No slots.');
+  const refDate = new Date(Date.UTC(year, month - 1, day));
+  if (refDate.getUTCDay() === 0) {
+    console.log('[BOOKING FILTER] Sunday detected. No slots.');
     return [];
   }
 
@@ -91,7 +92,7 @@ export const getAvailableSlots = (
     const slotStartUTC = fromZonedTime(`${dateStr} ${timeEST}:00`, PROVIDER_TIMEZONE);
     const slotEndUTC = addMinutes(slotStartUTC, duration);
 
-    const hasConflict = existingBookings.some(booking => {
+    const conflictingBooking = existingBookings.find(booking => {
       if (booking.selectedDate !== dateStr || booking.bookingStatus === 'cancelled') return false;
       
       const bStartUTC = fromZonedTime(`${booking.selectedDate} ${booking.selectedTime}:00`, PROVIDER_TIMEZONE);
@@ -100,11 +101,19 @@ export const getAvailableSlots = (
       return rangesOverlap(slotStartUTC, slotEndUTC, bStartUTC, bEndUTC);
     });
 
+    if (conflictingBooking) {
+      console.log(`[BOOKING FILTER] Conflict detected for slot ${timeEST} on ${dateStr} with booking ref ${conflictingBooking.bookingReference}`);
+    }
+    const hasConflict = !!conflictingBooking;
+
     // 4. Check against manual blocked slots (e.g. sanctuary maintenance)
     const isManuallyBlocked = (blockedSlots || []).some(block => {
       // Full day block (no time specified or explicit 24h range)
       const bt = block.blocked_time;
-      if (!bt || bt === '00:00-23:59' || bt === '00:00-11:59' || bt === '12:00 AM - 11:59 PM' || bt === '00:00') return true;
+      if (!bt || bt === '00:00-23:59' || bt === '00:00-11:59' || bt === '12:00 AM - 11:59 PM' || bt === '00:00') {
+        console.log(`[BLOCKED SLOTS] Full-day block matching for ${dateStr}: ${block.reason || 'No reason'}`);
+        return true;
+      }
 
       // Parse "HH:mm-HH:mm" or "HH:mm"
       const [bStart, bEnd] = block.blocked_time.split('-');
@@ -115,12 +124,16 @@ export const getAvailableSlots = (
         ? fromZonedTime(`${dateStr} ${bEnd}`, PROVIDER_TIMEZONE)
         : addMinutes(blockStartUTC, 30);
       
-      return rangesOverlap(slotStartUTC, slotEndUTC, blockStartUTC, blockEndUTC);
+      const overlaps = rangesOverlap(slotStartUTC, slotEndUTC, blockStartUTC, blockEndUTC);
+      if (overlaps) {
+        console.log(`[BLOCKED SLOTS] Slot ${timeEST} overlaps with blocked slot ${block.blocked_time} (${block.reason || 'No reason'})`);
+      }
+      return overlaps;
     });
 
     slots.push({
       timeEST: timeEST,
-      timeLocal: getLocalTimeForEST(dateStr, timeEST),
+      timeLocal: getLocalTimeForEST(dateStr, timeEST, userTimezone),
       isAvailable: !hasConflict && !isManuallyBlocked
     });
 
@@ -132,7 +145,7 @@ export const getAvailableSlots = (
     }
   }
 
-  console.log('Generated Slots Count:', slots.length);
+  console.log('[SLOTS GENERATED] Generated Slots Count:', slots.length);
   console.log('--- END UTILS DEBUG ---');
 
   return slots;

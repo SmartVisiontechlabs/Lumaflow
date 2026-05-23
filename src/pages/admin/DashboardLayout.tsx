@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Database
 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { adminSupabase as supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function DashboardLayout() {

@@ -25,6 +25,25 @@ export interface Booking {
   bookingStatus: BookingStatus;
   createdAt: string; // ISO
   updatedAt: string; // ISO
+
+  // Zoom & Reminders Integration
+  zoom_meeting_id?: string | null;
+  zoom_join_url?: string | null;
+  zoom_start_url?: string | null;
+  meeting_password?: string | null;
+  meeting_type?: string | null;
+  calendar_status?: string | null;
+  reminder_sent?: boolean | null;
+
+  zoomMeetingId?: string | null;
+  zoomJoinUrl?: string | null;
+  zoomStartUrl?: string | null;
+  meetingPassword?: string | null;
+  meetingType?: string | null;
+  calendarStatus?: string | null;
+  reminderSent?: boolean | null;
+  zoom_status?: string | null;
+  zoomStatus?: string | null;
 }
 
 export interface AvailabilitySlot {

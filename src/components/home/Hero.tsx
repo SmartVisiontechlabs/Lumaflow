@@ -1,42 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useBookingStore } from '../../store/bookingStore';
+import { useCmsStore } from '../../store/cmsStore';
+import { useAuth } from '../../providers/AuthProvider';
 import { Sparkles, Calendar, ArrowRight, ShieldCheck, Heart, Moon } from 'lucide-react';
-import { cmsService } from '../../services/cmsService';
-import { HeroContent } from '../../types/cms';
 
 export default function Hero() {
   const openBooking = useBookingStore(state => state.openBooking);
   const navigate = useNavigate();
-  const [content, setContent] = useState<HeroContent | null>(null);
+  const { isAuthenticated, profile, upcomingBooking } = useAuth();
+  
+  const hero = useCmsStore(state => state.hero);
+  const isLoading = useCmsStore(state => state.isLoading);
 
-  useEffect(() => {
-    cmsService.getHeroContent()
-      .then(data => setContent(data))
-      .catch(err => console.error('Failed to load dynamic hero content:', err));
-  }, []);
-
-  const heroData = content ? {
-    headline: content.title,
-    subheadline: content.subtitle,
-    cta_text: content.primary_cta_label,
-    cta_link: content.primary_cta_link,
-    secondary_cta_text: content.secondary_cta_label,
-    secondary_cta_link: content.secondary_cta_link
-  } : {
-    headline: 'Illuminate your\nhealing journey\nwith LumaFlow.',
-    subheadline: 'Step into a luminous sanctuary of high-frequency somatic restoration, where ancient stillness meets the cutting edge of personal transformation. Here, we don\'t fix you—we help you remember who you are.',
-    cta_text: 'Begin Your Healing Journey',
-    cta_link: '/book',
-    secondary_cta_text: 'Explore Healing Paths',
-    secondary_cta_link: '#transformation-journey'
-  };
+  const headline = hero?.title || hero?.headline || '';
+  const subheadline = hero?.subtitle || hero?.subheadline || '';
+  const cta_text = hero?.primary_cta_label || hero?.cta_text || '';
+  const cta_link = hero?.primary_cta_link || hero?.cta_link || '/book';
+  const secondary_cta_text = hero?.secondary_cta_label || hero?.secondary_cta_text || '';
+  const secondary_cta_link = hero?.secondary_cta_link || hero?.secondary_cta_text || '#transformation-journey';
 
   const handleHeroClick = () => {
-    openBooking(null, { entrySource: 'hero' });
-    navigate('/book');
+    if (isAuthenticated) {
+      if (upcomingBooking) {
+        navigate('/client/dashboard');
+      } else {
+        openBooking(null, { entrySource: 'hero' });
+        navigate('/book');
+      }
+    } else {
+      openBooking(null, { entrySource: 'hero' });
+      navigate('/book');
+    }
   };
+
+  const getPrimaryCtaText = () => {
+    if (!isAuthenticated) return cta_text || 'Book Ritual';
+    if (upcomingBooking) return 'Enter Sanctuary';
+    return 'Continue Healing Journey';
+  };
+
 
   return (
     <section className="relative min-h-[800px] lg:h-[95vh] flex items-center px-6 md:px-24 overflow-hidden bg-gradient-to-tr from-white via-cream to-[#FFFDF0] py-20 lg:py-0">
@@ -99,72 +103,104 @@ export default function Hero() {
         
         {/* LEFT SIDE: LUXURY HEADLINE & CTA */}
         <div className="lg:col-span-7 flex flex-col items-start text-left space-y-12">
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 2.2, ease: [0.22, 1, 0.36, 1] }}
-            className="space-y-8 relative w-full"
-          >
-            <div className="flex items-center gap-5 text-[10px] font-bold uppercase tracking-[0.5em] text-gold/60 z-10 relative">
-              <div className="w-8 h-[1px] bg-gold/30" />
-              <span>A Sacred Space for Awakening</span>
-            </div>
-            
-            <div className="relative">
-              {/* Soft Luminous Ambient Glow Behind Headline (5-10% Opacity) */}
-              <div className="absolute inset-x-0 -inset-y-4 bg-gold/6 rounded-full blur-[80px] scale-90 -z-10 pointer-events-none" />
+          {isLoading || !hero ? (
+            <div className="space-y-8 relative w-full animate-pulse">
+              <div className="flex items-center gap-5 text-[10px] font-bold uppercase tracking-[0.5em] text-gold/40">
+                <div className="w-8 h-[1px] bg-gold/20" />
+                <span>A Sacred Space for Awakening</span>
+              </div>
               
-              <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-text-dark leading-[1.1] tracking-tight max-w-[850px] font-light relative z-10">
-                {heroData.headline.split('\n').map((line, idx) => (
-                  <React.Fragment key={idx}>
-                    {idx === 1 ? (
-                      <span className="italic text-[#CBAE73] font-normal tracking-wide">{line}</span>
-                    ) : (
-                      line
-                    )}
-                    {idx < heroData.headline.split('\n').length - 1 && <br />}
-                  </React.Fragment>
-                ))}
-              </h1>
+              <div className="space-y-4">
+                <div className="h-12 sm:h-16 w-11/12 bg-gold/10 rounded-lg" />
+                <div className="h-12 sm:h-16 w-3/4 bg-gold/10 rounded-lg" />
+              </div>
+
+              <div className="space-y-3">
+                <div className="h-4 w-5/6 bg-gold/5 rounded" />
+                <div className="h-4 w-4/6 bg-gold/5 rounded" />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-6 w-full sm:w-auto pt-4">
+                <div className="w-full sm:w-48 h-14 bg-gold/10 rounded-full" />
+                <div className="w-full sm:w-40 h-14 bg-gold/5 rounded-full border border-gold/10" />
+              </div>
             </div>
-
-            <p className="font-body text-base md:text-lg text-text-dark/50 font-light max-w-[540px] leading-relaxed relative z-10">
-              {heroData.subheadline}
-            </p>
-          </motion.div>
-
-          {/* Premium Dual CTA Hierarchy */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1.8, delay: 0.8, ease: [0.22, 1, 0.36, 1] }}
-            className="flex flex-col sm:flex-row items-center gap-6 w-full sm:w-auto relative z-10"
-          >
-            {/* Primary CTA */}
-            <button
-              onClick={handleHeroClick}
-              className="w-full sm:w-auto px-12 py-5.5 bg-[#CBAE73] text-black rounded-full text-[11px] font-bold tracking-[0.4em] uppercase transition-all duration-500 shadow-[0_15px_30px_rgba(203,174,115,0.25)] hover:bg-[#E9D5A3] hover:shadow-[0_20px_45px_rgba(203,174,115,0.35)] hover:scale-105 active:scale-98 cursor-pointer group flex items-center justify-center gap-3"
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 2.2, ease: [0.22, 1, 0.36, 1] }}
+              className="space-y-8 relative w-full"
             >
-              <span className="relative z-10 flex items-center gap-3">
-                {heroData.cta_text} <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform duration-500" />
-              </span>
-            </button>
+              <div className="flex items-center gap-5 text-[10px] font-bold uppercase tracking-[0.5em] text-gold/60 z-10 relative">
+                <div className="w-8 h-[1px] bg-gold/30" />
+                <span>{isAuthenticated && profile?.full_name ? `Welcome Back, ${profile.full_name.split(' ')[0]}` : 'A Sacred Space for Awakening'}</span>
+              </div>
+              
+              <div className="relative">
+                {/* Soft Luminous Ambient Glow Behind Headline (5-10% Opacity) */}
+                <div className="absolute inset-x-0 -inset-y-4 bg-gold/6 rounded-full blur-[80px] scale-90 -z-10 pointer-events-none" />
+                
+                <h1 className="font-display text-4xl sm:text-5xl md:text-6xl lg:text-7xl text-text-dark leading-[1.1] tracking-tight max-w-[850px] font-light relative z-10">
+                  {isAuthenticated && profile?.full_name ? (
+                    <>
+                      Welcome back, <br />
+                      <span className="italic text-[#CBAE73] font-normal tracking-wide">{profile.full_name.split(' ')[0]}</span>
+                    </>
+                  ) : (
+                    headline.split('\n').map((line, idx) => (
+                      <React.Fragment key={idx}>
+                        {idx === 1 ? (
+                          <span className="italic text-[#CBAE73] font-normal tracking-wide">{line}</span>
+                        ) : (
+                          line
+                        )}
+                        {idx < headline.split('\n').length - 1 && <br />}
+                      </React.Fragment>
+                    ))
+                  )}
+                </h1>
+              </div>
 
-            {/* Secondary Ghost CTA */}
-            <button 
-              onClick={() => {
-                if (heroData.secondary_cta_link.startsWith('#')) {
-                  const element = document.getElementById(heroData.secondary_cta_link.substring(1));
-                  element?.scrollIntoView({ behavior: 'smooth' });
-                } else {
-                  navigate(heroData.secondary_cta_link);
-                }
-              }}
-              className="w-full sm:w-auto px-10 py-5.5 border border-gold/25 hover:border-gold/60 text-text-dark text-[11px] font-bold tracking-[0.4em] uppercase rounded-full transition-all duration-500 hover:bg-gold/5 hover:scale-102 active:scale-98 cursor-pointer flex items-center justify-center"
+              <p className="font-body text-base md:text-lg text-text-dark/50 font-light max-w-[540px] leading-relaxed relative z-10">
+                {subheadline}
+              </p>
+            </motion.div>
+          )}
+
+          {!isLoading && hero && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 1.8, delay: 0.8, ease: [0.22, 1, 0.36, 1] }}
+              className="flex flex-col sm:flex-row items-center gap-6 w-full sm:w-auto relative z-10"
             >
-              {heroData.secondary_cta_text}
-            </button>
-          </motion.div>
+              {/* Primary CTA */}
+              <button
+                onClick={handleHeroClick}
+                className="w-full sm:w-auto px-12 py-5.5 bg-[#CBAE73] text-black rounded-full text-[11px] font-bold tracking-[0.4em] uppercase transition-all duration-500 shadow-[0_15px_30px_rgba(203,174,115,0.25)] hover:bg-[#E9D5A3] hover:shadow-[0_20px_45px_rgba(203,174,115,0.35)] hover:scale-105 active:scale-98 cursor-pointer group flex items-center justify-center gap-3"
+              >
+                <span className="relative z-10 flex items-center gap-3">
+                  {getPrimaryCtaText()} <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1.5 transition-transform duration-500" />
+                </span>
+              </button>
+
+              {/* Secondary Ghost CTA */}
+              <button 
+                onClick={() => {
+                  if (secondary_cta_link.startsWith('#')) {
+                    const element = document.getElementById(secondary_cta_link.substring(1));
+                    element?.scrollIntoView({ behavior: 'smooth' });
+                  } else {
+                    navigate(secondary_cta_link);
+                  }
+                }}
+                className="w-full sm:w-auto px-10 py-5.5 border border-gold/25 hover:border-gold/60 text-text-dark text-[11px] font-bold tracking-[0.4em] uppercase rounded-full transition-all duration-500 hover:bg-gold/5 hover:scale-102 active:scale-98 cursor-pointer flex items-center justify-center"
+              >
+                {secondary_cta_text}
+              </button>
+            </motion.div>
+          )}
 
           {/* SACRED INDICATORS */}
           <motion.div 
@@ -186,60 +222,93 @@ export default function Hero() {
 
         {/* RIGHT SIDE: REFINED RITUAL BOOKING CARD (With Micro Hover Dynamics) */}
         <div className="lg:col-span-4 lg:col-start-9 relative hidden lg:block">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.97, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 2.2, ease: [0.22, 1, 0.36, 1], delay: 0.6 }}
-          >
-            {/* Breathing Motion Wrapper */}
-            <motion.div 
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
-              className="relative"
-            >
-              {/* Glassmorphic Panel - Lift & Shadow Transitions */}
-              <div className="glass rounded-[3.5rem] p-10 space-y-8 border-white/30 shadow-[0_20px_50px_rgba(58,58,58,0.03)] hover:shadow-[0_40px_80px_rgba(203,174,115,0.14)] bg-white/[0.12] hover:bg-white/[0.2] backdrop-blur-[80px] relative overflow-hidden group transition-all duration-1000 ease-out hover:-translate-y-2 cursor-pointer">
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/5 pointer-events-none group-hover:opacity-40 transition-opacity duration-1000" />
-                
-                <div className="space-y-4 relative z-10">
-                  <div className="flex items-center gap-3">
-                    <Moon className="w-3.5 h-3.5 text-gold" />
-                    <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold">Sacred Intake</p>
-                  </div>
-                  <h3 className="font-display text-3xl text-text-dark leading-[1.2] tracking-tight">Your <br />Personal <br />Sanctuary</h3>
+          {isLoading || !hero ? (
+            <div className="glass rounded-[3.5rem] p-10 space-y-8 border-white/30 bg-white/[0.06] backdrop-blur-[80px] animate-pulse">
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-3.5 h-3.5 rounded-full bg-gold/15" />
+                  <div className="h-2 w-24 bg-gold/15 rounded" />
                 </div>
-
-                <div className="space-y-6 relative z-10">
-                  {[
-                    { icon: Calendar, text: 'Select Your Moment', sub: 'Honoring your calendar' },
-                    { icon: Heart, text: 'Somatic Healing', sub: 'Where transformation begins' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center gap-5 group/item">
-                      <div className="w-10 h-10 rounded-full bg-cream/50 flex items-center justify-center text-gold border border-gold/5 transition-all duration-700 group-hover/item:border-gold/20 group-hover/item:scale-105">
-                        <item.icon className="w-4 h-4 stroke-[1.2]" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-dark/70">{item.text}</p>
-                        <p className="text-[10px] text-text-dark/35 italic font-light">{item.sub}</p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-2">
+                  <div className="h-6 w-32 bg-gold/10 rounded" />
+                  <div className="h-6 w-24 bg-gold/10 rounded" />
                 </div>
-
-                <button 
-                  onClick={handleHeroClick}
-                  className="w-full py-5 bg-text-dark text-white rounded-full text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-[#CBAE73] hover:text-black hover:shadow-lg transition-all duration-700 shadow-xl relative z-10 overflow-hidden cursor-pointer"
-                >
-                  <span className="relative z-10">Enter Sanctuary</span>
-                </button>
               </div>
+              <div className="space-y-6">
+                <div className="flex items-center gap-5">
+                  <div className="w-10 h-10 rounded-full bg-cream/50" />
+                  <div className="space-y-2">
+                    <div className="h-2.5 w-32 bg-gold/10 rounded" />
+                    <div className="h-2 w-20 bg-gold/5 rounded" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-5">
+                  <div className="w-10 h-10 rounded-full bg-cream/50" />
+                  <div className="space-y-2">
+                    <div className="h-2.5 w-28 bg-gold/10 rounded" />
+                    <div className="h-2 w-24 bg-gold/5 rounded" />
+                  </div>
+                </div>
+              </div>
+              <div className="w-full h-14 bg-gold/10 rounded-full" />
+            </div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.97, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 2.2, ease: [0.22, 1, 0.36, 1], delay: 0.6 }}
+            >
+              {/* Breathing Motion Wrapper */}
+              <motion.div 
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
+                className="relative"
+              >
+                {/* Glassmorphic Panel - Lift & Shadow Transitions */}
+                <div className="glass rounded-[3.5rem] p-10 space-y-8 border-white/30 shadow-[0_20px_50px_rgba(58,58,58,0.03)] hover:shadow-[0_40px_80px_rgba(203,174,115,0.14)] bg-white/[0.12] hover:bg-white/[0.2] backdrop-blur-[80px] relative overflow-hidden group transition-all duration-1000 ease-out hover:-translate-y-2 cursor-pointer">
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-white/5 pointer-events-none group-hover:opacity-40 transition-opacity duration-1000" />
+                  
+                  <div className="space-y-4 relative z-10">
+                    <div className="flex items-center gap-3">
+                      <Moon className="w-3.5 h-3.5 text-gold" />
+                      <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold">Sacred Intake</p>
+                    </div>
+                    <h3 className="font-display text-3xl text-text-dark leading-[1.2] tracking-tight">Your <br />Personal <br />Sanctuary</h3>
+                  </div>
 
-              {/* Decorative Texture Only */}
-              <div className="absolute -bottom-12 -left-12 w-48 h-48 border border-gold/[0.01] rounded-full mix-blend-overlay pointer-events-none" />
-              <div className="absolute -top-12 -right-12 w-40 h-40 border border-gold/[0.01] rounded-full mix-blend-overlay pointer-events-none" />
+                  <div className="space-y-6 relative z-10">
+                    {[
+                      { icon: Calendar, text: 'Select Your Moment', sub: 'Honoring your calendar' },
+                      { icon: Heart, text: 'Somatic Healing', sub: 'Where transformation begins' },
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-5 group/item">
+                        <div className="w-10 h-10 rounded-full bg-cream/50 flex items-center justify-center text-gold border border-gold/5 transition-all duration-700 group-hover/item:border-gold/20 group-hover/item:scale-105">
+                          <item.icon className="w-4 h-4 stroke-[1.2]" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-text-dark/70">{item.text}</p>
+                          <p className="text-[10px] text-text-dark/35 italic font-light">{item.sub}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button 
+                    onClick={handleHeroClick}
+                    className="w-full py-5 bg-text-dark text-white rounded-full text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-[#CBAE73] hover:text-black hover:shadow-lg transition-all duration-700 shadow-xl relative z-10 overflow-hidden cursor-pointer"
+                  >
+                    <span className="relative z-10">{getPrimaryCtaText()}</span>
+                  </button>
+                </div>
+
+                {/* Decorative Texture Only */}
+                <div className="absolute -bottom-12 -left-12 w-48 h-48 border border-gold/[0.01] rounded-full mix-blend-overlay pointer-events-none" />
+                <div className="absolute -top-12 -right-12 w-40 h-40 border border-gold/[0.01] rounded-full mix-blend-overlay pointer-events-none" />
+              </motion.div>
             </motion.div>
-          </motion.div>
+          )}
         </div>
+
 
       </div>
 

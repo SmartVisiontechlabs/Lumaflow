@@ -21,6 +21,10 @@ interface BookingConfirmationProps {
   intentions: string;
   googleCalendarUrl?: string;
   icsDataUri?: string;
+  sessionFormat: string;
+  zoomJoinUrl?: string | null;
+  zoomMeetingId?: string | null;
+  meetingPassword?: string | null;
 }
 
 export const BookingConfirmationEmail = ({
@@ -34,6 +38,10 @@ export const BookingConfirmationEmail = ({
   intentions,
   googleCalendarUrl,
   icsDataUri,
+  sessionFormat = 'Virtual',
+  zoomJoinUrl,
+  zoomMeetingId,
+  meetingPassword,
 }: BookingConfirmationProps) => (
   <EmailLayout previewTextText="Your sanctuary has been reserved ✨">
     {/* SECTION 1: Luxury Banner */}
@@ -82,7 +90,62 @@ export const BookingConfirmationEmail = ({
           <Text style={value}>{reference}</Text>
         </Column>
       </Row>
+
+      <Row style={row}>
+        <Column style={column}>
+          <Text style={label}>Format</Text>
+          <Text style={value}>{sessionFormat}</Text>
+        </Column>
+        <Column style={column}>
+          {sessionFormat.toLowerCase() === 'virtual' ? (
+            <>
+              <Text style={label}>Access Link</Text>
+              {zoomJoinUrl ? (
+                <a href={zoomJoinUrl} style={link}>Join Session</a>
+              ) : (
+                <Text style={value}>Sent in email guide</Text>
+              )}
+            </>
+          ) : (
+            <>
+              <Text style={label}>Location</Text>
+              <Text style={value}>Soho, Manhattan, NY</Text>
+            </>
+          )}
+        </Column>
+      </Row>
     </Section>
+
+    {/* SECTION: Zoom Credentials Card */}
+    {sessionFormat.toLowerCase() === 'virtual' && (zoomJoinUrl || zoomMeetingId) && (
+      <Section style={card}>
+        <Heading style={cardTitle}>Virtual Access Details</Heading>
+        <Text style={bodyText}>
+          Your live session will take place via Zoom. Use the details below when it is time to connect.
+        </Text>
+        {zoomJoinUrl && (
+          <Section style={{ textAlign: 'center', marginTop: '20px', marginBottom: '20px' }}>
+            <Button style={goldButton} href={zoomJoinUrl}>
+              Join Zoom Meeting
+            </Button>
+          </Section>
+        )}
+        {zoomMeetingId && (
+          <Row style={{ marginTop: '15px' }}>
+            <Column style={{ width: '50%' }}>
+              <Text style={label}>Meeting ID</Text>
+              <Text style={{ ...value, fontFamily: 'monospace' }}>{zoomMeetingId}</Text>
+            </Column>
+            {meetingPassword && (
+              <Column style={{ width: '50%' }}>
+                <Text style={label}>Password</Text>
+                <Text style={{ ...value, fontFamily: 'monospace' }}>{meetingPassword}</Text>
+              </Column>
+            )}
+          </Row>
+        )}
+      </Section>
+    )}
 
     {/* SECTION: Calendar CTA */}
     <Section style={calendarCtaSection}>
@@ -99,11 +162,22 @@ export const BookingConfirmationEmail = ({
     <Section style={prepSection}>
       <Heading style={h2}>Preparing For Your Session</Heading>
       <Section style={checklistContainer}>
-        <Text style={checkItem}>✓ &nbsp; Quiet private space</Text>
-        <Text style={checkItem}>✓ &nbsp; Water nearby</Text>
-        <Text style={checkItem}>✓ &nbsp; Comfortable clothing</Text>
-        <Text style={checkItem}>✓ &nbsp; Headphones recommended</Text>
-        <Text style={checkItem}>✓ &nbsp; Arrive 5 minutes early</Text>
+        {sessionFormat.toLowerCase() === 'virtual' ? (
+          <>
+            <Text style={checkItem}>✓ &nbsp; Find a quiet, private space</Text>
+            <Text style={checkItem}>✓ &nbsp; Water/herbal tea nearby</Text>
+            <Text style={checkItem}>✓ &nbsp; Comfortable, loose clothing</Text>
+            <Text style={checkItem}>✓ &nbsp; High-quality headphones recommended</Text>
+            <Text style={checkItem}>✓ &nbsp; Test your internet and camera setup</Text>
+          </>
+        ) : (
+          <>
+            <Text style={checkItem}>✓ &nbsp; Wear loose-fitting clothing</Text>
+            <Text style={checkItem}>✓ &nbsp; Arrive 10 minutes early to settle in</Text>
+            <Text style={checkItem}>✓ &nbsp; Refrain from heavy meals 2h prior</Text>
+            <Text style={checkItem}>✓ &nbsp; Arrive hydrated and open-minded</Text>
+          </>
+        )}
       </Section>
     </Section>
 
@@ -198,6 +272,14 @@ const value = {
   fontSize: '14px',
   fontWeight: '400',
   margin: 0,
+};
+
+const bodyText = {
+  color: '#3A3A3A',
+  fontSize: '14px',
+  lineHeight: '1.6',
+  fontWeight: '300',
+  margin: '0',
 };
 
 const prepSection = {

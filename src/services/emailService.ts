@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { BookingConfirmationEmail } from '../emails/BookingConfirmation';
 import { AdminNotificationEmail } from '../emails/AdminNotification';
 import { Reminder24hEmail } from '../emails/Reminder24h';
-import { Prep2hEmail } from '../emails/Prep2h';
+import { Prep1hEmail } from '../emails/Prep1h';
 import { Booking } from '../types/booking';
 import { getLocalTimeForEST } from '../utils/bookingUtils';
 import { format, parse } from 'date-fns';
@@ -57,6 +57,10 @@ export const emailService = {
           duration: booking.duration,
           reference: booking.bookingReference,
           intentions: booking.intentions,
+          sessionFormat: booking.sessionFormat || 'Virtual',
+          zoomJoinUrl: booking.zoomJoinUrl,
+          zoomMeetingId: booking.zoomMeetingId,
+          meetingPassword: booking.meetingPassword,
         }),
       });
 
@@ -134,31 +138,36 @@ export const emailService = {
   },
 
   /**
-   * Sends 2-hour preparation guide email
+   * Sends 1-hour preparation guide email
    */
-  async sendPrep2h(booking: Booking) {
-    console.log(`--- EMAIL ATTEMPT: 2h Prep for ${booking.bookingReference} ---`);
+  async sendPrep1h(booking: Booking) {
+    console.log(`--- EMAIL ATTEMPT: 1h Prep for ${booking.bookingReference} ---`);
     try {
       const timeLocal = getLocalTimeForEST(booking.selectedDate, booking.selectedTime);
 
       const result = await resend.emails.send({
         from: `LumaFlow <${FROM_EMAIL}>`,
         to: booking.email,
-        subject: 'A gentle preparation for your session',
-        react: Prep2hEmail({
+        subject: 'Your sanctuary ritual begins in 1 hour ✨',
+        react: Prep1hEmail({
           fullName: booking.fullName,
+          ritual: booking.selectedSession,
           timeLocal: timeLocal,
+          sessionFormat: booking.sessionFormat || 'Virtual',
+          zoomJoinUrl: booking.zoomJoinUrl,
+          zoomMeetingId: booking.zoomMeetingId,
+          meetingPassword: booking.meetingPassword,
         }),
       });
 
       if (result.error) {
-        await this.logEmail(booking.id, 'prep_2h', booking.email, 'failed', result.error.message);
+        await this.logEmail(booking.id, 'prep_1h', booking.email, 'failed', result.error.message);
       } else {
-        await this.logEmail(booking.id, 'prep_2h', booking.email, 'sent');
+        await this.logEmail(booking.id, 'prep_1h', booking.email, 'sent');
       }
     } catch (error: any) {
-      console.error('Error sending 2h prep email:', error);
-      await this.logEmail(booking.id, 'prep_2h_critical', booking.email, 'failed', error.message);
+      console.error('Error sending 1h prep email:', error);
+      await this.logEmail(booking.id, 'prep_1h_critical', booking.email, 'failed', error.message);
     }
   }
 };

@@ -11,3 +11,8 @@ coverage/
 scratch/
 test-db*
 .vscode/
+
+# Temporary diagnostic scripts
+test-*.ts
+inspect-*.ts
+server/check-bookings-schema.ts

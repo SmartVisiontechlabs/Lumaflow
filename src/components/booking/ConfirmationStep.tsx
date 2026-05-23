@@ -3,11 +3,27 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useBookingFlow } from '../../hooks/useBookingFlow';
 import { CheckCircle2, Sparkles, Clock, MapPin, Calendar, Mail, ChevronLeft, ChevronRight, Loader2, User, MessageSquare } from 'lucide-react';
-import { format, parseISO, parse } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { paymentService } from '../../services/paymentService';
 import { getLocalTimeForEST } from '../../utils/bookingUtils';
 import { ritualJourneyMap } from '../../data/recommendationMap';
 import { cn } from '../../lib/utils';
+
+const formatTo12Hour = (time24: string): string => {
+  if (!time24) return '';
+  try {
+    const [hoursStr, minutesStr] = time24.split(':');
+    const hours = parseInt(hoursStr, 10);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+    return `${displayHours.toString().padStart(2, '0')}:${minutesStr} ${ampm}`;
+  } catch (e) {
+    return time24;
+  }
+};
+
+import { useAuth } from '../../providers/AuthProvider';
+import { bookingService } from '../../services/bookingService';
 
 const ConfirmationStep = () => {
   const { 
@@ -32,8 +48,19 @@ const ConfirmationStep = () => {
     prevStep
   } = useBookingFlow();
   
+  const { isAuthenticated, profile, remainingCredits, user } = useAuth();
   const navigate = useNavigate();
   const [activeField, setActiveField] = useState<string | null>(null);
+
+  // Prefill details for logged-in users
+  React.useEffect(() => {
+    if (isAuthenticated && profile) {
+      setUserDetails({
+        fullName: fullName || profile.full_name || '',
+        email: email || profile.email || ''
+      });
+    }
+  }, [isAuthenticated, profile, setUserDetails]);
 
   const isFormValid = fullName.trim().length > 2 && email.includes('@') && email.includes('.');
 
@@ -42,25 +69,53 @@ const ConfirmationStep = () => {
 
     setIsSubmitting(true);
     try {
-      const checkoutUrl = await paymentService.createCheckoutSession({
-        emotion: emotionalState,
-        selectedSession: selectedRitual,
-        sessionFormat: sessionFormat as any,
-        duration: selectedDuration,
-        selectedDate: selectedDate,
-        selectedTime: selectedTime,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        fullName,
-        email,
-        intentions,
-        selectedPackage,
-        journeyType // Include journeyType
-      });
-      
-      // Redirect to Stripe Hosted Checkout
-      window.location.href = checkoutUrl;
+      if (isAuthenticated && remainingCredits > 0) {
+        // Book using existing membership/package credit
+        const bookingData = {
+          emotion: emotionalState,
+          selectedSession: selectedRitual,
+          sessionFormat: sessionFormat,
+          duration: selectedDuration,
+          selectedDate: selectedDate,
+          selectedTime: selectedTime,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          fullName,
+          email,
+          intentions,
+          selectedPackage: null, // No new package purchase
+          journeyType,
+          stripe_payment_id: 'credit_booking',
+          userId: profile?.id || user?.id
+        };
+
+        console.log('[ConfirmationStep] Booking with credit...', bookingData);
+        const result = await bookingService.createBooking(bookingData);
+        setBookingReference(result.bookingReference);
+        
+        setTimeout(() => {
+          setIsSubmitting(false);
+          navigate(`/booking/success?ref=${result.bookingReference}`);
+        }, 1500);
+      } else {
+        // Standard Stripe payment checkout
+        const checkoutUrl = await paymentService.createCheckoutSession({
+          emotion: emotionalState,
+          selectedSession: selectedRitual,
+          sessionFormat: sessionFormat as any,
+          duration: selectedDuration,
+          selectedDate: selectedDate,
+          selectedTime: selectedTime,
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          fullName,
+          email,
+          intentions,
+          selectedPackage,
+          journeyType
+        });
+        window.location.href = checkoutUrl;
+      }
     } catch (error) {
-      console.error('Payment initialization failed:', error);
+      console.error('Booking securing failed:', error);
       setIsSubmitting(false);
     }
   };
@@ -191,7 +246,7 @@ const ConfirmationStep = () => {
                     <Calendar className="w-4 h-4 text-gold" />
                   </div>
                   <span className="text-sm font-bold text-gold uppercase tracking-[0.3em]">
-                    {selectedTime && format(parse(selectedTime, 'HH:mm', new Date()), 'hh:mm a')} EST
+                    {selectedTime && formatTo12Hour(selectedTime)} EST
                   </span>
                 </div>
                 {selectedDate && selectedTime && (
@@ -332,10 +387,14 @@ const ConfirmationStep = () => {
             <button 
               onClick={handleSecureBooking}
               disabled={isSubmitting || !!lastBookingReference || !isFormValid}
-              className="px-12 py-6 bg-text-dark text-white rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-luxury hover:bg-gold transition-all duration-700 active:scale-[0.98] group flex-grow sm:flex-grow-0 disabled:opacity-30 disabled:cursor-not-allowed"
+              className="px-12 py-6 bg-text-dark text-white rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-luxury hover:bg-[#CBAE73] hover:text-black transition-all duration-700 active:scale-[0.98] group flex-grow sm:flex-grow-0 disabled:opacity-30 disabled:cursor-not-allowed"
             >
               <span className="flex items-center justify-center gap-2">
-                {isSubmitting ? "Opening Portal..." : lastBookingReference ? "Booking Confirmed" : "Secure & Proceed to Payment"}
+                {isSubmitting 
+                  ? (isAuthenticated && remainingCredits > 0 ? "Securing Session..." : "Opening Portal...") 
+                  : lastBookingReference 
+                  ? "Booking Confirmed" 
+                  : (isAuthenticated && remainingCredits > 0 ? "Book with 1 Ritual Credit" : "Secure & Proceed to Payment")}
                 {!isSubmitting && !lastBookingReference && <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
                 {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
               </span>

@@ -2,42 +2,154 @@ import { useState, useEffect, useLayoutEffect, memo } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useBookingStore } from '../store/bookingStore';
 
-const Nav = memo(({ openBooking }: { openBooking: () => void }) => (
-  <nav className="fixed top-0 w-full z-[1000] bg-[#1A1A1A]/90 backdrop-blur-md border-b border-white/10 shadow-2xl transition-all duration-700 [.modal-open_&]:opacity-20 [.modal-open_&]:blur-sm">
-    <div className="max-w-7xl mx-auto px-8 flex items-center justify-between h-[88px]">
-      <div className="flex items-center w-[200px] h-[64px]">
-        <Link to="/" className="flex items-center h-full w-full">
-          <img
-            src="/gold-logo.png"
-            alt="Lumaflow"
-            className="h-full w-auto object-contain drop-shadow-[0_0_8px_rgba(203,174,115,0.6)] brightness-110"
-          />
-        </Link>
-      </div>
+import { useAuth } from '../providers/AuthProvider';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown, LogOut, LayoutDashboard, Calendar, Sparkles, User, Compass, Clock } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
-      <div className="hidden md:flex items-center gap-12 text-[11px] font-bold uppercase tracking-[0.3em] text-white/80">
-        {['Home', 'About', 'Classes', 'Pricing', 'Contact'].map(link => {
-          let path = link === 'Home' ? '/' : `/${link.toLowerCase()}`;
-          return (
-            <Link key={link} to={path} className="relative group py-2 hover:text-[#CBAE73] transition-colors duration-500">
-              {link}
-              <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-[#CBAE73] transition-all duration-500 group-hover:w-full" />
-            </Link>
-          );
-        })}
-      </div>
+const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
+  const { isAuthenticated, profile } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
 
-      <div className="flex items-center justify-end">
-        <button
-          onClick={openBooking}
-          className="bg-[#CBAE73] text-black px-8 py-2.5 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-500 shadow-[0_6px_20px_rgba(203,174,115,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
-        >
-          Book Ritual
-        </button>
+  const handleLogout = async () => {
+    setIsOpen(false);
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
+  const menuItems = [
+    { name: 'Dashboard', path: '/client/dashboard', icon: LayoutDashboard },
+    { name: 'Upcoming Session', path: '/client/dashboard', icon: Clock },
+    { name: 'Membership', path: '/client/membership', icon: Sparkles },
+    { name: 'Booking History', path: '/client/bookings', icon: Calendar },
+    { name: 'Profile', path: '/client/profile', icon: User },
+  ];
+
+  // Close dropdown on click outside helper
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClose = () => setIsOpen(false);
+    document.addEventListener('click', handleClose);
+    return () => document.removeEventListener('click', handleClose);
+  }, [isOpen]);
+
+  const initials = profile?.full_name 
+    ? profile.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().substring(0, 2)
+    : 'SC';
+
+  return (
+    <nav className="fixed top-0 w-full z-[1000] bg-[#1A1A1A]/90 backdrop-blur-md border-b border-white/10 shadow-2xl transition-all duration-700 [.modal-open_&]:opacity-20 [.modal-open_&]:blur-sm">
+      <div className="max-w-7xl mx-auto px-8 flex items-center justify-between h-[88px]">
+        <div className="flex items-center w-[200px] h-[64px]">
+          <Link to="/" className="flex items-center h-full w-full">
+            <img
+              src="/gold-logo.png"
+              alt="Lumaflow"
+              className="h-full w-auto object-contain drop-shadow-[0_0_8px_rgba(203,174,115,0.6)] brightness-110"
+            />
+          </Link>
+        </div>
+
+        <div className="hidden md:flex items-center gap-12 text-[11px] font-bold uppercase tracking-[0.3em] text-white/80">
+          {['Home', 'About', 'Classes', 'Pricing', 'Contact'].map(link => {
+            let path = link === 'Home' ? '/' : `/${link.toLowerCase()}`;
+            return (
+              <Link key={link} to={path} className="relative group py-2 hover:text-[#CBAE73] transition-colors duration-500">
+                {link}
+                <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-[#CBAE73] transition-all duration-500 group-hover:w-full" />
+              </Link>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-end relative">
+          {isAuthenticated ? (
+            <div className="relative">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsOpen(!isOpen);
+                }}
+                className="bg-[#CBAE73] text-black px-6 py-2.5 rounded-full text-[10px] font-bold tracking-[0.25em] uppercase transition-all duration-500 shadow-[0_6px_20px_rgba(203,174,115,0.3)] hover:scale-102 flex items-center gap-3 cursor-pointer select-none"
+              >
+                <span>My Sanctuary</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <AnimatePresence>
+                {isOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 15, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 15, scale: 0.95 }}
+                    transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                    className="absolute right-0 mt-4 w-72 bg-[#1A1A1A]/95 border border-[#CBAE73]/20 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.5)] backdrop-blur-2xl overflow-hidden py-4 z-[1100]"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* User Profile Header */}
+                    <div className="px-6 py-4 border-b border-white/5 flex items-center gap-4 mb-2">
+                      <div className="w-10 h-10 rounded-full bg-[#CBAE73]/10 border border-[#CBAE73]/20 flex items-center justify-center text-[10px] font-bold text-[#CBAE73]">
+                        {initials}
+                      </div>
+                      <div className="space-y-0.5 truncate">
+                        <p className="text-xs font-bold text-white/90 truncate">{profile?.full_name || 'Client Sanctuary'}</p>
+                        <p className="text-[8px] font-bold uppercase tracking-widest text-[#CBAE73]/60 truncate">Client Member</p>
+                      </div>
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="space-y-1">
+                      {menuItems.map(item => (
+                        <Link
+                          key={item.name}
+                          to={item.path}
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center gap-4 px-6 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 hover:bg-white/5 hover:text-[#CBAE73] transition-all duration-500"
+                        >
+                          <item.icon className="w-4 h-4 text-[#CBAE73]/40" />
+                          {item.name}
+                        </Link>
+                      ))}
+
+                      {/* Custom book ritual link inside dropdown */}
+                      <button
+                        onClick={() => {
+                          setIsOpen(false);
+                          openBooking();
+                        }}
+                        className="w-full text-left flex items-center gap-4 px-6 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 hover:bg-white/5 hover:text-[#CBAE73] transition-all duration-500 cursor-pointer"
+                      >
+                        <Compass className="w-4 h-4 text-[#CBAE73]/40" />
+                        Book Ritual
+                      </button>
+
+                      {/* Logout */}
+                      <button
+                        onClick={handleLogout}
+                        className="w-full text-left flex items-center gap-4 px-6 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 hover:bg-red-500/5 hover:text-red-400 border-t border-white/5 mt-2 pt-4 transition-all duration-500 cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4 text-white/10" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <button
+              onClick={openBooking}
+              className="bg-[#CBAE73] text-black px-8 py-2.5 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-500 shadow-[0_6px_20px_rgba(203,174,115,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
+            >
+              Book Ritual
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  </nav>
-));
+    </nav>
+  );
+});
 
 const Footer = memo(() => (
   <footer className="bg-text-dark py-24 px-6 relative overflow-hidden">

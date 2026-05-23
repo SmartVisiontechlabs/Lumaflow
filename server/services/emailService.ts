@@ -3,7 +3,7 @@ import { supabase } from '../config/supabase';
 import { BookingConfirmationEmail } from '../../src/emails/BookingConfirmation';
 import { AdminNotificationEmail } from '../../src/emails/AdminNotification';
 import { Reminder24hEmail } from '../../src/emails/Reminder24h';
-import { Prep2hEmail } from '../../src/emails/Prep2h';
+import { Prep1hEmail } from '../../src/emails/Prep1h';
 import { FollowUpRitualEmail } from '../../src/emails/FollowUpRitualEmail';
 import { Booking } from '../types/booking';
 import { getLocalTimeForEST } from '../utils/bookingUtils';
@@ -61,17 +61,48 @@ export const emailService = {
 
     const calendarDates = `${formatInTimeZone(startUTC, 'UTC', "yyyyMMdd'T'HHmmss'Z'")}/${formatInTimeZone(endUTC, 'UTC', "yyyyMMdd'T'HHmmss'Z'")}`;
     const calendarTitle = encodeURIComponent('LumaFlow Healing Session');
-    const calendarDetails = encodeURIComponent(`
+    
+    const isVirtual = booking.sessionFormat?.toLowerCase() === 'virtual';
+    const locationStr = isVirtual 
+      ? (booking.zoomJoinUrl || 'Zoom link details to be sent')
+      : 'LumaFlow Sanctuary, Soho, Manhattan, NY';
+
+    const rawDetails = isVirtual ? `
 Client: ${booking.fullName}
 Ritual: ${booking.selectedSession}
 Reference: ${booking.bookingReference}
 
-Please arrive in a quiet space with water nearby and headphones if possible.
-    `.trim());
+Zoom Join Link: ${booking.zoomJoinUrl || 'Provisioning details will be sent shortly'}
+Meeting ID: ${booking.zoomMeetingId || 'N/A'}
+Password: ${booking.meetingPassword || 'N/A'}
 
-    const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${calendarTitle}&dates=${calendarDates}&details=${calendarDetails}`;
+Preparation Checklist:
+- Find a quiet, private space
+- Water/herbal tea nearby
+- Comfortable, loose clothing
+- High-quality headphones recommended
+- Test your internet and camera setup
+`.trim() : `
+Client: ${booking.fullName}
+Ritual: ${booking.selectedSession}
+Reference: ${booking.bookingReference}
+
+Location: LumaFlow Sanctuary • Soho, Manhattan, NY
+
+Preparation Checklist:
+- Wear loose-fitting clothing
+- Arrive 10 minutes early to settle in
+- Refrain from heavy meals 2h prior
+- Press the LumaFlow buzzer at the entrance
+`.trim();
+
+    const calendarDetails = encodeURIComponent(rawDetails);
+    const calendarLocation = encodeURIComponent(locationStr);
+
+    const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${calendarTitle}&dates=${calendarDates}&details=${calendarDetails}&location=${calendarLocation}`;
 
     // Generate ICS content
+    const icsDescription = rawDetails.replace(/\n/g, '\\n');
     const icsContent = `
 BEGIN:VCALENDAR
 VERSION:2.0
@@ -82,7 +113,8 @@ DTSTAMP:${formatInTimeZone(new Date(), 'UTC', "yyyyMMdd'T'HHmmss'Z'")}
 DTSTART:${formatInTimeZone(startUTC, 'UTC', "yyyyMMdd'T'HHmmss'Z'")}
 DTEND:${formatInTimeZone(endUTC, 'UTC', "yyyyMMdd'T'HHmmss'Z'")}
 SUMMARY:LumaFlow Healing Session
-DESCRIPTION:Client: ${booking.fullName}\\nRitual: ${booking.selectedSession}\\nReference: ${booking.bookingReference}\\n\\nPlease arrive in a quiet space with water nearby and headphones if possible.
+LOCATION:${locationStr}
+DESCRIPTION:${icsDescription}
 END:VEVENT
 END:VCALENDAR
     `.trim();
@@ -108,6 +140,10 @@ END:VCALENDAR
           intentions: booking.intentions,
           googleCalendarUrl,
           icsDataUri,
+          sessionFormat: booking.sessionFormat || 'Virtual',
+          zoomJoinUrl: booking.zoomJoinUrl,
+          zoomMeetingId: booking.zoomMeetingId,
+          meetingPassword: booking.meetingPassword,
         }),
         text: `
 Your Sanctuary Has Been Reserved
@@ -118,14 +154,31 @@ Your ritual journey is now scheduled.
 Ritual: ${booking.selectedSession}
 Date: ${format(parse(booking.selectedDate, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy')}
 Time: ${timeESTFormatted} (${timeLocal} Local)
+Format: ${booking.sessionFormat}
 Reference: ${booking.bookingReference}
 
-Preparation:
-- Quiet private space
-- Water nearby
-- Comfortable clothing
-- Headphones recommended
-- Arrive 5 minutes early
+${booking.sessionFormat?.toLowerCase() === 'virtual' ? `
+Access Details:
+Zoom Join Link: ${booking.zoomJoinUrl || 'Provisioning details will be sent shortly'}
+Meeting ID: ${booking.zoomMeetingId || 'N/A'}
+Password: ${booking.meetingPassword || 'N/A'}
+
+Preparation Checklist:
+- Find a quiet, private space
+- Water/herbal tea nearby
+- Comfortable, loose clothing
+- High-quality headphones recommended
+- Test your internet and camera setup
+` : `
+Location Details:
+LumaFlow Sanctuary • Soho, Manhattan, NY
+
+Preparation Checklist:
+- Wear loose-fitting clothing
+- Arrive 10 minutes early to settle in
+- Refrain from heavy meals 2h prior
+- Press the LumaFlow buzzer at the entrance
+`}
 
 Add to Google Calendar: ${googleCalendarUrl}
 
@@ -136,12 +189,14 @@ If you need support, reply to this email.
       if (clientResult.error) {
         console.error('USER EMAIL FAILED:', clientResult.error.message);
         await this.logEmail(booking.id, 'confirmation_client', booking.email, 'failed', clientResult.error.message);
+        throw new Error(`Client email failed: ${clientResult.error.message}`);
       } else {
-        console.log('USER EMAIL SUCCESS:', clientResult.data?.id);
+        console.log('[EMAIL SENT]');
         await this.logEmail(booking.id, 'confirmation_client', booking.email, 'sent');
       }
     } catch (userEmailError: any) {
       console.error('USER EMAIL FAILED (CRITICAL):', userEmailError.message);
+      throw userEmailError;
     }
 
     // 2. Send to ADMIN
@@ -170,12 +225,14 @@ If you need support, reply to this email.
       if (adminResult.error) {
         console.error('ADMIN EMAIL FAILED:', adminResult.error.message);
         await this.logEmail(booking.id, 'confirmation_admin', ADMIN_EMAIL, 'failed', adminResult.error.message);
+        throw new Error(`Admin email failed: ${adminResult.error.message}`);
       } else {
-        console.log('ADMIN EMAIL SUCCESS:', adminResult.data?.id);
+        console.log('[ADMIN EMAIL SENT]');
         await this.logEmail(booking.id, 'confirmation_admin', ADMIN_EMAIL, 'sent');
       }
     } catch (adminEmailError: any) {
       console.error('ADMIN EMAIL FAILED (CRITICAL):', adminEmailError.message);
+      throw adminEmailError;
     }
 
     console.log('--- EMAIL PIPELINE FINISHED ---');
@@ -257,31 +314,56 @@ If you need support, reply to this email.
   },
 
   /**
-   * Sends 2-hour preparation guide email
+   * Sends 1-hour preparation guide email
    */
-  async sendPrep2h(booking: Booking) {
-    console.log(`--- EMAIL ATTEMPT: 2h Prep for ${booking.bookingReference} ---`);
+  async sendPrep1h(booking: Booking) {
+    console.log(`--- EMAIL ATTEMPT: 1h Prep for ${booking.bookingReference} ---`);
     try {
       const timeLocal = getLocalTimeForEST(booking.selectedDate, booking.selectedTime);
 
       const result = await resend.emails.send({
         from: `LumaFlow <${FROM_EMAIL}>`,
         to: booking.email,
-        subject: 'A gentle preparation for your session',
-        react: Prep2hEmail({
+        subject: 'Your sanctuary ritual begins in 1 hour ✨',
+        react: Prep1hEmail({
           fullName: booking.fullName,
+          ritual: booking.selectedSession,
           timeLocal: timeLocal,
+          sessionFormat: booking.sessionFormat || 'Virtual',
+          zoomJoinUrl: booking.zoomJoinUrl,
+          zoomMeetingId: booking.zoomMeetingId,
+          meetingPassword: booking.meetingPassword,
         }),
+        text: `
+Soft Arrival
+
+Hello ${booking.fullName},
+The time for your ritual journey, ${booking.selectedSession}, is nearing. Your session begins in 1 hour (at ${timeLocal}).
+
+We invite you to begin your soft arrival now: disengage from screens, hydrate, and settle your breathing.
+
+${booking.sessionFormat?.toLowerCase() === 'virtual' ? `
+Virtual Sanctuary Credentials:
+Zoom Link: ${booking.zoomJoinUrl || 'N/A'}
+Meeting ID: ${booking.zoomMeetingId || 'N/A'}
+Password: ${booking.meetingPassword || 'N/A'}
+` : `
+Sanctuary Location:
+LumaFlow Sanctuary • Soho, Manhattan, NY
+`}
+
+We await you in the stillness.
+        `.trim(),
       });
 
       if (result.error) {
-        await this.logEmail(booking.id, 'prep_2h', booking.email, 'failed', result.error.message);
+        await this.logEmail(booking.id, 'prep_1h', booking.email, 'failed', result.error.message);
       } else {
-        await this.logEmail(booking.id, 'prep_2h', booking.email, 'sent');
+        await this.logEmail(booking.id, 'prep_1h', booking.email, 'sent');
       }
     } catch (error: any) {
-      console.error('Error sending 2h prep email:', error);
-      await this.logEmail(booking.id, 'prep_2h_critical', booking.email, 'failed', error.message);
+      console.error('Error sending 1h prep email:', error);
+      await this.logEmail(booking.id, 'prep_1h_critical', booking.email, 'failed', error.message);
     }
   }
 };

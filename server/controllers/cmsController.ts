@@ -2,11 +2,11 @@ import { Request, Response } from 'express';
 import { getSupabaseClient } from '../config/supabase';
 import fs from 'fs';
 import path from 'path';
-import { getLocalFallbackData, saveLocalFallbackData } from '../utils/localCmsFallback';
 
 export const cmsController = {
   // Batch get all CMS content (public read)
   async getBatch(req: Request, res: Response) {
+    console.log('[CMS LOAD] Starting batch fetch...');
     try {
       const client = getSupabaseClient(req);
       const [
@@ -27,103 +27,76 @@ export const cmsController = {
         client.from('intelligence_matrix').select('*').eq('is_active', true)
       ]);
 
-      let hero = heroRes.data;
-      if (heroRes.error) {
-        console.error('Supabase Error [Table: hero_content] in getBatch:', {
-          code: heroRes.error.code,
-          message: heroRes.error.message,
-          details: heroRes.error.details,
-          hint: heroRes.error.hint
+      const hasError = !!(
+        heroRes.error ||
+        stepsRes.error ||
+        founderRes.error ||
+        quotesRes.error ||
+        reviewsRes.error ||
+        offeringsRes.error ||
+        intelligenceRes.error
+      );
+
+      if (hasError) {
+        const errors = {
+          hero: heroRes.error?.message,
+          steps: stepsRes.error?.message,
+          founder: founderRes.error?.message,
+          quotes: quotesRes.error?.message,
+          reviews: reviewsRes.error?.message,
+          offerings: offeringsRes.error?.message,
+          intelligence: intelligenceRes.error?.message
+        };
+        console.error('[CMS LOAD] Database query failed. Exact reasons:', JSON.stringify(errors, null, 2));
+        console.log('[CMS LOAD] Resolving with local cms_fallback.json file content...');
+
+        const fallbackPath = path.join(process.cwd(), 'server', 'data', 'cms_fallback.json');
+        const fallbackRaw = fs.readFileSync(fallbackPath, 'utf8');
+        const fallback = JSON.parse(fallbackRaw);
+
+        console.log('[CMS LOAD] Fallback resolved successfully.');
+        return res.json({
+          hero: fallback.hero_content || {},
+          steps: fallback.transformation_steps || [],
+          founder: fallback.founder_bio || {},
+          quotes: fallback.quotes || [],
+          reviews: fallback.reviews || [],
+          offerings: fallback.offerings || [],
+          intelligence: fallback.intelligence_matrix || []
         });
-        hero = getLocalFallbackData('hero_content');
       }
 
-      let steps = stepsRes.data;
-      if (stepsRes.error) {
-        console.error('Supabase Error [Table: transformation_steps] in getBatch:', {
-          code: stepsRes.error.code,
-          message: stepsRes.error.message,
-          details: stepsRes.error.details,
-          hint: stepsRes.error.hint
-        });
-        steps = getLocalFallbackData('transformation_steps') || [];
-      }
-
-      let founder = founderRes.data;
-      if (founderRes.error) {
-        console.error('Supabase Error [Table: founder_bio] in getBatch:', {
-          code: founderRes.error.code,
-          message: founderRes.error.message,
-          details: founderRes.error.details,
-          hint: founderRes.error.hint
-        });
-        founder = getLocalFallbackData('founder_bio');
-      }
-
-      let quotes = quotesRes.data;
-      if (quotesRes.error) {
-        console.error('Supabase Error [Table: quotes] in getBatch:', {
-          code: quotesRes.error.code,
-          message: quotesRes.error.message,
-          details: quotesRes.error.details,
-          hint: quotesRes.error.hint
-        });
-        quotes = getLocalFallbackData('quotes') || [];
-      }
-
-      let reviews = reviewsRes.data;
-      if (reviewsRes.error) {
-        console.error('Supabase Error [Table: reviews] in getBatch:', {
-          code: reviewsRes.error.code,
-          message: reviewsRes.error.message,
-          details: reviewsRes.error.details,
-          hint: reviewsRes.error.hint
-        });
-        reviews = getLocalFallbackData('reviews') || [];
-      }
-
-      let offerings = offeringsRes.data;
-      if (offeringsRes.error) {
-        console.error('Supabase Error [Table: offerings] in getBatch:', {
-          code: offeringsRes.error.code,
-          message: offeringsRes.error.message,
-          details: offeringsRes.error.details,
-          hint: offeringsRes.error.hint
-        });
-        offerings = getLocalFallbackData('offerings') || [];
-      }
-
-      let intelligence = intelligenceRes.data;
-      if (intelligenceRes.error) {
-        console.error('Supabase Error [Table: intelligence_matrix] in getBatch:', {
-          code: intelligenceRes.error.code,
-          message: intelligenceRes.error.message,
-          details: intelligenceRes.error.details,
-          hint: intelligenceRes.error.hint
-        });
-        intelligence = getLocalFallbackData('intelligence_matrix') || [];
-      }
-
+      console.log('[CMS LOAD] Successfully loaded CMS content from Supabase database.');
       res.json({
-        hero: hero || {},
-        steps: steps || [],
-        founder: founder || {},
-        quotes: quotes || [],
-        reviews: reviews || [],
-        offerings: offerings || [],
-        intelligence: intelligence || []
+        hero: heroRes.data || {},
+        steps: stepsRes.data || [],
+        founder: founderRes.data || {},
+        quotes: quotesRes.data || [],
+        reviews: reviewsRes.data || [],
+        offerings: offeringsRes.data || [],
+        intelligence: intelligenceRes.data || []
       });
-    } catch (error) {
-      console.error('Unexpected error loading CMS batch:', error);
-      res.json({
-        hero: getLocalFallbackData('hero_content') || {},
-        steps: getLocalFallbackData('transformation_steps') || [],
-        founder: getLocalFallbackData('founder_bio') || {},
-        quotes: getLocalFallbackData('quotes') || [],
-        reviews: getLocalFallbackData('reviews') || [],
-        offerings: getLocalFallbackData('offerings') || [],
-        intelligence: getLocalFallbackData('intelligence_matrix') || []
-      });
+    } catch (error: any) {
+      console.error('[CMS LOAD] Unexpected error during fetch. Failure reason:', error.message || error);
+      console.log('[CMS LOAD] Attempting local JSON fallback retrieval...');
+      try {
+        const fallbackPath = path.join(process.cwd(), 'server', 'data', 'cms_fallback.json');
+        const fallbackRaw = fs.readFileSync(fallbackPath, 'utf8');
+        const fallback = JSON.parse(fallbackRaw);
+        console.log('[CMS LOAD] Fallback resolved successfully after unexpected exception.');
+        return res.json({
+          hero: fallback.hero_content || {},
+          steps: fallback.transformation_steps || [],
+          founder: fallback.founder_bio || {},
+          quotes: fallback.quotes || [],
+          reviews: fallback.reviews || [],
+          offerings: fallback.offerings || [],
+          intelligence: fallback.intelligence_matrix || []
+        });
+      } catch (fallbackErr: any) {
+        console.error('[CMS LOAD] CRITICAL: Fallback JSON failed to load:', fallbackErr.message || fallbackErr);
+        res.status(500).json({ error: error.message || 'Unexpected error loading CMS batch' });
+      }
     }
   },
 
@@ -133,28 +106,32 @@ export const cmsController = {
       const client = getSupabaseClient(req);
       const { data, error } = await client.from('hero_content').select('*').maybeSingle();
       if (error) {
-        console.error('Supabase Error [Table: hero_content] in getHero:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        return res.json(getLocalFallbackData('hero_content'));
+        console.error('Supabase Error [Table: hero_content] in getHero:', error);
+        return res.status(500).json({ error: error.message });
       }
-      res.json(data || getLocalFallbackData('hero_content'));
-    } catch (error) {
+      res.json(data || {});
+    } catch (error: any) {
       console.error('Unexpected error in getHero:', error);
-      res.json(getLocalFallbackData('hero_content'));
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
   async updateHero(req: Request, res: Response) {
-    const id = req.params?.id || req.body?.id;
     const { title, subtitle, primary_cta_label, primary_cta_link, secondary_cta_label, secondary_cta_link } = req.body || {};
     try {
       const client = getSupabaseClient(req);
+      const { data: existingRow, error: findError } = await client
+        .from('hero_content')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+
+      if (findError) {
+        console.error('Supabase Error finding existing hero_content in updateHero:', findError);
+      }
+
       let query;
-      if (id) {
+      if (existingRow?.id) {
         query = client.from('hero_content').update({
           title,
           subtitle,
@@ -163,7 +140,7 @@ export const cmsController = {
           secondary_cta_label,
           secondary_cta_link,
           updated_at: new Date().toISOString()
-        }).eq('id', id);
+        }).eq('id', existingRow.id);
       } else {
         query = client.from('hero_content').insert({
           title,
@@ -177,39 +154,13 @@ export const cmsController = {
 
       const { data, error } = await query.select().single();
       if (error) {
-        console.error('Supabase Error [Table: hero_content] in updateHero:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        // Fallback save
-        const saved = saveLocalFallbackData('hero_content', () => ({
-          id: id || 'fallback-hero-id',
-          title,
-          subtitle,
-          primary_cta_label,
-          primary_cta_link,
-          secondary_cta_label,
-          secondary_cta_link,
-          updated_at: new Date().toISOString()
-        }));
-        return res.json(saved);
+        console.error('Supabase Error [Table: hero_content] in updateHero:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in updateHero:', error);
-      const saved = saveLocalFallbackData('hero_content', () => ({
-        id: id || 'fallback-hero-id',
-        title,
-        subtitle,
-        primary_cta_label,
-        primary_cta_link,
-        secondary_cta_label,
-        secondary_cta_link,
-        updated_at: new Date().toISOString()
-      }));
-      res.json(saved);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -222,18 +173,13 @@ export const cmsController = {
         .select('*')
         .order('sort_order', { ascending: true });
       if (error) {
-        console.error('Supabase Error [Table: transformation_steps] in getSteps:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        return res.json(getLocalFallbackData('transformation_steps') || []);
+        console.error('Supabase Error [Table: transformation_steps] in getSteps:', error);
+        return res.status(500).json({ error: error.message });
       }
-      res.json(data && data.length > 0 ? data : (getLocalFallbackData('transformation_steps') || []));
-    } catch (error) {
+      res.json(data || []);
+    } catch (error: any) {
       console.error('Unexpected error in getSteps:', error);
-      res.json(getLocalFallbackData('transformation_steps') || []);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -258,40 +204,13 @@ export const cmsController = {
         .single();
 
       if (error) {
-        console.error('Supabase Error [Table: transformation_steps] in updateStep:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        const saved = saveLocalFallbackData('transformation_steps', (current: any[]) => {
-          const idx = current.findIndex(s => s.id === id);
-          const updatedStep = { id, step_number, title, subtitle, description, icon, sort_order, is_active };
-          if (idx > -1) {
-            current[idx] = updatedStep;
-          } else {
-            current.push(updatedStep);
-          }
-          return current;
-        });
-        const updatedItem = saved ? saved.find((s: any) => s.id === id) : null;
-        return res.json(updatedItem || { id, step_number, title, subtitle, description, icon, sort_order, is_active });
+        console.error('Supabase Error [Table: transformation_steps] in updateStep:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in updateStep:', error);
-      const saved = saveLocalFallbackData('transformation_steps', (current: any[]) => {
-        const idx = current.findIndex(s => s.id === id);
-        const updatedStep = { id, step_number, title, subtitle, description, icon, sort_order, is_active };
-        if (idx > -1) {
-          current[idx] = updatedStep;
-        } else {
-          current.push(updatedStep);
-        }
-        return current;
-      });
-      const updatedItem = saved ? saved.find((s: any) => s.id === id) : null;
-      res.json(updatedItem || { id, step_number, title, subtitle, description, icon, sort_order, is_active });
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -301,29 +220,32 @@ export const cmsController = {
       const client = getSupabaseClient(req);
       const { data, error } = await client.from('founder_bio').select('*').maybeSingle();
       if (error) {
-        console.error('Supabase Error [Table: founder_bio] in getFounder:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        return res.json(getLocalFallbackData('founder_bio'));
+        console.error('Supabase Error [Table: founder_bio] in getFounder:', error);
+        return res.status(500).json({ error: error.message });
       }
-      res.json(data || getLocalFallbackData('founder_bio'));
-    } catch (error) {
+      res.json(data || {});
+    } catch (error: any) {
       console.error('Unexpected error in getFounder:', error);
-      res.json(getLocalFallbackData('founder_bio'));
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
   async updateFounder(req: Request, res: Response) {
-    const id = req.params?.id || req.body?.id;
     const { name, title, bio, credentials, quote, image_url, button_label, button_link } = req.body || {};
     try {
       const client = getSupabaseClient(req);
+      const { data: existingRow, error: findError } = await client
+        .from('founder_bio')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+
+      if (findError) {
+        console.error('Supabase Error finding existing founder_bio in updateFounder:', findError);
+      }
 
       let query;
-      if (id) {
+      if (existingRow?.id) {
         const updateData: any = {
           title,
           bio,
@@ -336,7 +258,7 @@ export const cmsController = {
         if (name !== undefined && name !== null && name !== '') {
           updateData.name = name;
         }
-        query = client.from('founder_bio').update(updateData).eq('id', id);
+        query = client.from('founder_bio').update(updateData).eq('id', existingRow.id);
       } else {
         const insertData = {
           name: name || 'Alanna',
@@ -353,48 +275,13 @@ export const cmsController = {
 
       const { data, error } = await query.select().single();
       if (error) {
-        console.error('Supabase Error [Table: founder_bio] in updateFounder:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        
-        // Fallback save
-        const saved = saveLocalFallbackData('founder_bio', (current: any) => {
-          const updatedFounder = {
-            id: id || current?.id || 'fallback-founder-id',
-            name: name !== undefined && name !== null && name !== '' ? name : (current?.name || 'Alanna'),
-            title: title !== undefined ? title : current?.title,
-            bio: bio !== undefined ? bio : current?.bio,
-            credentials: credentials !== undefined ? credentials : current?.credentials,
-            quote: quote !== undefined ? quote : current?.quote,
-            image_url: image_url !== undefined ? image_url : current?.image_url,
-            button_label: button_label !== undefined ? button_label : current?.button_label,
-            button_link: button_link !== undefined ? button_link : current?.button_link
-          };
-          return updatedFounder;
-        });
-        return res.json(saved);
+        console.error('Supabase Error [Table: founder_bio] in updateFounder:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in updateFounder:', error);
-      const saved = saveLocalFallbackData('founder_bio', (current: any) => {
-        const updatedFounder = {
-          id: id || current?.id || 'fallback-founder-id',
-          name: name !== undefined && name !== null && name !== '' ? name : (current?.name || 'Alanna'),
-          title: title !== undefined ? title : current?.title,
-          bio: bio !== undefined ? bio : current?.bio,
-          credentials: credentials !== undefined ? credentials : current?.credentials,
-          quote: quote !== undefined ? quote : current?.quote,
-          image_url: image_url !== undefined ? image_url : current?.image_url,
-          button_label: button_label !== undefined ? button_label : current?.button_label,
-          button_link: button_link !== undefined ? button_link : current?.button_link
-        };
-        return updatedFounder;
-      });
-      res.json(saved);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -407,18 +294,13 @@ export const cmsController = {
         .select('*')
         .order('sort_order', { ascending: true });
       if (error) {
-        console.error('Supabase Error [Table: quotes] in getQuotes:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        return res.json(getLocalFallbackData('quotes') || []);
+        console.error('Supabase Error [Table: quotes] in getQuotes:', error);
+        return res.status(500).json({ error: error.message });
       }
-      res.json(data && data.length > 0 ? data : (getLocalFallbackData('quotes') || []));
-    } catch (error) {
+      res.json(data || []);
+    } catch (error: any) {
       console.error('Unexpected error in getQuotes:', error);
-      res.json(getLocalFallbackData('quotes') || []);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -432,32 +314,13 @@ export const cmsController = {
         .select()
         .single();
       if (error) {
-        console.error('Supabase Error [Table: quotes] in createQuote:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        
-        // Fallback save
-        const newId = `fallback-quote-${Date.now()}`;
-        const newQuote = { id: newId, quote, author, sort_order, is_featured };
-        saveLocalFallbackData('quotes', (current: any[]) => {
-          current.push(newQuote);
-          return current;
-        });
-        return res.status(201).json(newQuote);
+        console.error('Supabase Error [Table: quotes] in createQuote:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.status(201).json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in createQuote:', error);
-      const newId = `fallback-quote-${Date.now()}`;
-      const newQuote = { id: newId, quote, author, sort_order, is_featured };
-      saveLocalFallbackData('quotes', (current: any[]) => {
-        current.push(newQuote);
-        return current;
-      });
-      res.status(201).json(newQuote);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -473,40 +336,13 @@ export const cmsController = {
         .select()
         .single();
       if (error) {
-        console.error('Supabase Error [Table: quotes] in updateQuote:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        const saved = saveLocalFallbackData('quotes', (current: any[]) => {
-          const idx = current.findIndex(q => q.id === id);
-          const updatedQuote = { id, quote, author, sort_order, is_featured };
-          if (idx > -1) {
-            current[idx] = updatedQuote;
-          } else {
-            current.push(updatedQuote);
-          }
-          return current;
-        });
-        const updatedItem = saved ? saved.find((q: any) => q.id === id) : null;
-        return res.json(updatedItem || { id, quote, author, sort_order, is_featured });
+        console.error('Supabase Error [Table: quotes] in updateQuote:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in updateQuote:', error);
-      const saved = saveLocalFallbackData('quotes', (current: any[]) => {
-        const idx = current.findIndex(q => q.id === id);
-        const updatedQuote = { id, quote, author, sort_order, is_featured };
-        if (idx > -1) {
-          current[idx] = updatedQuote;
-        } else {
-          current.push(updatedQuote);
-        }
-        return current;
-      });
-      const updatedItem = saved ? saved.find((q: any) => q.id === id) : null;
-      res.json(updatedItem || { id, quote, author, sort_order, is_featured });
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -516,24 +352,13 @@ export const cmsController = {
       const client = getSupabaseClient(req);
       const { error } = await client.from('quotes').delete().eq('id', id);
       if (error) {
-        console.error('Supabase Error [Table: quotes] in deleteQuote:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        saveLocalFallbackData('quotes', (current: any[]) => {
-          return current.filter(q => q.id !== id);
-        });
-        return res.status(204).send();
+        console.error('Supabase Error [Table: quotes] in deleteQuote:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in deleteQuote:', error);
-      saveLocalFallbackData('quotes', (current: any[]) => {
-        return current.filter(q => q.id !== id);
-      });
-      res.status(204).send();
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -546,18 +371,13 @@ export const cmsController = {
         .select('*')
         .order('sort_order', { ascending: true });
       if (error) {
-        console.error('Supabase Error [Table: reviews] in getReviews:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        return res.json(getLocalFallbackData('reviews') || []);
+        console.error('Supabase Error [Table: reviews] in getReviews:', error);
+        return res.status(500).json({ error: error.message });
       }
-      res.json(data && data.length > 0 ? data : (getLocalFallbackData('reviews') || []));
-    } catch (error) {
+      res.json(data || []);
+    } catch (error: any) {
       console.error('Unexpected error in getReviews:', error);
-      res.json(getLocalFallbackData('reviews') || []);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -571,31 +391,13 @@ export const cmsController = {
         .select()
         .single();
       if (error) {
-        console.error('Supabase Error [Table: reviews] in createReview:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        // Fallback save
-        const newId = `fallback-review-${Date.now()}`;
-        const newReview = { id: newId, client_name, review_text, program, is_featured, sort_order, rating };
-        saveLocalFallbackData('reviews', (current: any[]) => {
-          current.push(newReview);
-          return current;
-        });
-        return res.status(201).json(newReview);
+        console.error('Supabase Error [Table: reviews] in createReview:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.status(201).json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in createReview:', error);
-      const newId = `fallback-review-${Date.now()}`;
-      const newReview = { id: newId, client_name, review_text, program, is_featured, sort_order, rating };
-      saveLocalFallbackData('reviews', (current: any[]) => {
-        current.push(newReview);
-        return current;
-      });
-      res.status(201).json(newReview);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -611,40 +413,13 @@ export const cmsController = {
         .select()
         .single();
       if (error) {
-        console.error('Supabase Error [Table: reviews] in updateReview:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        const saved = saveLocalFallbackData('reviews', (current: any[]) => {
-          const idx = current.findIndex(r => r.id === id);
-          const updatedReview = { id, client_name, review_text, program, is_featured, sort_order, rating };
-          if (idx > -1) {
-            current[idx] = updatedReview;
-          } else {
-            current.push(updatedReview);
-          }
-          return current;
-        });
-        const updatedItem = saved ? saved.find((r: any) => r.id === id) : null;
-        return res.json(updatedItem || { id, client_name, review_text, program, is_featured, sort_order, rating });
+        console.error('Supabase Error [Table: reviews] in updateReview:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in updateReview:', error);
-      const saved = saveLocalFallbackData('reviews', (current: any[]) => {
-        const idx = current.findIndex(r => r.id === id);
-        const updatedReview = { id, client_name, review_text, program, is_featured, sort_order, rating };
-        if (idx > -1) {
-          current[idx] = updatedReview;
-        } else {
-          current.push(updatedReview);
-        }
-        return current;
-      });
-      const updatedItem = saved ? saved.find((r: any) => r.id === id) : null;
-      res.json(updatedItem || { id, client_name, review_text, program, is_featured, sort_order, rating });
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -654,24 +429,13 @@ export const cmsController = {
       const client = getSupabaseClient(req);
       const { error } = await client.from('reviews').delete().eq('id', id);
       if (error) {
-        console.error('Supabase Error [Table: reviews] in deleteReview:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        saveLocalFallbackData('reviews', (current: any[]) => {
-          return current.filter(r => r.id !== id);
-        });
-        return res.status(204).send();
+        console.error('Supabase Error [Table: reviews] in deleteReview:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in deleteReview:', error);
-      saveLocalFallbackData('reviews', (current: any[]) => {
-        return current.filter(r => r.id !== id);
-      });
-      res.status(204).send();
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -684,18 +448,13 @@ export const cmsController = {
         .select('*')
         .order('sort_order', { ascending: true });
       if (error) {
-        console.error('Supabase Error [Table: offerings] in getOfferings:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        return res.json(getLocalFallbackData('offerings') || []);
+        console.error('Supabase Error [Table: offerings] in getOfferings:', error);
+        return res.status(500).json({ error: error.message });
       }
-      res.json(data && data.length > 0 ? data : (getLocalFallbackData('offerings') || []));
-    } catch (error) {
+      res.json(data || []);
+    } catch (error: any) {
       console.error('Unexpected error in getOfferings:', error);
-      res.json(getLocalFallbackData('offerings') || []);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -709,30 +468,13 @@ export const cmsController = {
         .select()
         .single();
       if (error) {
-        console.error('Supabase Error [Table: offerings] in createOffering:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        const newId = `fallback-offering-${Date.now()}`;
-        const newOffering = { id: newId, title, description, duration, price, image_url, is_featured, is_active, sort_order };
-        saveLocalFallbackData('offerings', (current: any[]) => {
-          current.push(newOffering);
-          return current;
-        });
-        return res.status(201).json(newOffering);
+        console.error('Supabase Error [Table: offerings] in createOffering:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.status(201).json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in createOffering:', error);
-      const newId = `fallback-offering-${Date.now()}`;
-      const newOffering = { id: newId, title, description, duration, price, image_url, is_featured, is_active, sort_order };
-      saveLocalFallbackData('offerings', (current: any[]) => {
-        current.push(newOffering);
-        return current;
-      });
-      res.status(201).json(newOffering);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -748,40 +490,13 @@ export const cmsController = {
         .select()
         .single();
       if (error) {
-        console.error('Supabase Error [Table: offerings] in updateOffering:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        const saved = saveLocalFallbackData('offerings', (current: any[]) => {
-          const idx = current.findIndex(o => o.id === id);
-          const updatedOffering = { id, title, description, duration, price, image_url, is_featured, is_active, sort_order };
-          if (idx > -1) {
-            current[idx] = updatedOffering;
-          } else {
-            current.push(updatedOffering);
-          }
-          return current;
-        });
-        const updatedItem = saved ? saved.find((o: any) => o.id === id) : null;
-        return res.json(updatedItem || { id, title, description, duration, price, image_url, is_featured, is_active, sort_order });
+        console.error('Supabase Error [Table: offerings] in updateOffering:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in updateOffering:', error);
-      const saved = saveLocalFallbackData('offerings', (current: any[]) => {
-        const idx = current.findIndex(o => o.id === id);
-        const updatedOffering = { id, title, description, duration, price, image_url, is_featured, is_active, sort_order };
-        if (idx > -1) {
-          current[idx] = updatedOffering;
-        } else {
-          current.push(updatedOffering);
-        }
-        return current;
-      });
-      const updatedItem = saved ? saved.find((o: any) => o.id === id) : null;
-      res.json(updatedItem || { id, title, description, duration, price, image_url, is_featured, is_active, sort_order });
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -791,24 +506,13 @@ export const cmsController = {
       const client = getSupabaseClient(req);
       const { error } = await client.from('offerings').delete().eq('id', id);
       if (error) {
-        console.error('Supabase Error [Table: offerings] in deleteOffering:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        saveLocalFallbackData('offerings', (current: any[]) => {
-          return current.filter(o => o.id !== id);
-        });
-        return res.status(204).send();
+        console.error('Supabase Error [Table: offerings] in deleteOffering:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.status(204).send();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in deleteOffering:', error);
-      saveLocalFallbackData('offerings', (current: any[]) => {
-        return current.filter(o => o.id !== id);
-      });
-      res.status(204).send();
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -821,18 +525,13 @@ export const cmsController = {
         .select('*')
         .order('id', { ascending: true });
       if (error) {
-        console.error('Supabase Error [Table: intelligence_matrix] in getIntelligence:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        return res.json(getLocalFallbackData('intelligence_matrix') || []);
+        console.error('Supabase Error [Table: intelligence_matrix] in getIntelligence:', error);
+        return res.status(500).json({ error: error.message });
       }
-      res.json(data && data.length > 0 ? data : (getLocalFallbackData('intelligence_matrix') || []));
-    } catch (error) {
+      res.json(data || []);
+    } catch (error: any) {
       console.error('Unexpected error in getIntelligence:', error);
-      res.json(getLocalFallbackData('intelligence_matrix') || []);
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 
@@ -858,40 +557,13 @@ export const cmsController = {
         .single();
 
       if (error) {
-        console.error('Supabase Error [Table: intelligence_matrix] in updateIntelligence:', {
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        const saved = saveLocalFallbackData('intelligence_matrix', (current: any[]) => {
-          const idx = current.findIndex(i => i.id === id);
-          const updatedIntelligence = { id, journey, feeling, recommended_ritual, duration, recommended_plan, focus, confidence_score, is_active };
-          if (idx > -1) {
-            current[idx] = updatedIntelligence;
-          } else {
-            current.push(updatedIntelligence);
-          }
-          return current;
-        });
-        const updatedItem = saved ? saved.find((i: any) => i.id === id) : null;
-        return res.json(updatedItem || { id, journey, feeling, recommended_ritual, duration, recommended_plan, focus, confidence_score, is_active });
+        console.error('Supabase Error [Table: intelligence_matrix] in updateIntelligence:', error);
+        return res.status(500).json({ error: error.message });
       }
       res.json(data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Unexpected error in updateIntelligence:', error);
-      const saved = saveLocalFallbackData('intelligence_matrix', (current: any[]) => {
-        const idx = current.findIndex(i => i.id === id);
-        const updatedIntelligence = { id, journey, feeling, recommended_ritual, duration, recommended_plan, focus, confidence_score, is_active };
-        if (idx > -1) {
-          current[idx] = updatedIntelligence;
-        } else {
-          current.push(updatedIntelligence);
-        }
-        return current;
-      });
-      const updatedItem = saved ? saved.find((i: any) => i.id === id) : null;
-      res.json(updatedItem || { id, journey, feeling, recommended_ritual, duration, recommended_plan, focus, confidence_score, is_active });
+      res.status(500).json({ error: error.message || 'Unexpected error' });
     }
   },
 

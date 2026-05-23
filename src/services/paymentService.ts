@@ -27,8 +27,13 @@ export const paymentService = {
   },
 
   async confirmPayment(sessionId: string) {
+    const endpoint = `${API_URL}/payments/confirm`;
+    console.log("CONFIRM PAYMENT START");
+    console.log("sessionId", sessionId);
+    console.log("endpoint", endpoint);
+
     try {
-      const response = await fetch(`${API_URL}/payments/confirm`, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,12 +41,23 @@ export const paymentService = {
         body: JSON.stringify({ session_id: sessionId }),
       });
 
+      console.log("response", response);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to confirm ritual.');
+        let errorMessage = 'Failed to confirm ritual payment.';
+        try {
+          const errorData = await response.json();
+          console.log("error response body", errorData);
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonErr) {
+          console.error("Failed to parse error response JSON", jsonErr);
+        }
+        throw new Error(errorMessage);
       }
 
-      return await response.json();
+      const data = await response.json();
+      console.log("confirmPayment success data:", data);
+      return data;
     } catch (error) {
       console.error('Payment Confirmation Error:', error);
       throw error;

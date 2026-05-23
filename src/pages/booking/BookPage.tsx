@@ -69,10 +69,36 @@ export default function BookPage() {
   const StepComponent = useMemo(() => stepComponents[currentStep], [currentStep]);
   const navigate = useNavigate();
 
-  // If page is loaded directly, initialize booking state once
+  // If page is loaded directly, initialize booking state once with query parameter check
   useEffect(() => {
-    if (!isOpen) {
-      openBooking();
+    const params = new URLSearchParams(window.location.search);
+    const planSlug = params.get('plan');
+    
+    if (planSlug) {
+      const plansList = [
+        { id: '772407fa-1b48-4f0f-80d5-1b343ada98c1', slug: 'single-session', name: 'Single Session', credits: 1, price: 45 },
+        { id: 'e69dfd27-1da5-4584-b410-72b1ea76c48f', slug: 'intro-offer', name: 'Starter Healing Journey', credits: 3, price: 99 },
+        { id: 'ecca0c9b-42c6-4fbe-aec5-a1651ab6a29b', slug: '10-class-package', name: '10-Class Package', credits: 10, price: 350 }
+      ];
+      
+      const matched = plansList.find(p => 
+        p.slug === planSlug || 
+        (planSlug === 'membership10' && p.slug === '10-class-package') ||
+        (planSlug === 'membership3' && p.slug === 'intro-offer') ||
+        (planSlug === 'drop-in' && p.slug === 'single-session')
+      );
+
+      if (matched) {
+        console.log('[BookPage] Pre-populating package from plan:', planSlug, matched);
+        openBooking(
+          { id: matched.id, name: matched.name, credits: matched.credits, price: matched.price },
+          { entrySource: 'pricing' }
+        );
+      } else {
+        if (!isOpen) openBooking();
+      }
+    } else {
+      if (!isOpen) openBooking();
     }
     fetchRecommendationMatrix();
   }, []);

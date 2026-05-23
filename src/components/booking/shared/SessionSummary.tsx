@@ -2,8 +2,21 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useBookingFlow } from '../../../hooks/useBookingFlow';
 import { Sparkles, Calendar, Clock, Heart } from 'lucide-react';
-import { format, parseISO, parse } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { getLocalTimeForEST } from '../../../utils/bookingUtils';
+
+const formatTo12Hour = (time24: string): string => {
+  if (!time24) return '';
+  try {
+    const [hoursStr, minutesStr] = time24.split(':');
+    const hours = parseInt(hoursStr, 10);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+    return `${displayHours.toString().padStart(2, '0')}:${minutesStr} ${ampm}`;
+  } catch (e) {
+    return time24;
+  }
+};
 
 export default function SessionSummary() {
   const { 
@@ -93,7 +106,7 @@ export default function SessionSummary() {
               <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold/60 mb-1.5">Scheduled Moment</p>
               <p className="text-lg text-text-dark font-light tracking-wide">
                 {parsedDate ? format(parsedDate, 'MMMM do, yyyy') : ''}
-                {selectedTime ? ` at ${format(parse(selectedTime, 'HH:mm', new Date()), 'hh:mm a')} EST` : ''}
+                {selectedTime ? ` at ${formatTo12Hour(selectedTime)} EST` : ''}
               </p>
               {selectedDate && selectedTime && (
                 <p className="text-[10px] text-text-dark/30 italic">
