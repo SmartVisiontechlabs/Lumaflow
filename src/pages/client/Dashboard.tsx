@@ -118,11 +118,11 @@ const ProgressRing = ({ value, max }: { value: number; max: number }) => {
         />
       </svg>
       <div className="absolute flex flex-col items-center justify-center text-center">
-        <span className="text-5xl font-display text-text-dark tracking-tighter font-light">
-          {value}
+        <span className="text-3xl font-display text-text-dark tracking-tighter font-light">
+          {value} / {max}
         </span>
-        <span className="text-[8px] font-bold text-text-dark/30 uppercase tracking-[0.25em] mt-1">
-          of {max} remaining
+        <span className="text-[8px] font-bold text-[#CBAE73] uppercase tracking-[0.25em] mt-1 font-semibold">
+          Remaining
         </span>
       </div>
     </div>
@@ -130,7 +130,7 @@ const ProgressRing = ({ value, max }: { value: number; max: number }) => {
 };
 
 export default function Dashboard() {
-  const { bookings, membership, upcomingBooking, remainingCredits, loading, profile } = useAuth();
+  const { bookings, membership, activePackages, upcomingBooking, remainingCredits, loading, profile } = useAuth();
   const [countdown, setCountdown] = useState<string>('');
   const [countdownHero, setCountdownHero] = useState<string>('');
   const [canJoin, setCanJoin] = useState(false);
@@ -249,46 +249,93 @@ export default function Dashboard() {
     });
   });
 
-  // Total credits from membership definition
-  const totalCreditsPossible = membership ? membership.total_credits : 10; // fallback default
+  // Completed and reserved counts
+  const completedSessionsCount = bookings.filter(b => b.booking_status === 'completed').length;
+  const reservedCount = bookings.filter(b => b.booking_status === 'confirmed').length;
+  
+  let totalCreditsPossible = 0;
+  if (membership) {
+    totalCreditsPossible = membership.total_credits;
+  } else if (activePackages && activePackages.length > 0) {
+    totalCreditsPossible = activePackages.reduce((sum: number, p: any) => sum + (p.total_credits || 0), 0);
+  } else {
+    totalCreditsPossible = remainingCredits + completedSessionsCount;
+  }
+
+  const remainingCount = remainingCredits;
+  const progressPercent = totalCreditsPossible > 0 ? Math.round((remainingCount / totalCreditsPossible) * 100) : 0;
   const firstName = profile?.full_name ? profile.full_name.split(' ')[0] : 'Member';
 
+  const activePackagesDetails = (activePackages || []).map(pkgRecord => {
+    return {
+      id: pkgRecord.id,
+      name: bookings.find(b => b.package_id === pkgRecord.package_id)?.package_name || 
+            (pkgRecord.package_id === 'ecca0c9b-42c6-4fbe-aec5-a1651ab6a29b' ? '10-Class Package' :
+             pkgRecord.package_id === 'e69dfd27-1da5-4584-b410-72b1ea76c48f' ? 'Starter Healing Journey' :
+             pkgRecord.package_id === '772407fa-1b48-4f0f-80d5-1b343ada98c1' ? 'Single Session' : 'Active Package'),
+      price: bookings.find(b => b.package_id === pkgRecord.package_id)?.package_price ||
+             (pkgRecord.package_id === 'ecca0c9b-42c6-4fbe-aec5-a1651ab6a29b' ? 350 :
+              pkgRecord.package_id === 'e69dfd27-1da5-4584-b410-72b1ea76c48f' ? 99 :
+              pkgRecord.package_id === '772407fa-1b48-4f0f-80d5-1b343ada98c1' ? 45 : 0),
+      remaining: pkgRecord.remaining_credits,
+      total: pkgRecord.total_credits
+    };
+  });
+
+  // State Chips Helper
+  const getChipStyle = (item: typeof timelineItems[0]) => {
+    if (item.isUpcoming) {
+      return "bg-[#CBAE73]/10 border border-[#CBAE73]/40 text-[#CBAE73] text-[8px] font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full shadow-[0_0_10px_rgba(203,174,115,0.1)]";
+    }
+    if (item.isCancelled) {
+      return "bg-red-500/5 border border-red-500/20 text-red-400 text-[8px] font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full";
+    }
+    return "bg-[#CBAE73]/5 border border-[#CBAE73]/15 text-[#CBAE73]/70 text-[8px] font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full";
+  };
+
+  const getChipLabel = (item: typeof timelineItems[0]) => {
+    if (item.isUpcoming) return "Confirmed Sanctuary Session";
+    if (item.isCancelled) return "Sanctuary Released";
+    return "Restoration Complete";
+  };
+
   return (
-    <div className="space-y-12 pb-16">
+    <div className="space-y-16 pb-24 pt-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       
       {/* 1. Welcome Hero Section */}
-      <div className="relative bg-white/40 border border-white/60 p-10 lg:p-14 rounded-[3.5rem] shadow-luxury overflow-hidden backdrop-blur-md">
-        <div className="absolute top-[-20%] right-[-10%] w-[400px] h-[400px] bg-gold/5 blur-[90px] rounded-full pointer-events-none" />
+      <div className="relative bg-white/30 border border-white/60 p-12 lg:p-20 rounded-[3.5rem] shadow-luxury overflow-hidden backdrop-blur-xl">
+        <div className="absolute top-[-30%] right-[-10%] w-[500px] h-[500px] bg-gold/5 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-gold/5 blur-[90px] rounded-full pointer-events-none" />
         
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10 relative z-10">
-          <div className="space-y-6 max-w-2xl">
-            <div className="inline-flex items-center gap-2.5 px-4 py-1.5 bg-gold/10 border border-gold/10 rounded-full">
-              <Sparkles className="w-3 h-3 text-gold" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-gold-light select-none">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-12 relative z-10">
+          <div className="space-y-8 max-w-3xl">
+            <div className="inline-flex items-center gap-2.5 px-4.5 py-2 bg-gold/10 border border-gold/10 rounded-full">
+              <Sparkles className="w-3.5 h-3.5 text-gold" />
+              <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#CBAE73] select-none">
                 Your Sanctuary Awaits
               </span>
             </div>
             
-            <h1 className="font-display text-4xl sm:text-6xl text-text-dark tracking-tight leading-none">
-              Welcome back, <br />
+            <h1 className="font-display text-5xl sm:text-7xl text-text-dark tracking-tight leading-[1.05] font-light">
+              Settle in, <br />
               <span className="italic text-[#CBAE73] font-normal">{firstName}</span>
             </h1>
 
-            <p className="text-sm font-light text-text-dark/50 leading-relaxed font-body">
+            <p className="text-base font-light text-text-dark/50 leading-relaxed max-w-xl">
               Step into a space of high-frequency restoration. Below is your current alignment status and upcoming chronologies.
             </p>
 
             {upcomingBooking && countdownHero && (
               <div className="pt-2 flex items-center gap-4 text-xs font-bold text-text-dark/40 uppercase tracking-widest">
                 <span>Next Ritual:</span>
-                <span className="text-gold font-display font-medium text-lg tracking-normal">
+                <span className="text-gold font-display font-medium text-xl tracking-normal">
                   {countdownHero}
                 </span>
               </div>
             )}
           </div>
 
-          <div className="flex flex-col gap-4 min-w-[260px] w-full lg:w-auto">
+          <div className="flex flex-col gap-4 min-w-[280px] w-full lg:w-auto">
             {upcomingBooking ? (
               <>
                 {upcomingBooking.session_format.toLowerCase() === 'virtual' ? (
@@ -297,20 +344,20 @@ export default function Dashboard() {
                     target="_blank"
                     rel="noreferrer"
                     className={cn(
-                      "w-full py-6 px-10 rounded-2xl text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-700 relative overflow-hidden group shadow-luxury border",
+                      "w-full py-6 px-12 rounded-full text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-700 relative overflow-hidden group shadow-luxury border",
                       canJoin 
-                        ? 'bg-text-dark text-white border-text-dark hover:bg-gold hover:text-black cursor-pointer animate-pulse' 
+                        ? 'bg-text-dark text-white border-text-dark hover:bg-gold hover:text-black cursor-pointer' 
                         : 'bg-white/40 text-text-dark/25 border-text-dark/5 cursor-not-allowed'
                     )}
                   >
-                    <Video className={cn("w-4 h-4", canJoin ? "text-gold" : "text-text-dark/20")} />
+                    <Video className={cn("w-4 h-4 transition-transform duration-500 group-hover:scale-110", canJoin ? "text-gold" : "text-text-dark/20")} />
                     Enter Sanctuary
                     {canJoin && (
-                      <span className="absolute inset-0 border border-gold/40 rounded-2xl animate-ping opacity-60" />
+                      <span className="absolute inset-0 border border-gold/40 rounded-full animate-ping opacity-60 pointer-events-none" />
                     )}
                   </a>
                 ) : (
-                  <div className="w-full py-6 px-10 rounded-2xl bg-white/40 border border-text-dark/5 text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 text-text-dark/40 select-none">
+                  <div className="w-full py-6 px-12 rounded-full bg-white/40 border border-text-dark/5 text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 text-text-dark/40 select-none">
                     <Compass className="w-4 h-4 text-gold/60" />
                     Sanctuary In-Person
                   </div>
@@ -320,7 +367,7 @@ export default function Dashboard() {
                   href={getGoogleCalendarUrl(upcomingBooking)}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-5 px-10 bg-white/60 hover:bg-white text-text-dark/60 hover:text-text-dark border border-text-dark/5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-500 shadow-soft"
+                  className="w-full py-5.5 px-12 bg-white/60 hover:bg-white text-text-dark/60 hover:text-text-dark border border-text-dark/5 rounded-full text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-500 shadow-soft"
                 >
                   <Calendar className="w-4 h-4 text-gold" />
                   Calendar Sync
@@ -329,7 +376,7 @@ export default function Dashboard() {
             ) : (
               <a
                 href="/book"
-                className="w-full py-6 px-10 bg-[#CBAE73] text-black rounded-2xl text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-700 hover:scale-[1.02] shadow-luxury"
+                className="w-full py-6 px-12 bg-[#CBAE73] hover:bg-[#CBAE73]/95 text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-700 hover:scale-[1.02] shadow-luxury"
               >
                 Book Your Next Ritual
                 <ArrowRight className="w-4 h-4" />
@@ -339,17 +386,17 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* 2. Content Grids */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {/* 2. Content Grids with Extra Whitespace */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         
-        {/* Left Grid: Upcoming & Credits */}
-        <div className="lg:col-span-7 space-y-8">
+        {/* Left Grid: Upcoming & Momentum (7 cols) */}
+        <div className="lg:col-span-7 space-y-12">
           
           {/* Upcoming Session Details Card */}
           {upcomingBooking && (
-            <div className="bg-white/40 border border-white/60 p-8 rounded-[2.5rem] shadow-luxury backdrop-blur-md space-y-8">
-              <div className="flex justify-between items-center pb-4 border-b border-gold/10">
-                <h3 className="font-display text-2xl text-text-dark">Upcoming Appointed Ritual</h3>
+            <div className="bg-white/30 border border-white/60 p-10 rounded-[3rem] shadow-luxury backdrop-blur-md space-y-8">
+              <div className="flex justify-between items-center pb-6 border-b border-gold/10">
+                <h3 className="font-display text-2xl text-text-dark font-light">Upcoming Appointed Ritual</h3>
                 <span className="text-[10px] font-bold text-text-dark/30 uppercase tracking-[0.2em]">
                   Ref: {upcomingBooking.booking_reference}
                 </span>
@@ -357,14 +404,14 @@ export default function Dashboard() {
               
               <div className="grid sm:grid-cols-2 gap-8">
                 <div className="space-y-6">
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-gold/60">Ritual</p>
-                    <p className="font-display text-2xl text-text-dark tracking-tight leading-snug">
+                    <p className="font-display text-3xl text-text-dark tracking-tight leading-snug font-light">
                       {upcomingBooking.selected_session}
                     </p>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-3 pt-2">
                     <div className="flex items-center gap-3 text-xs text-text-dark/60 font-medium">
                       <Calendar className="w-4 h-4 text-gold" />
                       <span>{upcomingBooking.selected_date}</span>
@@ -380,7 +427,7 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="bg-white/50 border border-text-dark/5 p-6 rounded-3xl flex flex-col justify-between space-y-4">
+                <div className="bg-white/50 border border-text-dark/5 p-8 rounded-[2rem] flex flex-col justify-between space-y-6 shadow-soft">
                   <div className="space-y-2">
                     <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold/80">Ritual Timeline</p>
                     <p className="text-xs text-text-dark/50 leading-relaxed font-light italic">
@@ -388,7 +435,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   {upcomingBooking.session_format.toLowerCase() === 'virtual' && upcomingBooking.zoom_join_url && (
-                    <div className="space-y-1 pt-2 border-t border-text-dark/5 text-[9px] font-medium text-text-dark/40">
+                    <div className="space-y-1.5 pt-3 border-t border-text-dark/5 text-[9px] font-medium text-text-dark/40">
                       <p>Meeting ID: {upcomingBooking.zoom_meeting_id || 'N/A'}</p>
                       <p>Password: {upcomingBooking.meeting_password || 'N/A'}</p>
                     </div>
@@ -398,95 +445,94 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Membership Visual Card */}
-          <div className="bg-white/40 border border-white/60 p-8 rounded-[2.5rem] shadow-luxury backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden">
-            <div className="absolute top-[-10%] left-[-10%] w-[150px] h-[150px] bg-gold/5 blur-[50px] rounded-full pointer-events-none" />
+          {/* Membership Visual Card (Healing Momentum) */}
+          <div className="bg-white/30 border border-white/60 p-10 rounded-[3rem] shadow-luxury backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-12 relative overflow-hidden">
+            <div className="absolute top-[-10%] left-[-10%] w-[200px] h-[200px] bg-gold/5 blur-[60px] rounded-full pointer-events-none" />
             
-            <div className="space-y-6 max-w-sm">
+            <div className="space-y-8 max-w-sm text-left">
               <div className="flex items-center gap-3">
-                <div className="w-6 h-6 bg-gold/10 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-3.5 h-3.5 text-gold" />
+                <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-gold" />
                 </div>
-                <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/40">Membership Credits</span>
+                <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/40">Healing Journey Progress</span>
               </div>
               
               <div className="space-y-3">
-                <h3 className="font-display text-2xl text-text-dark tracking-tight">Chronological Balance</h3>
-                <p className="text-xs text-text-dark/50 leading-relaxed font-light">
-                  Your remaining ritual credits allow you to secure bookings instantly. More credits can be claimed via the pricing investment tiers.
-                </p>
+                <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Sanctuary Momentum</h3>
+                <div className="space-y-2 pt-2">
+                  <div className="flex justify-between text-xs text-text-dark/70 font-light">
+                    <span>Completed Journey:</span>
+                    <span className="font-semibold text-gold">{completedSessionsCount} / {totalCreditsPossible} Completed</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-text-dark/70 font-light">
+                    <span>Ritual Reserved:</span>
+                    <span className="font-semibold text-gold">{reservedCount} {reservedCount === 1 ? 'Ritual' : 'Rituals'} Reserved</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-text-dark/70 font-light">
+                    <span>Remaining Balance:</span>
+                    <span className="font-semibold text-gold">{remainingCount} Remaining</span>
+                  </div>
+                  {activePackagesDetails.map((pkg, pIdx) => (
+                    <div key={pkg.id || pIdx} className="flex justify-between text-xs text-text-dark/70 font-light border-t border-text-dark/5 pt-2 mt-2">
+                      <span>Package:</span>
+                      <span className="font-semibold text-gold">{pkg.name} (${pkg.price}) — {pkg.remaining}/{pkg.total} remaining</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-dark/30 pt-2 border-t border-text-dark/5">
+              <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-dark/30 pt-3 border-t border-text-dark/5">
                 <span>Total: {totalCreditsPossible}</span>
-                <span>Used: {membership ? membership.used_credits : 0}</span>
+                <span>Active: {remainingCount}</span>
+                <span>Progress: {progressPercent}%</span>
               </div>
             </div>
 
-            <div className="flex-shrink-0">
-              <ProgressRing value={remainingCredits} max={totalCreditsPossible} />
+            <div className="flex-shrink-0 bg-white/40 p-6 rounded-[2.5rem] border border-white/60 shadow-soft">
+              <ProgressRing value={remainingCount} max={totalCreditsPossible} />
             </div>
           </div>
 
         </div>
 
-        {/* Right Grid: Journey Timeline */}
-        <div className="lg:col-span-5 bg-white/40 border border-white/60 p-8 lg:p-10 rounded-[2.5rem] shadow-luxury backdrop-blur-md space-y-8">
-          <div className="space-y-2">
-            <h3 className="font-display text-2xl text-text-dark tracking-tight">Ritual Journey Timeline</h3>
+        {/* Right Grid: Ritual Journey Timeline V2 (5 cols) */}
+        <div className="lg:col-span-5 bg-white/30 border border-white/60 p-10 rounded-[3rem] shadow-luxury backdrop-blur-md space-y-8">
+          <div className="space-y-2 text-left">
+            <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Ritual Chronology</h3>
             <p className="text-xs text-text-dark/40 font-light">Your progress through the LumaFlow transformation paths.</p>
           </div>
 
-          <div className="relative pl-8 border-l border-gold/15 space-y-10 custom-scrollbar max-h-[520px] overflow-y-auto pr-2">
+          <div className="space-y-6 custom-scrollbar max-h-[560px] overflow-y-auto pr-2">
             {timelineItems.length > 0 ? (
               timelineItems.map((item, idx) => (
-                <div key={idx} className="relative group">
-                  {/* Circle indicator on timeline */}
-                  <div className={cn(
-                    "absolute -left-[45px] top-1.5 w-6 h-6 rounded-full border flex items-center justify-center z-10 shadow-sm transition-all duration-700",
-                    item.isCompleted 
-                      ? "bg-text-dark border-text-dark text-[#CBAE73]" 
-                      : item.isUpcoming 
-                      ? "bg-white border-[#CBAE73] text-[#CBAE73] scale-110" 
-                      : "bg-white border-zinc-200 text-zinc-300"
-                  )}>
-                    {item.isCompleted ? (
-                      <Check className="w-3.5 h-3.5" />
-                    ) : item.isCancelled ? (
-                      <span className="text-[8px] font-bold">✕</span>
-                    ) : (
-                      <div className="w-2.5 h-2.5 rounded-full bg-current animate-pulse" />
-                    )}
+                <div 
+                  key={idx} 
+                  className="bg-white/40 border border-white/60 p-6 rounded-[2rem] hover:shadow-luxury hover:scale-[1.01] transition-all duration-500 flex flex-col gap-4 text-left group"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <h4 className={cn(
+                      "text-sm font-bold text-text-dark transition-colors duration-500", 
+                      item.isUpcoming ? "text-text-dark font-bold" : "text-text-dark/60 font-semibold",
+                      item.isCancelled && "line-through opacity-50"
+                    )}>
+                      {item.ritualName}
+                    </h4>
+                    <span className={getChipStyle(item)}>
+                      {getChipLabel(item)}
+                    </span>
                   </div>
                   
-                  <div className="space-y-2 text-left">
-                    <div className="flex flex-wrap items-center gap-3">
-                      <h4 className={cn(
-                        "text-sm font-bold transition-colors duration-500", 
-                        item.isUpcoming ? "text-text-dark font-semibold" : "text-text-dark/60 font-medium",
-                        item.isCancelled && "line-through opacity-50"
-                      )}>
-                        {item.ritualName}
-                      </h4>
-                      {item.isUpcoming && (
-                        <span className="px-2 py-0.5 bg-[#CBAE73]/15 text-[#CBAE73] text-[7px] font-bold uppercase tracking-widest rounded-full">
-                          Appointed
-                        </span>
-                      )}
-                      {item.isCancelled && (
-                        <span className="px-2 py-0.5 bg-red-500/10 text-red-500 text-[7px] font-bold uppercase tracking-widest rounded-full">
-                          Cancelled
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10px] font-medium text-text-dark/40">
-                      {item.date} • {item.time} • {item.format}
-                    </p>
+                  <div className="flex items-center justify-between border-t border-gold/5 pt-4 text-[10px] text-text-dark/40 font-medium">
+                    <span>{item.date}</span>
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-3 h-3 text-gold/60" />
+                      {item.time} ({item.format})
+                    </span>
                   </div>
                 </div>
               ))
             ) : (
-              <div className="text-center py-12">
+              <div className="text-center py-16">
                 <p className="text-xs text-text-dark/30 italic">No ritual history found. Reserve your first session to begin the timeline.</p>
               </div>
             )}

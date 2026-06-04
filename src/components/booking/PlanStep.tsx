@@ -4,11 +4,18 @@ import { useBookingFlow } from '../../hooks/useBookingFlow';
 import { packageService, Package } from '../../services/packageService';
 import { cn } from '../../lib/utils';
 import StepHeading from './shared/StepHeading';
+import { useAuth } from '../../providers/AuthProvider';
+import { X as CloseIcon, AlertTriangle } from 'lucide-react';
 
 const PlanStep = () => {
   const { selectedPackage, setSelectedPackage, nextStep, prevStep, journeyType, emotionalState, updateRecommendation } = useBookingFlow();
+  const { isAuthenticated, activePackages } = useAuth();
   const [packages, setPackages] = useState<Package[]>([]);
-  const [loading, setLoading] = useState(true);  useEffect(() => {
+  const [loading, setLoading] = useState(true);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicatePkgName, setDuplicatePkgName] = useState('');
+
+  useEffect(() => {
     const fetchPackages = async () => {
       const startTime = Date.now();
       try {
@@ -44,6 +51,17 @@ const PlanStep = () => {
   }, []);
 
   const handleSelect = (pkg: Package) => {
+    if (isAuthenticated) {
+      const isDuplicate = activePackages.some(
+        (ap) => ap.package_id === pkg.id && ap.remaining_credits > 0
+      );
+      if (isDuplicate) {
+        setDuplicatePkgName(pkg.name);
+        setShowDuplicateModal(true);
+        return;
+      }
+    }
+
     const pkgInfo = {
       id: pkg.id,
       name: pkg.name,
@@ -176,6 +194,67 @@ const PlanStep = () => {
           &larr; Prev Step
         </button>
       </div>
+
+      {/* Journey Already Active Modal */}
+      {showDuplicateModal && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 bg-[#0A0A0A]/60 backdrop-blur-md"
+            onClick={() => setShowDuplicateModal(false)}
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative bg-white/95 backdrop-blur-2xl border border-gold/10 p-10 md:p-12 rounded-[2.5rem] shadow-[0_30px_70px_rgba(203,174,115,0.15)] max-w-md w-full text-center space-y-8 z-10 text-text-dark"
+          >
+            <button 
+              onClick={() => setShowDuplicateModal(false)}
+              className="absolute top-6 right-6 text-text-dark/40 hover:text-gold transition-colors p-1"
+            >
+              <CloseIcon className="w-5 h-5" />
+            </button>
+            <div className="space-y-6">
+              <div className="w-16 h-16 bg-gold/10 rounded-full flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6 text-gold" />
+              </div>
+              <div className="space-y-3">
+                <h4 className="font-display text-3xl text-text-dark tracking-tight">
+                  Journey Already Active
+                </h4>
+                <p className="text-xs text-text-dark/60 font-light leading-relaxed">
+                  Your <strong className="font-semibold text-gold">{duplicatePkgName}</strong> is currently active. <br />
+                  You still have sanctuary moments remaining.
+                </p>
+                <p className="text-xs text-text-dark/50 italic font-light pt-2">
+                  Complete your current pathway or explore a deeper experience.
+                </p>
+              </div>
+              <div className="flex flex-col gap-4 pt-4">
+                <button
+                  onClick={() => {
+                    setShowDuplicateModal(false);
+                    // Bypasses plan purchase, set package to null to use existing credits, proceed to next step
+                    setSelectedPackage(null);
+                    updateRecommendation(journeyType, emotionalState, null);
+                    nextStep();
+                  }}
+                  className="w-full py-4 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-md cursor-pointer"
+                >
+                  Continue Current Journey
+                </button>
+                <button
+                  onClick={() => setShowDuplicateModal(false)}
+                  className="w-full py-4 bg-white/40 border border-text-dark/10 hover:border-gold/40 text-text-dark/60 hover:text-gold rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 cursor-pointer"
+                >
+                  Explore Other Plans
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

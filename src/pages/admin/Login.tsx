@@ -17,7 +17,8 @@ const Login = () => {
     setError(null);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
       const response = await fetch(`${API_URL}/admin/login`, {
         method: 'POST',
         headers: {

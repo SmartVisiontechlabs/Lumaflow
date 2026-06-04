@@ -98,9 +98,6 @@ export const getSupabaseClient = (req?: any) => {
           autoRefreshToken: false,
           persistSession: false,
         },
-        realtime: {
-          transport: ws as any,
-        },
         global: {
           fetch,
           headers: {

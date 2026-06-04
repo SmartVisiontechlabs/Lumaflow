@@ -73,6 +73,7 @@ export type BookingState = {
   setTime: (time: string) => void;
   setUserDetails: (details: { fullName?: string; email?: string; intentions?: string }) => void;
   setSelectedPackage: (pkg: PackageInfo | null) => void;
+  resumeFromDraftBooking: (draft: any) => void;
 };
 
 export const useBookingStore = create<BookingState>()(
@@ -279,6 +280,42 @@ export const useBookingStore = create<BookingState>()(
         selectedPackage: pkg,
         lastActivityTimestamp: Date.now()
       }),
+      resumeFromDraftBooking: (draft) => {
+        const journeyType = draft.journeyType || '';
+        const emotionalState = draft.emotion || '';
+        const selectedRitual = draft.selectedSession || draft.selected_session || '';
+        const sessionFormat = draft.sessionFormat || draft.session_format || '';
+        const selectedDuration = draft.duration || 60;
+        const recommendedDuration = draft.duration || 60;
+        const selectedPackage = (draft.packageId || draft.package_id) ? {
+          id: draft.packageId || draft.package_id,
+          name: draft.packageName || draft.package_name,
+          credits: draft.packageCredits || draft.package_credits || 1,
+          price: draft.packagePrice || draft.package_price || 0
+        } : null;
+        const selectedDate = draft.selectedDate || draft.selected_date || '';
+        const selectedTime = draft.selectedTime || draft.selected_time || '';
+        const fullName = draft.fullName || draft.full_name || '';
+        const email = draft.email || '';
+        const intentions = draft.intentions || '';
+
+        set({
+          journeyType,
+          emotionalState,
+          selectedRitual,
+          sessionFormat,
+          selectedDuration,
+          recommendedDuration,
+          selectedPackage,
+          selectedDate,
+          selectedTime,
+          fullName,
+          email,
+          intentions,
+          showResumePrompt: true,
+          lastActivityTimestamp: Date.now()
+        });
+      },
       fetchRecommendationMatrix: async () => {
         try {
           const matrix = await cmsService.getRecommendationMatrix();

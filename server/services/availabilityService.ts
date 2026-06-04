@@ -11,8 +11,8 @@ export const availabilityService = {
     console.log('Selected Duration:', duration);
     console.log('Server Timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
 
-    // Fetch bookings + blocked slots
-    const [bookingsResponse, blockedResponse] = await Promise.all([
+    // Fetch bookings + blocked slots + availability settings
+    const [bookingsResponse, blockedResponse, settingsResponse] = await Promise.all([
       supabase
         .from('bookings')
         .select('*')
@@ -22,7 +22,11 @@ export const availabilityService = {
       supabase
         .from('blocked_slots')
         .select('*')
-        .eq('blocked_date', date)
+        .eq('blocked_date', date),
+
+      supabase
+        .from('availability_settings')
+        .select('*')
     ]);
 
     if (bookingsResponse.error) {
@@ -32,9 +36,19 @@ export const availabilityService = {
     if (blockedResponse.error) {
       console.warn('[BLOCKED SLOTS] Blocked Slots Fetch Error:', blockedResponse.error.message || blockedResponse.error);
     }
+    if (settingsResponse.error) {
+      console.warn('[AVAILABILITY SETTINGS] Fetch Error (using fallbacks):', settingsResponse.error.message || settingsResponse.error);
+    }
 
     const rawBookings = bookingsResponse.data || [];
     const blockedSlots = blockedResponse.data || [];
+    
+    // Schema-compatible filtering: check both is_active and is_available, default to true if not explicitly false
+    const rawSettings = settingsResponse.data || [];
+    const scheduleSettings = rawSettings.filter((s: any) => {
+      const active = s.is_active !== undefined ? s.is_active : s.is_available;
+      return active !== false;
+    });
 
     console.log(`[BLOCKED SLOTS] Fetched blocked slots for ${date}:`, JSON.stringify(blockedSlots));
 
@@ -79,7 +93,8 @@ export const availabilityService = {
       duration,
       existingBookings,
       blockedSlots,
-      timezone
+      timezone,
+      scheduleSettings
     );
 
     const availableCount = generatedSlots.filter((s: any) => s.isAvailable).length;

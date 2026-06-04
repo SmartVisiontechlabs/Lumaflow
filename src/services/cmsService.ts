@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { adminSupabase as supabase } from '../lib/supabase';
 import { 
   HeroContent, 
   TransformationStep, 
@@ -9,7 +9,8 @@ import {
   IntelligenceMatrixEntry 
 } from '../types/cms';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
 // ─── AUTH HELPER ─────────────────────────────────────────────────────────────
 
@@ -17,14 +18,18 @@ async function getAuthHeaders() {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.access_token) {
-      headers['Authorization'] = `Bearer ${session.access_token}`;
-    }
-  } catch (e) {
-    console.error('CMS auth token extraction error:', e);
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  console.log('CMS Session:', session);
+  
+  if (!session || !session.access_token) {
+    throw new Error('No authorization header provided');
   }
+  
+  headers['Authorization'] = `Bearer ${session.access_token}`;
+  
+  console.log('CMS Headers:', headers);
   return headers;
 }
 
@@ -331,6 +336,35 @@ export const cmsService = {
     if (!response.ok) {
       const err = await response.json().catch(() => ({}));
       throw new Error(err.error || 'Failed to update matrix mapping');
+    }
+    return await response.json();
+  },
+
+  /**
+   * Fetch all pages custom configs
+   */
+  async getPagesContent(): Promise<Record<string, any>> {
+    const response = await fetch(`${API_URL}/cms/pages`);
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to fetch pages content');
+    }
+    return await response.json();
+  },
+
+  /**
+   * Update a specific page custom config
+   */
+  async updatePageContent(page_name: string, content: any): Promise<any> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/cms/pages/${page_name}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ content })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to update page content');
     }
     return await response.json();
   }

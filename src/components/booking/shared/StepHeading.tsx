@@ -9,7 +9,7 @@ interface StepHeadingProps {
 
 export default function StepHeading({ title, subtitle, tag }: StepHeadingProps) {
   return (
-    <div className="text-center space-y-4 mb-10 max-w-2xl mx-auto">
+    <div className="text-center space-y-4 mb-6 max-w-2xl mx-auto">
       {tag && (
         <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold/60">
           {tag}

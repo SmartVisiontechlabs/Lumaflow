@@ -7,8 +7,8 @@ import StepHeading from './shared/StepHeading';
 
 const ALL_DURATIONS = [
   {
-    id: 45,
-    title: '45 Minutes',
+    id: 30,
+    title: '30 Minutes',
     depth: 'Opening',
     intensity: 'Calm',
     description: 'A focused, gentle session to quiet the mind and body.',
@@ -26,13 +26,6 @@ const ALL_DURATIONS = [
     depth: 'Integration',
     intensity: 'Release',
     description: 'Allows the body to fully soften and release held tension.',
-  },
-  {
-    id: 120,
-    title: '120 Minutes',
-    depth: 'Sacred',
-    intensity: 'Transformation',
-    description: 'Our most immersive ritual for somatic breakthrough.',
   },
 ];
 
@@ -79,7 +72,7 @@ const DurationStep = () => {
         )}
       </AnimatePresence>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {ALL_DURATIONS.map((item, index) => {
           const isSelected = selectedDuration === item.id;
           const isRecommended = recommendedDuration === item.id;

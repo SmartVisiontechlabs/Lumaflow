@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase';
+import { adminSupabase as supabase } from '../lib/supabase';
 
 export const adminService = {
   /**

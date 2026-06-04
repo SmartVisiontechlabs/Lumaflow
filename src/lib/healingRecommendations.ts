@@ -52,7 +52,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'Letting go is not an action. It is a surrender.',
     confidence: 'Highly Aligned',
     confidenceReason: 'Breathwork is the primary clinical modality for processing and releasing heavy, stagnant emotional charge.',
-    altDurations: [60, 120],
+    altDurations: [60, 90],
     archetype: 'breathwork',
   },
 
@@ -65,7 +65,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'What is empty can also be made whole.',
     confidence: 'Highly Aligned',
     confidenceReason: 'Breathwork directly addresses the depleted energetic state that underlies emotional fatigue.',
-    altDurations: [60, 120],
+    altDurations: [60, 90],
     archetype: 'breathwork',
   },
 
@@ -78,7 +78,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'Breathe in space. Breathe out quiet.',
     confidence: 'Highly Aligned',
     confidenceReason: 'Controlled breathwork is the fastest evidence-based pathway to deactivating the stress response.',
-    altDurations: [45, 90],
+    altDurations: [30, 90],
     archetype: 'breathwork',
   },
 
@@ -91,7 +91,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'In the eye of the storm, there is a place of absolute quiet.',
     confidence: 'Highly Aligned',
     confidenceReason: 'Breathwork creates immediate physiological changes that interrupt the anxiety feedback loop.',
-    altDurations: [45, 90],
+    altDurations: [30, 90],
     archetype: 'breathwork',
   },
 
@@ -104,7 +104,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'The answer is not in the noise. It is in the depth of your breath.',
     confidence: 'Strong Match',
     confidenceReason: 'Breathwork is highly effective at dissolving dissociation and rebuilding somatic awareness.',
-    altDurations: [60, 120],
+    altDurations: [60, 90],
     archetype: 'breathwork',
   },
 
@@ -117,7 +117,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'The answer was always there. We simply clear the static.',
     confidence: 'Strong Match',
     confidenceReason: 'Breathwork creates altered states that reliably access intuition beyond analytical mind.',
-    altDurations: [60, 120],
+    altDurations: [60, 90],
     archetype: 'breathwork',
   },
 
@@ -125,7 +125,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
   'somatic flow::heavy': {
     ritual: 'Vitality Restoration',
     focus: 'Energy Body Rejuvenation & Fascia Flow',
-    duration: 120,
+    duration: 90,
     insight: 'Heaviness accumulates in the connective tissue — the fascia — as a form of chronic muscle bracing. Slow, passive somatic release postures held over time create the deep myofascial unwinding needed to restore genuine lightness.',
     quote: 'Rest is the soil from which vitality grows.',
     confidence: 'Highly Aligned',
@@ -138,7 +138,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
   'somatic flow::emotionally drained': {
     ritual: 'Vitality Restoration',
     focus: 'Deep Replenishment & Energy Body Reset',
-    duration: 120,
+    duration: 90,
     insight: 'Burnout requires more than rest — it requires intelligent replenishment. Restorative somatic postures combined with conscious body mapping allow the nervous system to shift from survival mode into genuine recovery.',
     quote: 'You cannot pour from an empty vessel. Let us refill yours.',
     confidence: 'Highly Aligned',
@@ -156,7 +156,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'Your body is the temple. Movement is the prayer.',
     confidence: 'Highly Aligned',
     confidenceReason: 'Somatic movement is clinically validated for releasing the physical holding patterns of chronic stress.',
-    altDurations: [45, 90],
+    altDurations: [30, 90],
     archetype: 'somatic',
   },
 
@@ -169,7 +169,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'Feel the ground beneath you. It has always held you.',
     confidence: 'Strong Match',
     confidenceReason: 'Somatic grounding is the most direct pathway to interrupting anxiety\'s future-orientation.',
-    altDurations: [45, 90],
+    altDurations: [30, 90],
     archetype: 'somatic',
   },
 
@@ -182,7 +182,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'To inhabit the body is to walk on holy ground.',
     confidence: 'Highly Aligned',
     confidenceReason: 'Somatic practice is the most direct modality for rebuilding body-mind connection and felt presence.',
-    altDurations: [60, 120],
+    altDurations: [60, 90],
     archetype: 'somatic',
   },
 
@@ -195,7 +195,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'The body knows what the mind is still trying to learn.',
     confidence: 'Strong Match',
     confidenceReason: 'Somatic practices access pre-cognitive body wisdom that transcends mental analysis.',
-    altDurations: [60, 120],
+    altDurations: [60, 90],
     archetype: 'somatic',
   },
 
@@ -208,7 +208,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'You are not a drop in the ocean. You are the entire ocean in a drop.',
     confidence: 'Strong Match',
     confidenceReason: 'Expansion meditation creates psychological distance from heavy emotional content, providing immediate relief.',
-    altDurations: [60, 120],
+    altDurations: [60, 90],
     archetype: 'meditation',
   },
 
@@ -221,7 +221,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'Rest in the infinite. You are always held.',
     confidence: 'Strong Match',
     confidenceReason: 'Transcendental meditation states are highly restorative for deep emotional exhaustion.',
-    altDurations: [60, 120],
+    altDurations: [60, 90],
     archetype: 'meditation',
   },
 
@@ -229,7 +229,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
   'deep meditation::stressed': {
     ritual: 'Stillness Ritual',
     focus: 'Focus Anchoring & Thought Uncoupling',
-    duration: 45,
+    duration: 30,
     insight: 'Stress fills the mind with urgent, looping thoughts. Mindfulness anchors — returning attention to a single point of focus — interrupt the thought cascade. Sound vibration further slows brainwave activity into calm, coherent states.',
     quote: 'Quiet the mind, and the soul will speak.',
     confidence: 'Highly Aligned',
@@ -242,7 +242,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
   'deep meditation::anxious': {
     ritual: 'Stillness Ritual',
     focus: 'Present-Moment Anchoring & Worry Release',
-    duration: 45,
+    duration: 30,
     insight: 'Anxiety lives in the future — in projected scenarios of what might happen. Mindfulness meditation, specifically noting practice, gently returns awareness to the safety of the present moment, dissolving the fuel that anxiety runs on.',
     quote: 'In this moment, right now, you are safe.',
     confidence: 'Highly Aligned',
@@ -260,7 +260,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'Silence is the language of clarity.',
     confidence: 'Strong Match',
     confidenceReason: 'Non-dual meditation practices are uniquely suited to healing the sense of disconnection from self.',
-    altDurations: [45, 90],
+    altDurations: [30, 90],
     archetype: 'meditation',
   },
 
@@ -273,7 +273,7 @@ const RECOMMENDATION_MATRIX: Record<string, HealingRecommendation> = {
     quote: 'Silence is the language of the soul. Everything else is a translation.',
     confidence: 'Highly Aligned',
     confidenceReason: 'Meditation is the primary tool for accessing the clarity that lies beneath mental noise.',
-    altDurations: [45, 90],
+    altDurations: [30, 90],
     archetype: 'meditation',
   },
 };
@@ -288,7 +288,7 @@ const DEFAULT_RECOMMENDATION: HealingRecommendation = {
   quote: 'Every moment of genuine stillness is a seed of transformation.',
   confidence: 'Resonant Path',
   confidenceReason: 'A holistic approach supports all emotional states and healing intentions.',
-  altDurations: [45, 90, 120],
+  altDurations: [30, 90],
   archetype: 'integration',
 };
 

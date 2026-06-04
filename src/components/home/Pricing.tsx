@@ -106,14 +106,14 @@ export default function Pricing() {
   return (
     <>
       <div className="section-transition" />
-      <section className="py-48 bg-white relative section-fade-top section-fade-bottom">
+      <section className="py-36 bg-white relative section-fade-top section-fade-bottom">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 1.5 }}
-            className="text-center mb-32"
+            className="text-center mb-24"
           >
             <span className="text-gold text-xs font-medium tracking-[0.3em] uppercase mb-4 block">The Investment</span>
             <h2 className="font-display text-5xl md:text-6xl text-text-dark font-light">
@@ -179,7 +179,7 @@ export default function Pricing() {
           </div>
 
           {/* Trust Row */}
-          <div className="mt-32 flex flex-wrap justify-center gap-x-16 gap-y-8 opacity-60">
+          <div className="mt-20 flex flex-wrap justify-center gap-x-16 gap-y-8 opacity-60">
             {trustItems.map((item, i) => (
               <div key={i} className="flex items-center gap-3">
                 <span className="text-gold text-lg">{item.icon}</span>

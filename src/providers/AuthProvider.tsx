@@ -57,10 +57,22 @@ export interface LiveBooking {
   used_package_credit: boolean;
 }
 
+export interface UserPackage {
+  id: string;
+  user_email: string;
+  package_id: string;
+  stripe_payment_id: string | null;
+  total_credits: number;
+  remaining_credits: number;
+  status: string;
+  created_at: string;
+}
+
 interface AuthContextType {
   user: any | null;
   profile: UserProfile | null;
   membership: MembershipCredits | null;
+  activePackages: UserPackage[];
   upcomingBooking: LiveBooking | null;
   remainingCredits: number;
   isAuthenticated: boolean;
@@ -79,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [membership, setMembership] = useState<MembershipCredits | null>(null);
   const [bookings, setBookings] = useState<LiveBooking[]>([]);
   const [history, setHistory] = useState<BookingHistory[]>([]);
+  const [activePackages, setActivePackages] = useState<UserPackage[]>([]);
   const [loading, setLoading] = useState(true);
   const [upcomingBooking, setUpcomingBooking] = useState<LiveBooking | null>(null);
   const [remainingCredits, setRemainingCredits] = useState(0);
@@ -90,6 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setMembership(null);
       setBookings([]);
       setHistory([]);
+      setActivePackages([]);
       setUpcomingBooking(null);
       setRemainingCredits(0);
       setLoading(false);
@@ -105,7 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         supabase.from('membership_credits').select('*').eq('user_id', authUser.id).maybeSingle(),
         supabase.from('bookings').select('*').or(`user_id.eq.${authUser.id},email.eq.${authUser.email}`).order('selected_date', { ascending: false }),
         supabase.from('booking_history').select('*').eq('user_id', authUser.id).order('session_date_time', { ascending: false }),
-        supabase.from('user_packages').select('remaining_credits').eq('user_email', authUser.email).eq('status', 'active')
+        supabase.from('user_packages').select('*').ilike('user_email', authUser.email).eq('status', 'active')
       ]);
 
       if (profileRes.error) console.error('Error fetching profile:', profileRes.error);
@@ -118,12 +132,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const membershipData = membershipRes.data || null;
       const bookingsList = bookingsRes.data || [];
       const historyList = historyRes.data || [];
-      const packageCreditsList = userPkgsRes.data || [];
+      const packageCreditsList = (userPkgsRes.data || []).filter((p: any) => {
+        if (p.expires_at && new Date(p.expires_at) < new Date()) {
+          return false;
+        }
+        return true;
+      });
 
       setProfile(profileData);
       setMembership(membershipData);
       setBookings(bookingsList);
       setHistory(historyList);
+      setActivePackages(packageCreditsList);
 
       // Calculate upcoming booking (nearest confirmed future/ongoing booking)
       const now = new Date();
@@ -149,9 +169,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       // Calculate total remaining credits
-      const mCredits = membershipData ? membershipData.remaining_credits : 0;
-      const pCredits = packageCreditsList.reduce((sum: number, p: any) => sum + (p.remaining_credits || 0), 0);
-      setRemainingCredits(mCredits + pCredits);
+      let remainingCreditsValue = 0;
+      if (membershipData) {
+        remainingCreditsValue = membershipData.remaining_credits;
+      } else {
+        remainingCreditsValue = packageCreditsList.reduce((sum: number, p: any) => sum + (p.remaining_credits || 0), 0);
+      }
+      setRemainingCredits(remainingCreditsValue);
 
     } catch (err) {
       console.error('Error loading auth-dependent data:', err);
@@ -204,6 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user,
     profile,
     membership,
+    activePackages,
     upcomingBooking,
     remainingCredits,
     isAuthenticated: !!user,

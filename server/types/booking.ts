@@ -44,11 +44,15 @@ export interface Booking {
   reminderSent?: boolean | null;
   zoom_status?: string | null;
   zoomStatus?: string | null;
+  practitionerTime?: string;
+  clientLocalTime?: string;
 }
 
 export interface AvailabilitySlot {
   timeEST: string; // HH:mm
   timeLocal: string; // HH:mm translated to user timezone
+  timeESTLabel?: string;
+  timeLocalLabel?: string;
   isAvailable: boolean;
   reason?: string;
 }

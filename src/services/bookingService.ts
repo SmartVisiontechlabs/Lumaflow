@@ -3,13 +3,57 @@ import { generateBookingReference } from '../utils/bookingUtils';
 
 const STORAGE_KEY = 'lumaflow_production_bookings';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
 /**
  * PRODUCTION BOOKING SERVICE
  * Connects to the Node.js backend
  */
 export const bookingService = {
+  /**
+   * Checks if an email account exists in the database
+   */
+  async checkEmail(email: string): Promise<{ exists: boolean; userId: string | null }> {
+    try {
+      const response = await fetch(`${API_URL}/bookings/check-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      if (!response.ok) throw new Error('Failed to verify account status');
+      return await response.json();
+    } catch (error) {
+      console.error('[bookingService] checkEmail error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Silently restores a user session based on their email
+   */
+  async restoreSession(email: string): Promise<{ access_token: string; refresh_token: string }> {
+    try {
+      const response = await fetch(`${API_URL}/bookings/restore-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to silently restore your session.');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('[bookingService] restoreSession error:', error);
+      throw error;
+    }
+  },
+
   /**
    * Persists a new booking (POST /api/bookings)
    */
@@ -38,6 +82,70 @@ export const bookingService = {
     } catch (error) {
       console.error('API Connection Error:', error);
       throw error;
+    }
+  },
+
+  /**
+   * Creates a draft booking (POST /api/bookings/draft)
+   */
+  async createDraftBooking(bookingData: any): Promise<Booking> {
+    try {
+      const response = await fetch(`${API_URL}/bookings/draft`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(bookingData),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create booking draft.');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[bookingService] createDraftBooking error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Confirms a credit booking (POST /api/bookings/confirm-credit)
+   */
+  async confirmCreditBooking(bookingId: string, userId?: string): Promise<Booking> {
+    try {
+      const response = await fetch(`${API_URL}/bookings/confirm-credit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ bookingId, userId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to confirm sanctuary credits.');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[bookingService] confirmCreditBooking error:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Gets any active draft booking (GET /api/bookings/active-draft)
+   */
+  async getActiveDraftBooking(userId: string): Promise<Booking | null> {
+    try {
+      const response = await fetch(`${API_URL}/bookings/active-draft?userId=${userId}`);
+      if (!response.ok) {
+        return null;
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('[bookingService] getActiveDraftBooking error:', error);
+      return null;
     }
   },
 

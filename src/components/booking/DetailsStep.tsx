@@ -49,7 +49,7 @@ const DetailsStep = () => {
 
       <div className="space-y-8">
         {/* COMPACT SUMMARY CARD */}
-        <div className="bg-white/80 backdrop-blur-2xl p-10 rounded-[3rem] border border-gold/10 shadow-luxury grid grid-cols-1 md:grid-cols-3 gap-8 relative overflow-hidden">
+        <div className="bg-white/80 backdrop-blur-2xl p-6 rounded-[2rem] border border-gold/10 shadow-luxury grid grid-cols-1 md:grid-cols-3 gap-6 relative overflow-hidden">
           <div className="space-y-2">
             <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold/60">Ritual</p>
             <div className="flex items-center gap-3 text-text-dark/80">
@@ -85,15 +85,15 @@ const DetailsStep = () => {
         </div>
 
         {/* COMPACT FORM SECTION */}
-        <div className="bg-white/50 backdrop-blur-md p-10 rounded-[3.5rem] border border-text-dark/5 space-y-8 relative shadow-luxury">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="bg-white/50 backdrop-blur-md p-8 rounded-[2rem] border border-text-dark/5 space-y-6 relative shadow-luxury">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Full Name */}
             <div className="relative">
               <div className={cn(
-                "absolute left-8 top-1/2 -translate-y-1/2 transition-colors duration-700",
+                "absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-700",
                 activeField === 'fullName' ? "text-gold" : "text-text-dark/10"
               )}>
-                <User className="w-6 h-6" />
+                <User className="w-5 h-5" />
               </div>
               <input 
                 type="text" 
@@ -104,11 +104,11 @@ const DetailsStep = () => {
                 onBlur={() => setActiveField(null)}
                 onChange={(e) => setUserDetails({ fullName: e.target.value })}
                 className={cn(
-                  "peer w-full pl-20 pr-8 pt-9 pb-3.5 bg-white/40 border border-text-dark/5 rounded-[2rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-base font-light text-text-dark",
+                  "peer w-full pl-16 pr-6 pt-7 pb-2.5 bg-white/40 border border-text-dark/5 rounded-[1.5rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark",
                   fullName && "border-gold/20"
                 )}
               />
-              <label className="absolute left-20 top-3 text-[10px] font-bold uppercase tracking-[0.4em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-sm peer-focus:top-3 peer-focus:translate-y-0 peer-focus:text-[10px]">
+              <label className="absolute left-16 top-2 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-xs peer-focus:top-2 peer-focus:translate-y-0 peer-focus:text-[8px]">
                 Full Name
               </label>
             </div>
@@ -116,10 +116,10 @@ const DetailsStep = () => {
             {/* Email Address */}
             <div className="relative">
               <div className={cn(
-                "absolute left-8 top-1/2 -translate-y-1/2 transition-colors duration-700",
+                "absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-700",
                 activeField === 'email' ? "text-gold" : "text-text-dark/10"
               )}>
-                <Mail className="w-6 h-6" />
+                <Mail className="w-5 h-5" />
               </div>
               <input 
                 type="email" 
@@ -130,11 +130,11 @@ const DetailsStep = () => {
                 onBlur={() => setActiveField(null)}
                 onChange={(e) => setUserDetails({ email: e.target.value })}
                 className={cn(
-                  "peer w-full pl-20 pr-8 pt-9 pb-3.5 bg-white/40 border border-text-dark/5 rounded-[2rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-base font-light text-text-dark",
+                  "peer w-full pl-16 pr-6 pt-7 pb-2.5 bg-white/40 border border-text-dark/5 rounded-[1.5rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark",
                   email && "border-gold/20"
                 )}
               />
-              <label className="absolute left-20 top-3 text-[10px] font-bold uppercase tracking-[0.4em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-sm peer-focus:top-3 peer-focus:translate-y-0 peer-focus:text-[10px]">
+              <label className="absolute left-16 top-2 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-xs peer-focus:top-2 peer-focus:translate-y-0 peer-focus:text-[8px]">
                 Email Address
               </label>
             </div>
@@ -143,24 +143,24 @@ const DetailsStep = () => {
           {/* Intentions */}
           <div className="relative">
             <div className={cn(
-              "absolute left-8 top-10 transition-colors duration-700",
+              "absolute left-6 top-6 transition-colors duration-700",
               activeField === 'intentions' ? "text-gold" : "text-text-dark/10"
             )}>
-              <MessageSquare className="w-6 h-6" />
+              <MessageSquare className="w-5 h-5" />
             </div>
             <textarea 
               placeholder=" "
-              rows={4}
+              rows={3}
               value={intentions}
               onFocus={() => setActiveField('intentions')}
               onBlur={() => setActiveField(null)}
               onChange={(e) => setUserDetails({ intentions: e.target.value })}
               className={cn(
-                "peer w-full pl-20 pr-10 pt-12 pb-6 bg-white/40 border border-text-dark/5 rounded-[2.5rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-base font-light text-text-dark resize-none leading-relaxed",
+                "peer w-full pl-16 pr-6 pt-9 pb-4 bg-white/40 border border-text-dark/5 rounded-[1.8rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark resize-none leading-relaxed",
                 intentions && "border-gold/20"
               )}
             />
-            <label className="absolute left-20 top-5 text-[10px] font-bold uppercase tracking-[0.4em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-10 peer-placeholder-shown:text-sm peer-focus:top-5 peer-focus:text-[10px]">
+            <label className="absolute left-16 top-3 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-6 peer-placeholder-shown:text-xs peer-focus:top-3 peer-focus:text-[8px]">
               What is your primary intention?
             </label>
           </div>

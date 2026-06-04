@@ -19,14 +19,14 @@ export default function AboutMe() {
   return (
     <>
       <div className="section-transition" />
-      <section className="py-48 bg-transparent relative overflow-hidden section-fade-top section-fade-bottom">
+      <section className="py-36 bg-transparent relative overflow-hidden section-fade-top section-fade-bottom">
         
         {/* Soft morning sun ray & glow behind section */}
         <div className="absolute inset-0 sun-beam-ray opacity-[0.02] pointer-events-none" />
         <div className="absolute top-[20%] left-[-10%] w-[45vw] h-[45vw] ambient-glow-gold opacity-[0.05] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-24 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             
             {/* LEFT: Founder Image (Alanna) with Double Luxury Gold Framing */}
             {isLoading || !founder ? (

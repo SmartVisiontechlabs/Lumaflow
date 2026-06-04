@@ -33,7 +33,7 @@ const ClientProfile = lazy(() => import('./pages/client/Profile'));
 // Protected Route Guard
 import { Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './providers/AuthProvider';
-import { adminSupabase } from './lib/supabase';
+import { supabase, adminSupabase } from './lib/supabase';
 import { useState, useEffect } from 'react';
 
 const ProtectedRoute = () => {
@@ -41,52 +41,41 @@ const ProtectedRoute = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     const checkAdmin = async () => {
       try {
         const { data: { session } } = await adminSupabase.auth.getSession();
+        if (!active) return;
         if (!session || !session.user) {
           setIsAdmin(false);
           setLoading(false);
           return;
         }
 
-        const { data: profile } = await adminSupabase
+        const { data: profile, error } = await adminSupabase
           .from('user_profiles')
           .select('role')
           .eq('id', session.user.id)
           .maybeSingle();
 
-        setIsAdmin(profile?.role === 'admin');
+        if (!active) return;
+        if (error || !profile || profile.role !== 'admin') {
+          setIsAdmin(false);
+        } else {
+          setIsAdmin(true);
+        }
       } catch (err) {
         console.error('Error verifying admin authorization:', err);
-        setIsAdmin(false);
+        if (active) setIsAdmin(false);
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     checkAdmin();
-
-    const { data: { subscription } } = adminSupabase.auth.onAuthStateChange(async (_event, session) => {
-      if (session && session.user) {
-        try {
-          const { data: profile } = await adminSupabase
-            .from('user_profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .maybeSingle();
-          setIsAdmin(profile?.role === 'admin');
-        } catch (err) {
-          console.error('Error fetching role in auth state change:', err);
-          setIsAdmin(false);
-        }
-      } else {
-        setIsAdmin(false);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (loading) return <Loading />;
@@ -100,14 +89,59 @@ const ClientProtectedRoute = () => {
   return isAuthenticated ? <Outlet /> : <Navigate to="/client/login" replace />;
 };
 
-// Loading Fallback
+// Luxury Lumaflow Loading Screen
 const Loading = () => (
-  <div className="min-h-screen bg-cream flex items-center justify-center">
-    <div className="w-12 h-12 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
+  <div className="min-h-screen bg-[#090D16] flex flex-col items-center justify-center relative overflow-hidden">
+    {/* Soft glowing ambient backgrounds */}
+    <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-gold/5 rounded-full blur-[100px] animate-pulse" />
+    <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-amber-500/5 rounded-full blur-[100px] animate-pulse delay-75" />
+    
+    <div className="relative z-10 flex flex-col items-center gap-6">
+      {/* pulsing gold logo circle with breathing animation */}
+      <div className="relative w-20 h-20 flex items-center justify-center animate-pulse" style={{ animationDuration: '3s' }}>
+        {/* Pulsing outer ring */}
+        <div className="absolute inset-0 rounded-full border border-gold/25 animate-ping opacity-60" style={{ animationDuration: '3s' }} />
+        
+        {/* Core spinning ring */}
+        <div className="absolute inset-0 rounded-full border border-transparent border-t-gold/80 border-r-gold/40 animate-spin" style={{ animationDuration: '1.2s' }} />
+        
+        {/* Center brand mark */}
+        <span className="font-serif text-lg text-gold tracking-widest font-extralight">LF</span>
+      </div>
+      
+      {/* Elegantly styled branding text with breathing animation */}
+      <div className="flex flex-col items-center gap-1.5 animate-pulse text-center" style={{ animationDuration: '3s' }}>
+        <h2 className="font-serif text-gold/90 tracking-[0.25em] text-sm font-light uppercase">LUMAFLOW</h2>
+        <p className="text-gold/60 font-sans text-[10px] tracking-[0.2em] font-light uppercase">Preparing Your Sanctuary...</p>
+      </div>
+    </div>
   </div>
 );
 
 export default function App() {
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        // Force session restore check on mount before rendering protected paths
+        await Promise.all([
+          adminSupabase.auth.getSession(),
+          supabase.auth.getSession()
+        ]);
+      } catch (e) {
+        console.error('Error during app boot session restore:', e);
+      } finally {
+        setAuthReady(true);
+      }
+    };
+    restoreSession();
+  }, []);
+
+  if (!authReady) {
+    return <Loading />;
+  }
+
   return (
     <AuthProvider>
       <BrowserRouter>

@@ -47,8 +47,8 @@ export const emailService = {
     console.log('SENDER:', `LumaFlow <${FROM_EMAIL}>`);
     console.log('BOOKING REFERENCE:', booking.bookingReference);
 
-    const timeLocal = getLocalTimeForEST(booking.selectedDate, booking.selectedTime);
-    const timeESTFormatted = format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST';
+    const timeESTFormatted = booking.practitionerTime || (format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST');
+    const timeLocal = booking.clientLocalTime || getLocalTimeForEST(booking.selectedDate, booking.selectedTime, booking.timezone);
 
 
     // Calendar Integration Data
@@ -286,8 +286,8 @@ If you need support, reply to this email.
   async sendReminder24h(booking: Booking) {
     console.log(`--- EMAIL ATTEMPT: 24h Reminder for ${booking.bookingReference} ---`);
     try {
-      const timeLocal = getLocalTimeForEST(booking.selectedDate, booking.selectedTime);
-      const timeESTFormatted = format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST';
+      const timeESTFormatted = booking.practitionerTime || (format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST');
+      const timeLocal = booking.clientLocalTime || getLocalTimeForEST(booking.selectedDate, booking.selectedTime, booking.timezone);
 
       const result = await resend.emails.send({
         from: `LumaFlow <${FROM_EMAIL}>`,
@@ -319,7 +319,7 @@ If you need support, reply to this email.
   async sendPrep1h(booking: Booking) {
     console.log(`--- EMAIL ATTEMPT: 1h Prep for ${booking.bookingReference} ---`);
     try {
-      const timeLocal = getLocalTimeForEST(booking.selectedDate, booking.selectedTime);
+      const timeLocal = booking.clientLocalTime || getLocalTimeForEST(booking.selectedDate, booking.selectedTime, booking.timezone);
 
       const result = await resend.emails.send({
         from: `LumaFlow <${FROM_EMAIL}>`,

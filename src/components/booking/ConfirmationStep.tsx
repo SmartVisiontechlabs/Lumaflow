@@ -1,5 +1,5 @@
 import React, { useState, memo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useBookingFlow } from '../../hooks/useBookingFlow';
 import { CheckCircle2, Sparkles, Clock, MapPin, Calendar, Mail, ChevronLeft, ChevronRight, Loader2, User, MessageSquare } from 'lucide-react';
@@ -24,6 +24,8 @@ const formatTo12Hour = (time24: string): string => {
 
 import { useAuth } from '../../providers/AuthProvider';
 import { bookingService } from '../../services/bookingService';
+import { supabase } from '../../lib/supabase';
+import { Lock, X as CloseIcon, AlertTriangle } from 'lucide-react';
 
 const ConfirmationStep = () => {
   const { 
@@ -45,12 +47,98 @@ const ConfirmationStep = () => {
     setIsSubmitting,
     resetBooking, 
     closeBooking,
-    prevStep
+    prevStep,
+    setSelectedPackage,
+    updateRecommendation,
+    goToStep
   } = useBookingFlow();
   
-  const { isAuthenticated, profile, remainingCredits, user } = useAuth();
+  const { isAuthenticated, profile, remainingCredits, user, bookings, refresh, activePackages } = useAuth();
   const navigate = useNavigate();
   const [activeField, setActiveField] = useState<string | null>(null);
+
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicatePkgName, setDuplicatePkgName] = useState('');
+
+  const handleEmailBlur = async () => {
+    setActiveField(null);
+    if (!email || !email.includes('@') || !email.includes('.')) return;
+    
+    if (isAuthenticated && profile?.email?.toLowerCase() === email.toLowerCase()) {
+      return;
+    }
+    
+    try {
+      console.log('[ConfirmationStep] Checking account status for:', email);
+      const res = await bookingService.checkEmail(email);
+      if (res.exists) {
+        setOtpError(null);
+        setShowAuthModal(true);
+      }
+    } catch (e) {
+      console.error('Error verifying email status:', e);
+    }
+  };
+
+  const checkDuplicatePlan = (packagesList: any[]) => {
+    if (selectedPackage && packagesList.length > 0) {
+      const activeDuplicate = packagesList.find(
+        (ap) => ap.package_id === selectedPackage.id && ap.remaining_credits > 0
+      );
+      if (activeDuplicate) {
+        setDuplicatePkgName(selectedPackage.name);
+        setShowDuplicateModal(true);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const handleSilentRestore = async () => {
+    setIsVerifying(true);
+    setOtpError(null);
+    try {
+      console.log('[ConfirmationStep] Silently restoring session for email:', email);
+      const tokenData = await bookingService.restoreSession(email);
+      
+      const { error } = await supabase.auth.setSession({
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token
+      });
+      
+      if (error) throw error;
+      
+      // Fetch active packages directly to run duplicate check instantly before refresh resolves
+      const { data: pkgs } = await supabase
+        .from('user_packages')
+        .select('*')
+        .eq('user_email', email)
+        .eq('status', 'active');
+      
+      // Update auth provider state
+      await refresh();
+      
+      // Close the modal
+      setShowAuthModal(false);
+
+      if (pkgs && pkgs.length > 0) {
+        checkDuplicatePlan(pkgs);
+      }
+
+      console.log('[ConfirmationStep] Silent session restore succeeded');
+    } catch (err: any) {
+      console.error('Silent restore failed:', err);
+      setOtpError(err.message || 'Failed to silently verify sanctuary account.');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const bookableCredits = remainingCredits;
 
   // Prefill details for logged-in users
   React.useEffect(() => {
@@ -62,6 +150,12 @@ const ConfirmationStep = () => {
     }
   }, [isAuthenticated, profile, setUserDetails]);
 
+  React.useEffect(() => {
+    if (isAuthenticated && activePackages && selectedPackage) {
+      checkDuplicatePlan(activePackages);
+    }
+  }, [isAuthenticated, activePackages, selectedPackage]);
+
   const isFormValid = fullName.trim().length > 2 && email.includes('@') && email.includes('.');
 
   const handleSecureBooking = async () => {
@@ -69,27 +163,34 @@ const ConfirmationStep = () => {
 
     setIsSubmitting(true);
     try {
-      if (isAuthenticated && remainingCredits > 0) {
-        // Book using existing membership/package credit
-        const bookingData = {
-          emotion: emotionalState,
-          selectedSession: selectedRitual,
-          sessionFormat: sessionFormat,
-          duration: selectedDuration,
-          selectedDate: selectedDate,
-          selectedTime: selectedTime,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          fullName,
-          email,
-          intentions,
-          selectedPackage: null, // No new package purchase
-          journeyType,
-          stripe_payment_id: 'credit_booking',
-          userId: profile?.id || user?.id
-        };
+      // 1. Create a draft booking in the database first
+      const draftData = {
+        emotion: emotionalState,
+        recommendedPath: journeyType || '',
+        selectedSession: selectedRitual,
+        sessionFormat: sessionFormat,
+        duration: selectedDuration,
+        selectedDate: selectedDate,
+        selectedTime: selectedTime,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        fullName,
+        email,
+        intentions,
+        packageId: selectedPackage?.id || null,
+        packageName: selectedPackage?.name || 'Single Session',
+        packagePrice: selectedPackage?.price || null,
+        packageCredits: selectedPackage?.credits || null,
+        journeyType,
+        userId: profile?.id || user?.id || null
+      };
 
-        console.log('[ConfirmationStep] Booking with credit...', bookingData);
-        const result = await bookingService.createBooking(bookingData);
+      console.log('[ConfirmationStep] Creating draft booking...', draftData);
+      const draft = await bookingService.createDraftBooking(draftData);
+      
+      if (isAuthenticated && bookableCredits > 0 && !selectedPackage) {
+        // Book using existing membership/package credit
+        console.log('[ConfirmationStep] Confirming credit booking for ID:', draft.id);
+        const result = await bookingService.confirmCreditBooking(draft.id, profile?.id || user?.id);
         setBookingReference(result.bookingReference);
         
         setTimeout(() => {
@@ -97,8 +198,9 @@ const ConfirmationStep = () => {
           navigate(`/booking/success?ref=${result.bookingReference}`);
         }, 1500);
       } else {
-        // Standard Stripe payment checkout
+        // Standard Stripe payment checkout: link with the draft booking ID
         const checkoutUrl = await paymentService.createCheckoutSession({
+          bookingId: draft.id,
           emotion: emotionalState,
           selectedSession: selectedRitual,
           sessionFormat: sessionFormat as any,
@@ -123,7 +225,7 @@ const ConfirmationStep = () => {
   const parsedDate = selectedDate ? parseISO(selectedDate) : null;
 
   return (
-    <div className="relative min-h-[60vh] flex items-center justify-center py-12 px-6 overflow-hidden">
+    <div className="relative min-h-[60vh] flex items-center justify-center py-8 px-6 overflow-hidden">
       {/* IMMERSIVE BACKGROUND EFFECTS */}
       <div className="absolute inset-0 pointer-events-none">
         <motion.div 
@@ -140,7 +242,7 @@ const ConfirmationStep = () => {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1.5, ease: [0.22, 1, 0.36, 1] }}
-        className="relative z-10 max-w-4xl w-full text-center space-y-14"
+        className="relative z-10 max-w-4xl w-full text-center space-y-8"
       >
         <div className="space-y-10">
           <motion.div
@@ -180,7 +282,7 @@ const ConfirmationStep = () => {
         </div>
 
         {/* BOOKING SUMMARY AND DETAILS CARD */}
-        <div className="bg-white/70 backdrop-blur-3xl border border-white/50 rounded-[4rem] p-12 shadow-luxury text-left grid grid-cols-1 lg:grid-cols-2 gap-12 relative overflow-hidden">
+        <div className="bg-white/70 backdrop-blur-3xl border border-white/50 rounded-[2.5rem] p-8 shadow-luxury text-left grid grid-cols-1 lg:grid-cols-2 gap-8 relative overflow-hidden">
           {/* LEFT: SUMMARY DETAILS */}
           <div className="space-y-8">
             <div className="space-y-6 pb-6 border-b border-gold/10 relative">
@@ -259,64 +361,85 @@ const ConfirmationStep = () => {
           </div>
 
           {/* RIGHT: DETAILS INPUT FORM */}
-          <div className="space-y-6 lg:border-l border-gold/10 lg:pl-12 flex flex-col justify-center">
+          <div className="space-y-6 lg:border-l border-gold/10 lg:pl-8 flex flex-col justify-center">
             <div className="space-y-1">
               <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold/80">Client Details</p>
               <p className="text-xs font-light text-text-dark/40">Please provide your details to secure this sacred container.</p>
             </div>
 
             <div className="space-y-6">
-              {/* Full Name */}
-              <div className="relative">
-                <div className={cn(
-                  "absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-700",
-                  activeField === 'fullName' ? "text-gold" : "text-text-dark/10"
-                )}>
-                  <User className="w-5 h-5" />
+              {isAuthenticated ? (
+                <div className="p-6 bg-white/50 backdrop-blur-xl border border-gold/10 rounded-[2rem] space-y-4 shadow-luxury text-left">
+                  <div className="flex justify-between items-center border-b border-gold/5 pb-3">
+                    <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-gold/80">Sanctuary Profile</span>
+                    <span className="inline-flex items-center px-3 py-0.5 rounded-full text-[8px] font-semibold bg-gold/15 text-gold uppercase tracking-widest">Active Member</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-text-dark/40 block">Full Name</span>
+                      <span className="text-sm font-medium text-text-dark">{profile?.full_name || fullName}</span>
+                    </div>
+                    <div>
+                      <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-text-dark/40 block">Email Address</span>
+                      <span className="text-sm font-light text-text-dark/70">{profile?.email || email}</span>
+                    </div>
+                  </div>
                 </div>
-                <input 
-                  type="text" 
-                  placeholder=" "
-                  autoComplete="name"
-                  value={fullName}
-                  onFocus={() => setActiveField('fullName')}
-                  onBlur={() => setActiveField(null)}
-                  onChange={(e) => setUserDetails({ fullName: e.target.value })}
-                  className={cn(
-                    "peer w-full pl-16 pr-6 pt-7 pb-2.5 bg-white/40 border border-text-dark/5 rounded-[1.5rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark",
-                    fullName && "border-gold/20"
-                  )}
-                />
-                <label className="absolute left-16 top-2 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-xs peer-focus:top-2 peer-focus:translate-y-0 peer-focus:text-[8px]">
-                  Full Name
-                </label>
-              </div>
+              ) : (
+                <>
+                  {/* Full Name */}
+                  <div className="relative">
+                    <div className={cn(
+                      "absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-700",
+                      activeField === 'fullName' ? "text-gold" : "text-text-dark/10"
+                    )}>
+                      <User className="w-5 h-5" />
+                    </div>
+                    <input 
+                      type="text" 
+                      placeholder=" "
+                      autoComplete="name"
+                      value={fullName}
+                      onFocus={() => setActiveField('fullName')}
+                      onBlur={() => setActiveField(null)}
+                      onChange={(e) => setUserDetails({ fullName: e.target.value })}
+                      className={cn(
+                        "peer w-full pl-16 pr-6 pt-7 pb-2.5 bg-white/40 border border-text-dark/5 rounded-[1.5rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark",
+                        fullName && "border-gold/20"
+                      )}
+                    />
+                    <label className="absolute left-16 top-2 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-xs peer-focus:top-2 peer-focus:translate-y-0 peer-focus:text-[8px]">
+                      Full Name
+                    </label>
+                  </div>
 
-              {/* Email Address */}
-              <div className="relative">
-                <div className={cn(
-                  "absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-700",
-                  activeField === 'email' ? "text-gold" : "text-text-dark/10"
-                )}>
-                  <Mail className="w-5 h-5" />
-                </div>
-                <input 
-                  type="email" 
-                  placeholder=" "
-                  autoComplete="email"
-                  value={email}
-                  onFocus={() => setActiveField('email')}
-                  onBlur={() => setActiveField(null)}
-                  onChange={(e) => setUserDetails({ email: e.target.value })}
-                  className={cn(
-                    "peer w-full pl-16 pr-6 pt-7 pb-2.5 bg-white/40 border border-text-dark/5 rounded-[1.5rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark",
-                    email && "border-gold/20"
-                  )}
-                />
-                <label className="absolute left-16 top-2 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-xs peer-focus:top-2 peer-focus:translate-y-0 peer-focus:text-[8px]">
-                  Email Address
-                </label>
-              </div>
+                  {/* Email Address */}
+                  <div className="relative">
+                    <div className={cn(
+                      "absolute left-6 top-1/2 -translate-y-1/2 transition-colors duration-700",
+                      activeField === 'email' ? "text-gold" : "text-text-dark/10"
+                    )}>
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <input 
+                      type="email" 
+                      placeholder=" "
+                      autoComplete="email"
+                      value={email}
+                      onFocus={() => setActiveField('email')}
+                      onBlur={handleEmailBlur}
+                      onChange={(e) => setUserDetails({ email: e.target.value })}
+                      className={cn(
+                        "peer w-full pl-16 pr-6 pt-7 pb-2.5 bg-white/40 border border-text-dark/5 rounded-[1.5rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark",
+                        email && "border-gold/20"
+                      )}
+                    />
+                    <label className="absolute left-16 top-2 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-1/2 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:text-xs peer-focus:top-2 peer-focus:translate-y-0 peer-focus:text-[8px]">
+                      Email Address
+                    </label>
+                  </div>
+                </>
+              )}
 
               {/* Intentions */}
               <div className="relative">
@@ -391,10 +514,10 @@ const ConfirmationStep = () => {
             >
               <span className="flex items-center justify-center gap-2">
                 {isSubmitting 
-                  ? (isAuthenticated && remainingCredits > 0 ? "Securing Session..." : "Opening Portal...") 
+                  ? (isAuthenticated && bookableCredits > 0 && !selectedPackage ? "Securing Session..." : "Opening Portal...") 
                   : lastBookingReference 
                   ? "Booking Confirmed" 
-                  : (isAuthenticated && remainingCredits > 0 ? "Book with 1 Ritual Credit" : "Secure & Proceed to Payment")}
+                  : (isAuthenticated && bookableCredits > 0 && !selectedPackage ? "Book with 1 Ritual Credit" : "Secure & Proceed to Payment")}
                 {!isSubmitting && !lastBookingReference && <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
                 {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
               </span>
@@ -434,6 +557,148 @@ const ConfirmationStep = () => {
           <Sparkles className="w-4 h-4 animate-pulse" /> {lastBookingReference ? "A ritual guide has been sent to your inbox" : "Sacred confirmation prepared for your inbox"}
         </div>
       </motion.div>
+
+      {/* LUXURY WELCOME BACK SILENT AUTH MODAL */}
+      <AnimatePresence>
+        {showAuthModal && (
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!isVerifying) setShowAuthModal(false);
+              }}
+              className="absolute inset-0 bg-[#1A1A1A]/40 backdrop-blur-md"
+            />
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="relative bg-white/95 backdrop-blur-2xl border border-gold/10 p-10 md:p-12 rounded-[2.5rem] shadow-[0_30px_70px_rgba(203,174,115,0.15)] max-w-md w-full text-center space-y-8 z-10"
+            >
+              <button 
+                onClick={() => setShowAuthModal(false)}
+                className="absolute top-6 right-6 text-text-dark/40 hover:text-gold transition-colors p-1 cursor-pointer"
+                aria-label="Close modal"
+                disabled={isVerifying}
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+
+              <div className="space-y-6">
+                <div className="w-16 h-16 bg-gold/10 rounded-full flex items-center justify-center mx-auto">
+                  <Lock className="w-6 h-6 text-gold" />
+                </div>
+                
+                <div className="space-y-3">
+                  <h4 className="font-display text-3xl text-text-dark tracking-tight">
+                    Welcome Back
+                  </h4>
+                  <p className="text-xs text-text-dark/60 font-light leading-relaxed">
+                    We found your sanctuary account. <br />Continue your booking securely.
+                  </p>
+                </div>
+
+                {otpError && (
+                  <p className="text-[10px] text-red-500 font-bold uppercase tracking-wider italic">
+                    “{otpError}”
+                  </p>
+                )}
+
+                <button
+                  onClick={handleSilentRestore}
+                  disabled={isVerifying}
+                  className="w-full py-4 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isVerifying ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Restoring Sanctuary...
+                    </>
+                  ) : (
+                    <>
+                      Continue Booking
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Journey Already Active Modal */}
+      <AnimatePresence>
+        {showDuplicateModal && (
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#0A0A0A]/60 backdrop-blur-md"
+              onClick={() => setShowDuplicateModal(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              className="relative bg-white/95 backdrop-blur-2xl border border-gold/10 p-10 md:p-12 rounded-[2.5rem] shadow-[0_30px_70px_rgba(203,174,115,0.15)] max-w-md w-full text-center space-y-8 z-10 text-text-dark"
+            >
+              <button 
+                onClick={() => setShowDuplicateModal(false)}
+                className="absolute top-6 right-6 text-text-dark/40 hover:text-gold transition-colors p-1 cursor-pointer"
+                aria-label="Close modal"
+              >
+                <CloseIcon className="w-5 h-5" />
+              </button>
+              <div className="space-y-6">
+                <div className="w-16 h-16 bg-gold/10 rounded-full flex items-center justify-center mx-auto">
+                  <AlertTriangle className="w-6 h-6 text-gold" />
+                </div>
+                <div className="space-y-3">
+                  <h4 className="font-display text-3xl text-text-dark tracking-tight">
+                    Your healing journey is already active.
+                  </h4>
+                  <p className="text-xs text-text-dark/60 font-light leading-relaxed">
+                    Your <strong className="font-semibold text-gold">{duplicatePkgName}</strong> is currently active. <br />
+                    You still have sanctuary moments remaining.
+                  </p>
+                  <p className="text-xs text-text-dark/50 italic font-light pt-2">
+                    Complete your current pathway or explore a deeper experience.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-4 pt-4">
+                  <button
+                    onClick={() => {
+                      setShowDuplicateModal(false);
+                      // Bypasses plan purchase, set package to null to use existing credits, and update recommendations
+                      setSelectedPackage(null);
+                      updateRecommendation(journeyType, emotionalState, null);
+                    }}
+                    className="w-full py-4 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-md cursor-pointer"
+                  >
+                    Continue Existing Journey
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDuplicateModal(false);
+                      goToStep(4);
+                    }}
+                    className="w-full py-4 bg-white/40 border border-text-dark/10 hover:border-gold/40 text-text-dark/60 hover:text-gold rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 cursor-pointer"
+                  >
+                    Explore Another Offering
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

@@ -50,4 +50,8 @@ router.delete('/offerings/:id', adminAuth, cmsController.deleteOffering);
 router.get('/intelligence', cmsController.getIntelligence);
 router.put('/intelligence/:id', adminAuth, cmsController.updateIntelligence);
 
+// Pages Custom CMS routes
+router.get('/pages', cmsController.getPagesContent);
+router.put('/pages/:page_name', adminAuth, cmsController.updatePageContent);
+
 export default router;

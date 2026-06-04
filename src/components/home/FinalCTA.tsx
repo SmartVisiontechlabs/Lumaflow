@@ -7,7 +7,7 @@ export default function FinalCTA() {
   return (
     <>
       <div className="section-transition" />
-      <section className="relative py-72 overflow-hidden bg-transparent flex items-center justify-center">
+      <section className="relative py-56 overflow-hidden bg-transparent flex items-center justify-center">
         {/* Massive Emotional Glow */}
         <div className="absolute inset-0 z-0">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vw] h-[100vw] bg-[#CBAE73]/12 rounded-full blur-[140px] animate-breathe pointer-events-none" />

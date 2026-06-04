@@ -1,4 +1,4 @@
-import { useClientPortal } from '../../hooks/useClientPortal';
+import { useAuth } from '../../providers/AuthProvider';
 import { 
   Calendar, 
   Clock, 
@@ -69,7 +69,8 @@ Preparation Checklist:
 }
 
 export default function Bookings() {
-  const { bookings, loading, error } = useClientPortal();
+  const { bookings, loading } = useAuth();
+  const error = null;
 
   if (loading) {
     return (

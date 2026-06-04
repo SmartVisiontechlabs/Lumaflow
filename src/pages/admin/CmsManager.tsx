@@ -13,13 +13,17 @@ import {
   Trash,
   CheckCircle,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  BookOpen,
+  Mail,
+  Gift
 } from 'lucide-react';
 import { cmsService } from '../../services/cmsService';
 import { adminSupabase as supabase } from '../../lib/supabase';
 import { useCmsStore } from '../../store/cmsStore';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 import { 
   HeroContent, 
   TransformationStep, 
@@ -33,11 +37,15 @@ import { Toast, ToastType } from '../../components/ui/Toast';
 import { cn } from '../../lib/utils';
 
 export default function CmsManager() {
-  const [activeTab, setActiveTab] = useState<'hero' | 'steps' | 'about' | 'quotes' | 'paths' | 'matrix'>('hero');
+  const [activeTab, setActiveTab] = useState<'hero' | 'steps' | 'about' | 'quotes' | 'paths' | 'matrix' | 'classes' | 'contact' | 'packages'>('hero');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Custom pages content configurations (Classes, Contact)
+  const [pagesContent, setPagesContent] = useState<Record<string, any>>({});
+  const [pristinePagesContent, setPristinePagesContent] = useState<Record<string, any>>({});
 
   // Current Working Data States
   const [hero, setHero] = useState<HeroContent | null>(null);
@@ -47,6 +55,7 @@ export default function CmsManager() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [paths, setPaths] = useState<HealingPath[]>([]);
   const [matrix, setMatrix] = useState<RecommendationMatrixEntry[]>([]);
+  const [packages, setPackages] = useState<any[]>([]);
 
   // Pristine Copy for Dirty Checking
   const [pristineState, setPristineState] = useState<{
@@ -71,6 +80,7 @@ export default function CmsManager() {
   const [editingStep, setEditingStep] = useState<TransformationStep | null>(null);
   const [editingPath, setEditingPath] = useState<HealingPath | null>(null);
   const [editingMatrix, setEditingMatrix] = useState<RecommendationMatrixEntry | null>(null);
+  const [editingPackage, setEditingPackage] = useState<any | null>(null);
   
   const [showQuoteModal, setShowQuoteModal] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Partial<Quote> | null>(null);
@@ -192,7 +202,9 @@ export default function CmsManager() {
         quotesData,
         testimonialsData,
         pathsData,
-        matrixData
+        matrixData,
+        pagesData,
+        packagesRes
       ] = await Promise.all([
         cmsService.getHeroContent(),
         cmsService.getTransformationSteps(),
@@ -200,7 +212,9 @@ export default function CmsManager() {
         cmsService.getQuotes(),
         cmsService.getTestimonials(),
         cmsService.getHealingPaths(),
-        cmsService.getRecommendationMatrix()
+        cmsService.getRecommendationMatrix(),
+        cmsService.getPagesContent(),
+        supabase.from('packages').select('*').order('created_at', { ascending: true })
       ]);
 
       // Form input mappings — check heroData?.id to avoid treating {} as a valid record
@@ -209,21 +223,20 @@ export default function CmsManager() {
         headline: (heroData as any).title || heroData.headline || '',
         subheadline: (heroData as any).subtitle || heroData.subheadline || '',
         cta_text: (heroData as any).primary_cta_label || heroData.cta_text || '',
-        cta_link: (heroData as any).primary_cta_link || heroData.cta_link || '/book',
+        cta_link: (heroData as any).primary_cta_link || heroData.cta_link || '',
         secondary_cta_text: (heroData as any).secondary_cta_label || heroData.secondary_cta_text || '',
-        secondary_cta_link: (heroData as any).secondary_cta_link || heroData.secondary_cta_link || '#transformation-journey',
-        background_visual_url: heroData.background_visual_url,
-        is_active: heroData.is_active,
-        updated_at: heroData.updated_at
-      } as any : null;
+        secondary_cta_link: (heroData as any).secondary_cta_link || heroData.secondary_cta_link || '',
+        background_visual_url: heroData.background_visual_url || '',
+        is_active: heroData.is_active || false
+      } : { id: '', headline: '', subheadline: '', cta_text: '', cta_link: '', secondary_cta_text: '', secondary_cta_link: '' };
 
       const mappedSteps = stepsData.map(s => ({
         id: s.id,
-        step_number: s.step_number,
-        title: s.title || '',
-        subtitle: s.subtitle || '',
-        description: s.description || '',
-        icon_name: (s as any).icon || s.icon_name || '',
+        step_number: (s as any).step_number || s.sort_order || 1,
+        title: s.title,
+        subtitle: s.subtitle,
+        description: s.description,
+        icon_name: (s as any).icon || s.icon || 'Sparkles',
         is_active: s.is_active,
         created_at: s.created_at,
         updated_at: s.updated_at
@@ -241,26 +254,36 @@ export default function CmsManager() {
         cta_label: (aboutData as any).button_label || aboutData.cta_label || 'Begin Your Journey',
         cta_link: (aboutData as any).button_link || aboutData.cta_link || '/book',
         updated_at: aboutData.updated_at
-      } : null;
+      } : {
+        id: 'new-about-id',
+        name: 'Alanna',
+        photo_url: '',
+        bio_title: 'Meet Alanna',
+        quote: 'Healing is not about fixing ourselves; it is about remembering the alignment that was always there.',
+        bio_body: 'Alanna is a dedicated somatic practitioner and breathwork therapist with over a decade of experience guiding individuals toward inner balance and nervous system resilience.',
+        credentials: ['Certified Somatic Breathwork Facilitator', 'Nervous System Regulation Therapist', 'Integrative Sound Healer'],
+        cta_label: 'Begin Your Journey',
+        cta_link: '/book'
+      };
 
       const mappedQuotes = quotesData.map(q => ({
         id: q.id,
-        quote_text: (q as any).quote || q.quote_text,
-        author_text: (q as any).author || q.author_text,
+        quote_text: (q as any).quote || q.quote_text || '',
+        author_text: (q as any).author || q.author_text || 'Client Reflection',
         is_active: (q as any).is_active !== false,
-        display_order: (q as any).sort_order || q.display_order,
+        display_order: (q as any).sort_order || q.display_order || 1,
         created_at: q.created_at
       }));
 
       const mappedTestimonials = testimonialsData.map(t => ({
         id: t.id,
-        name: (t as any).client_name || t.name,
-        role: (t as any).program || t.role,
-        quote: (t as any).review_text || t.quote,
-        rating: t.rating,
-        is_featured: t.is_featured,
+        name: (t as any).client_name || t.name || '',
+        role: (t as any).program || t.role || '',
+        quote: (t as any).review_text || t.quote || '',
+        rating: t.rating || 5,
+        is_featured: t.is_featured || false,
         is_active: (t as any).is_active !== false,
-        display_order: (t as any).sort_order || t.display_order,
+        display_order: (t as any).sort_order || t.display_order || 1,
         created_at: t.created_at
       }));
 
@@ -299,6 +322,8 @@ export default function CmsManager() {
       setTestimonials(mappedTestimonials);
       setPaths(mappedPaths);
       setMatrix(mappedMatrix);
+      setPagesContent(pagesData || {});
+      setPackages(packagesRes?.data || []);
 
       // Save baseline for dirty checking
       setPristineState({
@@ -310,6 +335,7 @@ export default function CmsManager() {
         paths: JSON.parse(JSON.stringify(mappedPaths)),
         matrix: JSON.parse(JSON.stringify(mappedMatrix))
       });
+      setPristinePagesContent(JSON.parse(JSON.stringify(pagesData || {})));
 
     } catch (e) {
       console.error('Error loading CMS data:', e);
@@ -331,6 +357,8 @@ export default function CmsManager() {
   const isTestimonialsDirty = JSON.stringify(testimonials) !== JSON.stringify(pristineState.testimonials);
   const isPathsDirty = JSON.stringify(paths) !== JSON.stringify(pristineState.paths);
   const isMatrixDirty = JSON.stringify(matrix) !== JSON.stringify(pristineState.matrix);
+  const isClassesDirty = JSON.stringify(pagesContent.classes) !== JSON.stringify(pristinePagesContent.classes);
+  const isContactDirty = JSON.stringify(pagesContent.contact) !== JSON.stringify(pristinePagesContent.contact);
 
   const getDirtyTabName = () => {
     if (isHeroDirty) return 'Hero Section';
@@ -339,10 +367,12 @@ export default function CmsManager() {
     if (isQuotesDirty || isTestimonialsDirty) return 'Quotes & Reviews';
     if (isPathsDirty) return 'Offerings';
     if (isMatrixDirty) return 'Intelligence Matrix';
+    if (isClassesDirty) return 'Classes Page';
+    if (isContactDirty) return 'Contact Page';
     return null;
   };
 
-  const isDirty = isHeroDirty || isAboutDirty || isStepsDirty || isQuotesDirty || isTestimonialsDirty || isPathsDirty || isMatrixDirty;
+  const isDirty = isHeroDirty || isAboutDirty || isStepsDirty || isQuotesDirty || isTestimonialsDirty || isPathsDirty || isMatrixDirty || isClassesDirty || isContactDirty;
 
   // Discard all changes
   const handleDiscardChanges = () => {
@@ -353,6 +383,7 @@ export default function CmsManager() {
     setTestimonials(JSON.parse(JSON.stringify(pristineState.testimonials)));
     setPaths(JSON.parse(JSON.stringify(pristineState.paths)));
     setMatrix(JSON.parse(JSON.stringify(pristineState.matrix)));
+    setPagesContent(JSON.parse(JSON.stringify(pristinePagesContent)));
     setEditingStep(null);
     setEditingPath(null);
     setEditingMatrix(null);
@@ -411,6 +442,42 @@ export default function CmsManager() {
     } catch (e) {
       console.error(e);
       showToast('Unable to save founder profile', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveClasses = async () => {
+    if (!pagesContent.classes) return;
+    setIsSaving(true);
+    try {
+      await cmsService.updatePageContent('classes', pagesContent.classes);
+      showToast('Classes Page configuration saved successfully.', 'success');
+      setPristinePagesContent(prev => ({
+        ...prev,
+        classes: JSON.parse(JSON.stringify(pagesContent.classes))
+      }));
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to save Classes Page changes.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    if (!pagesContent.contact) return;
+    setIsSaving(true);
+    try {
+      await cmsService.updatePageContent('contact', pagesContent.contact);
+      showToast('Contact Page configuration saved successfully.', 'success');
+      setPristinePagesContent(prev => ({
+        ...prev,
+        contact: JSON.parse(JSON.stringify(pagesContent.contact))
+      }));
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to save Contact Page changes.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -501,6 +568,44 @@ export default function CmsManager() {
     } catch (e) {
       console.error(e);
       showToast('Failed to align intelligence mapping.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Save package changes
+  const handleSavePackage = async () => {
+    if (!editingPackage) return;
+    setIsSaving(true);
+    try {
+      const payload: any = {
+        name: editingPackage.name,
+        description: editingPackage.description,
+        price: Number(editingPackage.price) || 0,
+        total_credits: Number(editingPackage.total_credits) || 0,
+        is_featured: editingPackage.is_featured || false,
+        is_active: editingPackage.is_active || false
+      };
+
+      // Conditionally add validity_months if editingPackage contains it
+      if (editingPackage.validity_months !== undefined) {
+        payload.validity_months = Number(editingPackage.validity_months) || 1;
+      }
+
+      const { error } = await supabase
+        .from('packages')
+        .update(payload)
+        .eq('id', editingPackage.id);
+
+      if (error) throw error;
+      showToast('Package details updated successfully.', 'success');
+
+      const newPkgs = packages.map(p => p.id === editingPackage.id ? editingPackage : p);
+      setPackages(newPkgs);
+      setEditingPackage(null);
+    } catch (e: any) {
+      console.error(e);
+      showToast(e.message || 'Failed to save package updates.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -677,6 +782,9 @@ export default function CmsManager() {
     { id: 'quotes', name: 'Quotes & Reviews', icon: QuoteIcon },
     { id: 'paths', name: 'Offerings', icon: Compass },
     { id: 'matrix', name: 'Intelligence Matrix', icon: Brain },
+    { id: 'classes', name: 'Classes Page', icon: BookOpen },
+    { id: 'contact', name: 'Contact Page', icon: Mail },
+    { id: 'packages', name: 'Packages', icon: Gift },
   ] as const;
 
   return (
@@ -724,6 +832,8 @@ export default function CmsManager() {
                   activeTab === 'steps' && editingStep ? handleSaveStep :
                   activeTab === 'paths' && editingPath ? handleSavePath :
                   activeTab === 'matrix' && editingMatrix ? handleSaveMatrixEntry :
+                  activeTab === 'classes' ? handleSaveClasses :
+                  activeTab === 'contact' ? handleSaveContact :
                   () => showToast('Save changes inside specific cards below.', 'info')
                 }
                 className="px-6 py-2.5 bg-text-dark text-white hover:bg-gold rounded-full text-[9px] font-bold uppercase tracking-[0.25em] transition-all cursor-pointer shadow-luxury"
@@ -1470,6 +1580,412 @@ export default function CmsManager() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 7: CLASSES PAGE CMS */}
+        {activeTab === 'classes' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div>
+              <h4 className="text-2xl font-display text-text-dark tracking-tight">Classes Page CMS Configuration</h4>
+              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Modify class descriptions, headers, benefits, and call to action.</p>
+            </div>
+
+            {!pagesContent.classes ? (
+              <div className="text-sm text-text-dark/40">Loading Classes Page CMS configuration...</div>
+            ) : (
+              <div className="space-y-8">
+                {/* Hero section inside Classes page */}
+                <div className="p-8 bg-cream/10 border border-text-dark/5 rounded-[2rem] space-y-6">
+                  <h5 className="font-display text-lg text-text-dark">Hero Section</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Hero Title (Use \n for newlines)</label>
+                      <input
+                        type="text"
+                        value={pagesContent.classes.hero_title || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          classes: { ...prev.classes, hero_title: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Hero Subtitle</label>
+                      <input
+                        type="text"
+                        value={pagesContent.classes.hero_subtitle || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          classes: { ...prev.classes, hero_subtitle: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Services/Ritual Cards config */}
+                <div className="p-8 bg-cream/10 border border-text-dark/5 rounded-[2rem] space-y-8">
+                  <h5 className="font-display text-lg text-text-dark">Rituals & Services Cards</h5>
+                  <div className="space-y-8 divide-y divide-text-dark/5">
+                    {(pagesContent.classes.services || []).map((service: any, sIdx: number) => (
+                      <div key={sIdx} className={cn("space-y-6", sIdx > 0 && "pt-8")}>
+                        <h6 className="font-display text-sm font-semibold text-gold capitalize">{service.title || `Service ${sIdx + 1}`}</h6>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Card Title</label>
+                            <input
+                              type="text"
+                              value={service.title || ''}
+                              onChange={e => {
+                                const updatedServices = [...pagesContent.classes.services];
+                                updatedServices[sIdx] = { ...service, title: e.target.value };
+                                setPagesContent(prev => ({
+                                  ...prev,
+                                  classes: { ...prev.classes, services: updatedServices }
+                                }));
+                              }}
+                              className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Card Icon</label>
+                            <input
+                              type="text"
+                              value={service.icon || ''}
+                              onChange={e => {
+                                const updatedServices = [...pagesContent.classes.services];
+                                updatedServices[sIdx] = { ...service, icon: e.target.value };
+                                setPagesContent(prev => ({
+                                  ...prev,
+                                  classes: { ...prev.classes, services: updatedServices }
+                                }));
+                              }}
+                              className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                            />
+                          </div>
+
+                          <div className="space-y-2 md:col-span-2">
+                            <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Card Description</label>
+                            <textarea
+                              value={service.description || ''}
+                              onChange={e => {
+                                const updatedServices = [...pagesContent.classes.services];
+                                updatedServices[sIdx] = { ...service, description: e.target.value };
+                                setPagesContent(prev => ({
+                                  ...prev,
+                                  classes: { ...prev.classes, services: updatedServices }
+                                }));
+                              }}
+                              className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all min-h-[80px]"
+                            />
+                          </div>
+
+                          <div className="space-y-2 md:col-span-2">
+                            <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Benefits (Comma-separated list)</label>
+                            <input
+                              type="text"
+                              value={(service.benefits || []).join(', ')}
+                              onChange={e => {
+                                const updatedServices = [...pagesContent.classes.services];
+                                updatedServices[sIdx] = { 
+                                  ...service, 
+                                  benefits: e.target.value.split(',').map(b => b.trim()).filter(Boolean)
+                                };
+                                setPagesContent(prev => ({
+                                  ...prev,
+                                  classes: { ...prev.classes, services: updatedServices }
+                                }));
+                              }}
+                              className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Classes CTA copy */}
+                <div className="p-8 bg-cream/10 border border-text-dark/5 rounded-[2rem] space-y-6">
+                  <h5 className="font-display text-lg text-text-dark">Bottom Call to Action Banner</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">CTA Title (Use \n for newlines)</label>
+                      <input
+                        type="text"
+                        value={pagesContent.classes.cta_title || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          classes: { ...prev.classes, cta_title: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">CTA Description</label>
+                      <textarea
+                        value={pagesContent.classes.cta_description || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          classes: { ...prev.classes, cta_description: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all min-h-[80px]"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">CTA Button Text</label>
+                      <input
+                        type="text"
+                        value={pagesContent.classes.cta_button_text || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          classes: { ...prev.classes, cta_button_text: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 8: CONTACT PAGE CMS */}
+        {activeTab === 'contact' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div>
+              <h4 className="text-2xl font-display text-text-dark tracking-tight">Contact Page CMS Configuration</h4>
+              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Modify contact descriptions, headers, trust metrics, quotes, and layouts.</p>
+            </div>
+
+            {!pagesContent.contact ? (
+              <div className="text-sm text-text-dark/40">Loading Contact Page CMS configuration...</div>
+            ) : (
+              <div className="space-y-8">
+                {/* Hero section inside Contact page */}
+                <div className="p-8 bg-cream/10 border border-text-dark/5 rounded-[2rem] space-y-6">
+                  <h5 className="font-display text-lg text-text-dark">Hero Section</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Hero Title (Use \n for newlines)</label>
+                      <input
+                        type="text"
+                        value={pagesContent.contact.hero_title || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          contact: { ...prev.contact, hero_title: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Hero Subtitle</label>
+                      <input
+                        type="text"
+                        value={pagesContent.contact.hero_subtitle || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          contact: { ...prev.contact, hero_subtitle: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Form header and Trust details */}
+                <div className="p-8 bg-cream/10 border border-text-dark/5 rounded-[2rem] space-y-6">
+                  <h5 className="font-display text-lg text-text-dark">Form & Trust Setup</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Form Title</label>
+                      <input
+                        type="text"
+                        value={pagesContent.contact.form_title || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          contact: { ...prev.contact, form_title: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Form Microcopy / Quote</label>
+                      <input
+                        type="text"
+                        value={pagesContent.contact.form_microcopy || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          contact: { ...prev.contact, form_microcopy: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Form Submit Button Text</label>
+                      <input
+                        type="text"
+                        value={pagesContent.contact.button_text || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          contact: { ...prev.contact, button_text: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Right Quote / Supportive Statement</label>
+                      <input
+                        type="text"
+                        value={pagesContent.contact.right_quote || ''}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          contact: { ...prev.contact, right_quote: e.target.value }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Trust Details / Bullet Points (Comma-separated)</label>
+                      <input
+                        type="text"
+                        value={(pagesContent.contact.trust_details || []).join(', ')}
+                        onChange={e => setPagesContent(prev => ({
+                          ...prev,
+                          contact: { 
+                            ...prev.contact, 
+                            trust_details: e.target.value.split(',').map(t => t.trim()).filter(Boolean)
+                          }
+                        }))}
+                        className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none focus:border-gold/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 9: PACKAGES CMS */}
+        {activeTab === 'packages' && (
+          <div className="space-y-8 animate-fadeIn">
+            <div>
+              <h4 className="text-2xl font-display text-text-dark tracking-tight">Packages & Validity Settings</h4>
+              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Modify package names, pricing, credits, and subscription validity durations.</p>
+            </div>
+
+            {editingPackage ? (
+              <div className="bg-cream/40 border border-text-dark/5 p-8 rounded-3xl space-y-6 text-left">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">Modifying Package: {editingPackage.name}</span>
+                  <button 
+                    onClick={() => setEditingPackage(null)} 
+                    className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/40 hover:text-text-dark cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Package Name</label>
+                    <input
+                      type="text"
+                      value={editingPackage.name || ''}
+                      onChange={e => setEditingPackage(prev => ({ ...prev!, name: e.target.value }))}
+                      className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Price ($)</label>
+                    <input
+                      type="number"
+                      value={editingPackage.price || 0}
+                      onChange={e => setEditingPackage(prev => ({ ...prev!, price: parseFloat(e.target.value) || 0 }))}
+                      className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Total Credits (Sessions)</label>
+                    <input
+                      type="number"
+                      value={editingPackage.total_credits || 0}
+                      onChange={e => setEditingPackage(prev => ({ ...prev!, total_credits: parseInt(e.target.value) || 0 }))}
+                      className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Validity (Months)</label>
+                    <input
+                      type="number"
+                      value={editingPackage.validity_months !== undefined ? editingPackage.validity_months : 1}
+                      onChange={e => setEditingPackage(prev => ({ ...prev!, validity_months: parseInt(e.target.value) || 1 }))}
+                      className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-3 md:col-span-2">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Description</label>
+                    <textarea
+                      value={editingPackage.description || ''}
+                      onChange={e => setEditingPackage(prev => ({ ...prev!, description: e.target.value }))}
+                      className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none min-h-[80px]"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4">
+                  <button
+                    onClick={handleSavePackage}
+                    className="flex items-center gap-3 px-8 py-4 bg-text-dark text-white rounded-xl text-[10px] font-bold uppercase tracking-[0.3em] hover:bg-gold transition-all duration-500 cursor-pointer"
+                  >
+                    <Save className="w-3.5 h-3.5 text-gold" />
+                    Save Package Details
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {packages.map(pkg => (
+                <div key={pkg.id} className="p-8 bg-white border border-text-dark/5 rounded-[2.5rem] flex flex-col justify-between group text-left">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold">{pkg.total_credits} Session{pkg.total_credits > 1 ? 's' : ''}</span>
+                      <span className="text-sm font-bold text-text-dark">${pkg.price}</span>
+                    </div>
+                    <h5 className="font-display text-2xl text-text-dark">{pkg.name}</h5>
+                    <p className="text-xs text-text-dark/60 leading-relaxed font-light">{pkg.description}</p>
+                    <div className="pt-2 border-t border-text-dark/5 text-[9px] font-bold uppercase tracking-wider text-text-dark/40">
+                      Validity: {pkg.validity_months !== undefined ? pkg.validity_months : 1} Month{(pkg.validity_months !== undefined ? pkg.validity_months : 1) > 1 ? 's' : ''}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setEditingPackage(pkg)}
+                    className="mt-8 flex items-center justify-center gap-2 w-full py-3.5 bg-cream hover:bg-gold/15 text-[10px] text-text-dark font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+                  >
+                    <Edit className="w-3 h-3 text-gold" />
+                    Edit Package
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}

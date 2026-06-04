@@ -203,7 +203,7 @@ export default function Testimonials() {
     <>
       <div className="section-transition" />
       <section
-        className="py-44 bg-transparent relative overflow-hidden section-fade-top section-fade-bottom"
+        className="py-32 bg-transparent relative overflow-hidden section-fade-top section-fade-bottom"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onTouchStart={handleTouchStart}
@@ -221,7 +221,7 @@ export default function Testimonials() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-100px' }}
             transition={{ duration: 2.0, ease: [0.22, 1, 0.36, 1] }}
-            className="text-center mb-36"
+            className="text-center mb-24"
           >
             <span className="text-[#CBAE73] text-[10px] font-bold tracking-[0.4em] uppercase mb-4 block animate-glow">
               Testimonials

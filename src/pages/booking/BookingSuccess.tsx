@@ -6,6 +6,8 @@ import { format, parseISO } from 'date-fns';
 import { paymentService } from '../../services/paymentService';
 import { useBookingStore } from '../../store/bookingStore';
 import { getLocalTimeForEST } from '../../utils/bookingUtils';
+import { useAuth } from '../../providers/AuthProvider';
+import { supabase } from '../../lib/supabase';
 
 const formatTo12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -23,8 +25,10 @@ const formatTo12Hour = (time24: string): string => {
 const BookingSuccess = () => {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
+  const ref = searchParams.get('ref');
   const navigate = useNavigate();
   const { setBookingReference, resetBooking } = useBookingStore();
+  const { isAuthenticated, loading } = useAuth();
   
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [bookingData, setBookingData] = useState<any>(null);
@@ -32,6 +36,10 @@ const BookingSuccess = () => {
   const hasConfirmed = useRef(false);
 
   const [copiedText, setCopiedText] = useState<'url' | 'password' | 'address' | null>(null);
+  const [redirectCount, setRedirectCount] = useState<number | null>(null);
+  const [hasSession, setHasSession] = useState<boolean | null>(null);
+  const [isNewUser, setIsNewUser] = useState<boolean>(false);
+  const [reauthLink, setReauthLink] = useState<string | null>(null);
 
   const copyToClipboard = (text: string, type: 'url' | 'password' | 'address') => {
     navigator.clipboard.writeText(text);
@@ -40,31 +48,86 @@ const BookingSuccess = () => {
   };
 
   useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setHasSession(!!session);
+    };
+    checkSession();
+  }, []);
+
+  useEffect(() => {
     const confirmBooking = async () => {
       console.log("SUCCESS PAGE PARAMS");
       console.log("searchParams", searchParams.toString());
       console.log("sessionId", sessionId);
+      console.log("ref", ref);
 
-      if (!sessionId || hasConfirmed.current) {
-        if (!sessionId) {
-          setStatus('error');
-          setError('Missing session information. Please verify your Stripe payment session.');
-        }
+      if (hasConfirmed.current) return;
+
+      if (!sessionId && !ref) {
+        setStatus('error');
+        setError('Missing session information. Please verify your Stripe payment session or booking reference.');
         return;
       }
       
       hasConfirmed.current = true;
 
       try {
-        const response = await paymentService.confirmPayment(sessionId);
-        console.log("payment confirmation response:", response);
-        const booking = response.booking || response;
-        console.log("extracted booking object:", booking);
-        setBookingData(booking);
-        setBookingReference(booking.bookingReference);
-        setStatus('success');
-        
-        // Optional: clear some store state but keep reference for the UI
+        if (ref) {
+          console.log(`[confirmBooking] Fetching booking by reference: ${ref}`);
+          const { data: dbBooking, error: fetchErr } = await supabase
+            .from('bookings')
+            .select('*')
+            .eq('booking_reference', ref)
+            .maybeSingle();
+
+          if (fetchErr) {
+            console.error('Error fetching booking by reference:', fetchErr);
+            throw new Error(fetchErr.message);
+          }
+
+          if (!dbBooking) {
+            console.error('No booking found for reference:', ref);
+            throw new Error(`Could not locate booking records for reference ${ref}`);
+          }
+
+          // Map snake_case to camelCase
+          const booking = {
+            ...dbBooking,
+            bookingReference: dbBooking.booking_reference,
+            selectedDate: dbBooking.selected_date,
+            selectedTime: dbBooking.selected_time,
+            bookingStatus: dbBooking.booking_status,
+            fullName: dbBooking.full_name,
+            selectedSession: dbBooking.selected_session,
+            sessionFormat: dbBooking.session_format,
+            stripe_payment_id: dbBooking.stripe_payment_id,
+            packageName: dbBooking.package_name || 'Single Session',
+            packagePrice: dbBooking.package_price || 0,
+            packageCredits: dbBooking.package_credits || 1,
+            createdAt: dbBooking.created_at,
+            updatedAt: dbBooking.updated_at,
+            zoomMeetingId: dbBooking.zoom_meeting_id,
+            zoomJoinUrl: dbBooking.zoom_join_url,
+            meetingPassword: dbBooking.meeting_password,
+          };
+
+          setBookingData(booking);
+          setBookingReference(booking.bookingReference);
+          setStatus('success');
+        } else if (sessionId) {
+          const response = await paymentService.confirmPayment(sessionId);
+          console.log("payment confirmation response:", response);
+          const booking = response.booking || response;
+          console.log("extracted booking object:", booking);
+          setIsNewUser(response.isNew ?? false);
+          if (response.actionLink) {
+            setReauthLink(response.actionLink);
+          }
+          setBookingData(booking);
+          setBookingReference(booking.bookingReference);
+          setStatus('success');
+        }
       } catch (err: any) {
         console.error('Confirmation error:', err);
         setStatus('error');
@@ -73,9 +136,33 @@ const BookingSuccess = () => {
     };
 
     confirmBooking();
-  }, [sessionId, setBookingReference, searchParams]);
+  }, [sessionId, ref, setBookingReference, searchParams]);
 
-  if (status === 'loading') {
+  useEffect(() => {
+    if (status === 'success' && (isAuthenticated || hasSession || reauthLink)) {
+      setRedirectCount(6);
+      const timer = setInterval(() => {
+        setRedirectCount((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(timer);
+            resetBooking();
+            if (isAuthenticated || hasSession) {
+              navigate('/client/dashboard');
+            } else if (reauthLink) {
+              console.log('[BookingSuccess] Executing silent auto-login via action link...');
+              window.location.href = reauthLink;
+            }
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [status, isAuthenticated, hasSession, reauthLink, navigate, resetBooking]);
+
+
+  if (status === 'loading' || loading || hasSession === null) {
     return (
       <div className="min-h-screen bg-cream flex items-center justify-center p-6">
         <div className="text-center space-y-8">
@@ -113,8 +200,89 @@ const BookingSuccess = () => {
 
   const parsedDate = bookingData?.selectedDate ? parseISO(bookingData.selectedDate) : null;
 
+  const handleAddToCalendar = () => {
+    if (!bookingData) return;
+    const startTime = bookingData.selectedDate.replace(/-/g, '') + 'T' + bookingData.selectedTime.replace(/:/g, '') + '00';
+    
+    // End time calculation (approximate using duration)
+    const startHour = parseInt(bookingData.selectedTime.split(':')[0]);
+    const startMin = parseInt(bookingData.selectedTime.split(':')[1]);
+    const totalMins = startHour * 60 + startMin + (bookingData.duration || 60);
+    const endHour = Math.floor(totalMins / 60);
+    const endMin = totalMins % 60;
+    const endTime = bookingData.selectedDate.replace(/-/g, '') + 'T' + 
+                  endHour.toString().padStart(2, '0') + 
+                  endMin.toString().padStart(2, '0') + '00';
+
+    const isVirtual = bookingData.sessionFormat?.toLowerCase() === 'virtual';
+    const locationStr = isVirtual 
+      ? (bookingData.zoomJoinUrl || 'Zoom link details to be sent')
+      : 'LumaFlow Sanctuary, Soho, Manhattan, NY';
+
+    const rawDetails = isVirtual ? `
+Client: ${bookingData.fullName || 'Valued Guest'}
+Ritual: ${bookingData.selectedSession}
+Reference: ${bookingData.bookingReference}
+
+Zoom Join Link: ${bookingData.zoomJoinUrl || 'Provisioning details will be sent shortly'}
+Meeting ID: ${bookingData.zoomMeetingId || 'N/A'}
+Password: ${bookingData.meetingPassword || 'N/A'}
+
+Preparation Checklist:
+- Find a quiet, private space
+- Water/herbal tea nearby
+- Comfortable, loose clothing
+- High-quality headphones recommended
+- Test your internet and camera setup
+`.trim() : `
+Client: ${bookingData.fullName || 'Valued Guest'}
+Ritual: ${bookingData.selectedSession}
+Reference: ${bookingData.bookingReference}
+
+Location: LumaFlow Sanctuary • Soho, Manhattan, NY
+
+Preparation Checklist:
+- Wear loose-fitting clothing
+- Arrive 10 minutes early to settle in
+- Refrain from heavy meals 2h prior
+- Press the LumaFlow buzzer at the entrance
+`.trim();
+
+    const calendarTitle = encodeURIComponent('LumaFlow Healing Session');
+    const calendarDetails = encodeURIComponent(rawDetails);
+    const calendarLocation = encodeURIComponent(locationStr);
+    
+    const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${calendarTitle}&dates=${startTime}/${endTime}&details=${calendarDetails}&location=${calendarLocation}&ctz=America/New_York`;
+    
+    window.open(googleCalendarUrl, '_blank');
+  };
+
+  const handleEnterSanctuary = () => {
+    resetBooking();
+    if (isAuthenticated || hasSession) {
+      navigate('/client/dashboard');
+    } else if (reauthLink) {
+      console.log('[BookingSuccess] Redirecting to silent reauth action link...');
+      window.location.href = reauthLink;
+    } else {
+      navigate('/client/login');
+    }
+  };
+
+  const handleViewBooking = () => {
+    resetBooking();
+    if (isAuthenticated || hasSession) {
+      navigate('/client/bookings');
+    } else if (reauthLink) {
+      console.log('[BookingSuccess] Redirecting to silent reauth action link...');
+      window.location.href = reauthLink;
+    } else {
+      navigate('/client/login');
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-cream relative overflow-hidden flex flex-col items-center justify-center py-20 px-6">
+    <div className="min-h-screen bg-cream relative overflow-hidden flex flex-col items-center justify-center py-14 px-6">
       {/* Immersive Background */}
       <div className="absolute inset-0 pointer-events-none">
         <motion.div 
@@ -145,14 +313,114 @@ const BookingSuccess = () => {
 
           <div className="space-y-4">
             <h1 className="font-display text-5xl md:text-7xl text-text-dark tracking-tight leading-tight">
-              Sanctuary <span className="italic text-gold">Secured</span>
+              {(isAuthenticated || hasSession) ? (
+                <>Welcome <span className="italic text-gold">Home</span></>
+              ) : isNewUser ? (
+                <>Sanctuary <span className="italic text-gold">Ready</span></>
+              ) : (
+                <>Sanctuary <span className="italic text-gold">Secured</span></>
+              )}
             </h1>
+            <p className="font-display text-2xl md:text-3xl text-text-dark/80 italic font-light">
+              {(isAuthenticated || hasSession) 
+                ? "Your sanctuary is active" 
+                : isNewUser 
+                ? "Your Sanctuary Is Ready" 
+                : "Welcome back to your sanctuary"}
+            </p>
             <div className="flex flex-col items-center gap-3">
               <span className="text-[10px] font-bold text-text-dark/30 uppercase tracking-[0.5em]">Booking Reference</span>
               <span className="font-display text-4xl text-gold tracking-[0.2em]">{bookingData?.bookingReference}</span>
             </div>
           </div>
         </div>
+
+        {/* Status Journey Tracker */}
+        <div className="bg-white/40 border border-white/60 rounded-[3rem] p-8 max-w-3xl mx-auto backdrop-blur-md shadow-luxury">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="flex flex-col items-center text-center space-y-3 p-4">
+              <div className="w-10 h-10 rounded-full bg-gold text-white flex items-center justify-center shadow-[0_0_15px_rgba(203,174,115,0.4)]">
+                <Check className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-text-dark">Booking Confirmed</p>
+                <p className="text-[9px] text-text-dark/40 mt-1">Confirmed & reserved</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center text-center space-y-3 p-4">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(203,174,115,0.2)] ${(isAuthenticated || hasSession) ? 'bg-gold text-white' : 'bg-gold/15 text-gold border border-gold/30'}`}>
+                <Check className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-text-dark">Portal Secured</p>
+                <p className="text-[9px] text-text-dark/40 mt-1">
+                  {(isAuthenticated || hasSession) 
+                    ? 'Account active & verified' 
+                    : isNewUser 
+                    ? 'Portal created' 
+                    : 'Existing account detected'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center text-center space-y-3 p-4">
+              <div className="w-10 h-10 rounded-full bg-gold text-white flex items-center justify-center shadow-[0_0_15px_rgba(203,174,115,0.4)]">
+                <Check className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-text-dark">Email Dispatch</p>
+                <p className="text-[9px] text-text-dark/40 mt-1">Sent to inbox</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center text-center space-y-3 p-4">
+              <div className="w-10 h-10 rounded-full bg-gold/15 text-gold border border-gold/30 flex items-center justify-center animate-pulse">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-text-dark">Prepare Ritual</p>
+                <p className="text-[9px] text-text-dark/40 mt-1">Review guidelines below</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {(isAuthenticated || hasSession) ? (
+          <div className="bg-white/40 border border-white/60 rounded-[3rem] p-6 max-w-xl mx-auto backdrop-blur-md shadow-luxury text-center">
+            <p className="text-[11px] font-bold text-gold uppercase tracking-[0.25em] mb-1">Portal Session Active</p>
+            <p className="text-xs text-text-dark/70 font-light leading-relaxed">
+              Welcome back to LumaFlow. Your active sanctuary session has been recognized. You will be redirected to your dashboard automatically.
+            </p>
+          </div>
+        ) : isNewUser ? (
+          <div className="bg-gold/5 border border-gold/15 rounded-[3rem] p-8 max-w-xl mx-auto backdrop-blur-md shadow-luxury text-center space-y-3">
+            <p className="text-xs font-bold text-gold uppercase tracking-[0.3em]">Welcome to LumaFlow Sanctuary</p>
+            <p className="text-xs text-text-dark/70 font-light leading-relaxed">
+              We have created your sacred portal. A magic login link has been dispatched to your email. Click the link in your inbox to enter your sanctuary dashboard.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white/40 border border-gold/20 rounded-[3rem] p-8 max-w-xl mx-auto backdrop-blur-md shadow-luxury text-center space-y-4">
+            <p className="text-xs font-bold text-gold uppercase tracking-[0.3em]">Welcome Back</p>
+            <p className="text-xs text-text-dark/70 font-light leading-relaxed">
+              You already have a sanctuary account associated with your email. Click below to immediately enter your sanctuary.
+            </p>
+            <button
+              onClick={handleEnterSanctuary}
+              className="px-8 py-4 bg-text-dark hover:bg-gold text-white hover:text-black text-[10px] font-bold uppercase tracking-[0.2em] rounded-full transition-all duration-500 shadow-luxury flex items-center justify-center gap-2 mx-auto"
+            >
+              Enter My Sanctuary
+            </button>
+          </div>
+        )}
+
+        {/* Redirect Notice */}
+        {redirectCount !== null && (
+          <p className="text-[10px] text-gold font-bold uppercase tracking-[0.25em] animate-pulse">
+            Ascending to your sanctuary in {redirectCount} seconds...
+          </p>
+        )}
 
         {/* Summary Card */}
         <div className="bg-white/60 backdrop-blur-3xl border border-white/50 rounded-[4rem] p-12 shadow-luxury grid grid-cols-1 md:grid-cols-2 gap-12 text-left relative overflow-hidden">
@@ -358,95 +626,35 @@ const BookingSuccess = () => {
             )}
           </div>
         )}
-        
-        {/* SECTION: Prepare For Your Session */}
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-500 fill-mode-both">
-          <div className="space-y-2">
-            <h2 className="font-display text-3xl text-text-dark italic">Prepare For Your Session</h2>
-            <p className="text-text-dark/40 uppercase tracking-[0.4em] text-[10px] font-bold">Reserve this sacred moment in your calendar.</p>
-          </div>
 
-          <div className="flex justify-center">
-            <button 
-              onClick={() => {
-                if (!bookingData) return;
-                const startTime = bookingData.selectedDate.replace(/-/g, '') + 'T' + bookingData.selectedTime.replace(/:/g, '') + '00';
-                
-                // End time calculation (approximate using duration)
-                const startHour = parseInt(bookingData.selectedTime.split(':')[0]);
-                const startMin = parseInt(bookingData.selectedTime.split(':')[1]);
-                const totalMins = startHour * 60 + startMin + (bookingData.duration || 60);
-                const endHour = Math.floor(totalMins / 60);
-                const endMin = totalMins % 60;
-                const endTime = bookingData.selectedDate.replace(/-/g, '') + 'T' + 
-                              endHour.toString().padStart(2, '0') + 
-                              endMin.toString().padStart(2, '0') + '00';
-
-                const isVirtual = bookingData.sessionFormat?.toLowerCase() === 'virtual';
-                const locationStr = isVirtual 
-                  ? (bookingData.zoomJoinUrl || 'Zoom link details to be sent')
-                  : 'LumaFlow Sanctuary, Soho, Manhattan, NY';
-
-                const rawDetails = isVirtual ? `
-Client: ${bookingData.fullName || 'Valued Guest'}
-Ritual: ${bookingData.selectedSession}
-Reference: ${bookingData.bookingReference}
-
-Zoom Join Link: ${bookingData.zoomJoinUrl || 'Provisioning details will be sent shortly'}
-Meeting ID: ${bookingData.zoomMeetingId || 'N/A'}
-Password: ${bookingData.meetingPassword || 'N/A'}
-
-Preparation Checklist:
-- Find a quiet, private space
-- Water/herbal tea nearby
-- Comfortable, loose clothing
-- High-quality headphones recommended
-- Test your internet and camera setup
-`.trim() : `
-Client: ${bookingData.fullName || 'Valued Guest'}
-Ritual: ${bookingData.selectedSession}
-Reference: ${bookingData.bookingReference}
-
-Location: LumaFlow Sanctuary • Soho, Manhattan, NY
-
-Preparation Checklist:
-- Wear loose-fitting clothing
-- Arrive 10 minutes early to settle in
-- Refrain from heavy meals 2h prior
-- Press the LumaFlow buzzer at the entrance
-`.trim();
-
-                const calendarTitle = encodeURIComponent('LumaFlow Healing Session');
-                const calendarDetails = encodeURIComponent(rawDetails);
-                const calendarLocation = encodeURIComponent(locationStr);
-                
-                const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${calendarTitle}&dates=${startTime}/${endTime}&details=${calendarDetails}&location=${calendarLocation}&ctz=America/New_York`;
-                
-                window.open(googleCalendarUrl, '_blank');
-              }}
-              className="px-10 py-5 border border-gold bg-gold/5 text-gold rounded-full text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-gold hover:text-white transition-all duration-700 flex items-center gap-3 shadow-luxury"
-            >
-              <Calendar className="w-4 h-4" />
-              Add to Google Calendar
-            </button>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-8 items-center">
-          <button 
-            onClick={() => { resetBooking(); navigate('/'); }}
-            className="px-16 py-6 bg-text-dark text-white rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-luxury hover:bg-gold transition-all duration-700 group"
+        {/* Buttons Grid */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 max-w-2xl mx-auto pt-6">
+          <button
+            onClick={handleEnterSanctuary}
+            className="w-full sm:w-auto px-10 py-5 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury"
           >
-            <span className="flex items-center gap-2">
-              Return to Sanctuary
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </span>
+            Enter My Sanctuary
           </button>
           
-          <p className="text-text-dark/30 font-display italic text-lg max-w-md mx-auto">
-            “Your space is held. Prepare gently for your arrival.”
-          </p>
+          <button
+            onClick={handleViewBooking}
+            className="w-full sm:w-auto px-10 py-5 bg-white/60 hover:bg-white text-text-dark border border-text-dark/5 rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft"
+          >
+            {(isAuthenticated || hasSession) ? "View Updated Journey" : "View Booking"}
+          </button>
+
+          <button
+            onClick={handleAddToCalendar}
+            className="w-full sm:w-auto px-10 py-5 bg-[#CBAE73]/15 hover:bg-[#CBAE73] text-[#CBAE73] hover:text-black border border-[#CBAE73]/20 rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft flex items-center justify-center gap-2"
+          >
+            <Calendar className="w-4 h-4" />
+            Add to Calendar
+          </button>
         </div>
+
+        <p className="text-text-dark/30 font-display italic text-lg max-w-md mx-auto pt-4">
+          “Your space is held. Prepare gently for your arrival.”
+        </p>
       </motion.div>
       
       {/* Grain Texture */}

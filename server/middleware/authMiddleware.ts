@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabase } from '../config/supabase';
+import { supabase, supabaseAdmin } from '../config/supabase';
 
 export const adminAuth = async (req: Request, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
@@ -17,14 +17,16 @@ export const adminAuth = async (req: Request, res: Response, next: NextFunction)
       return res.status(401).json({ error: 'Invalid or expired sanctuary token' });
     }
 
-    // Check user_profiles for role = admin
-    const { data: profile, error: profileError } = await supabase
+    // Check user_profiles for role = admin using the admin client to bypass RLS policies
+    const client = supabaseAdmin || supabase;
+    const { data: profile, error: profileError } = await client
       .from('user_profiles')
       .select('role')
       .eq('id', user.id)
       .maybeSingle();
 
     if (profileError || !profile || profile.role !== 'admin') {
+      console.warn(`[adminAuth] Access denied for user ${user.id} (${user.email}). Profile:`, profile, 'Error:', profileError);
       return res.status(403).json({ error: 'Access denied: Administrative privileges required' });
     }
 
@@ -33,6 +35,7 @@ export const adminAuth = async (req: Request, res: Response, next: NextFunction)
     (req as any).profile = profile;
     next();
   } catch (error) {
+    console.error('[adminAuth] Unexpected auth exception:', error);
     return res.status(401).json({ error: 'Sanctuary authentication failed' });
   }
 };

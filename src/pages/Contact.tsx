@@ -1,9 +1,45 @@
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Clock, Heart } from 'lucide-react';
+import { cmsService } from '../services/cmsService';
 
 export default function Contact() {
+  const [pageConfig, setPageConfig] = useState<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    cmsService.getPagesContent()
+      .then(data => {
+        if (active && data?.contact) {
+          setPageConfig(data.contact);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to load Contact Page CMS config:', err);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const defaultTrust = [
+    "Typically responds within 24 hours",
+    "100+ healing journeys supported",
+    "Private & confidential"
+  ];
+
+  const trustDetails = pageConfig?.trust_details || defaultTrust;
+
+  const getTrustIcon = (idx: number) => {
+    switch (idx) {
+      case 0: return <Clock className="w-4 h-4 text-[#CBAE73]" />;
+      case 1: return <Heart className="w-4 h-4 text-[#CBAE73]" />;
+      case 2:
+      default:
+        return <ShieldCheck className="w-4 h-4 text-[#CBAE73]" />;
+    }
+  };
+
   return (
-    <div className="pt-48 pb-32 px-6 max-w-7xl mx-auto min-h-screen">
+    <div className="pt-36 pb-24 px-6 max-w-7xl mx-auto min-h-screen">
       <div className="grid md:grid-cols-2 gap-16 lg:gap-24 items-center">
         
         {/* LEFT: FORM SECTION */}
@@ -15,21 +51,29 @@ export default function Contact() {
         >
           <div className="space-y-6">
             <h1 className="font-display text-5xl md:text-7xl text-[#3A3A3A] leading-tight">
-              Begin your conversation <br />
-              <span className="italic text-[#CBAE73]">with stillness</span>
+              {pageConfig?.hero_title ? (
+                pageConfig.hero_title.split(pageConfig.hero_title.includes('\\n') ? '\\n' : '\n').map((line: string, i: number, arr: string[]) => (
+                  <React.Fragment key={i}>
+                    {i === 1 ? <span className="italic text-[#CBAE73]">{line}</span> : line}
+                    {i < arr.length - 1 && <br />}
+                  </React.Fragment>
+                ))
+              ) : (
+                <>Begin your conversation <br /><span className="italic text-[#CBAE73]">with stillness</span></>
+              )}
             </h1>
             <p className="text-xl text-[#3A3A3A]/60 font-light max-w-lg leading-relaxed">
-              We’re here to support you — gently, thoughtfully, at your pace.
+              {pageConfig?.hero_subtitle || "We’re here to support you — gently, thoughtfully, at your pace."}
             </p>
           </div>
           
           <div className="bg-white/60 backdrop-blur-md p-10 md:p-12 rounded-[2.5rem] shadow-[0_20px_60px_rgba(203,174,115,0.15)] border border-white/40 space-y-8">
             <div className="text-center space-y-2">
-              <p className="text-[10px] text-[#CBAE73] font-bold uppercase tracking-[0.4em]">Inquiry</p>
-              <p className="text-sm text-[#3A3A3A]/50 font-light italic">"Take a moment. Breathe. Then share what’s on your heart."</p>
+              <p className="text-[10px] text-[#CBAE73] font-bold uppercase tracking-[0.4em]">{pageConfig?.form_title || "Inquiry"}</p>
+              <p className="text-sm text-[#3A3A3A]/50 font-light italic">{pageConfig?.form_microcopy || `"Take a moment. Breathe. Then share what’s on your heart."`}</p>
             </div>
 
-            <form className="space-y-6">
+            <form className="space-y-6" onSubmit={e => e.preventDefault()}>
               <div className="space-y-4">
                 <input 
                   type="text" 
@@ -51,26 +95,20 @@ export default function Contact() {
               <motion.button 
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                className="bg-[#CBAE73] text-black w-full py-6 rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-[0_15px_30px_rgba(203,174,115,0.3)] hover:shadow-[0_20px_40px_rgba(203,174,115,0.45)] transition-all duration-500"
+                className="bg-[#CBAE73] text-black w-full py-6 rounded-full text-[11px] font-bold uppercase tracking-[0.4em] shadow-[0_15px_30px_rgba(203,174,115,0.3)] hover:shadow-[0_20px_40px_rgba(203,174,115,0.45)] transition-all duration-500 cursor-pointer"
               >
-                Reach Out Gently
+                {pageConfig?.button_text || "Reach Out Gently"}
               </motion.button>
             </form>
 
             {/* TRUST SECTION */}
             <div className="pt-8 border-t border-[#3A3A3A]/5 grid grid-cols-1 gap-4">
-              <div className="flex items-center gap-3 text-[10px] text-[#3A3A3A]/40 font-bold uppercase tracking-[0.2em]">
-                <Clock className="w-4 h-4 text-[#CBAE73]" />
-                Typically responds within 24 hours
-              </div>
-              <div className="flex items-center gap-3 text-[10px] text-[#3A3A3A]/40 font-bold uppercase tracking-[0.2em]">
-                <Heart className="w-4 h-4 text-[#CBAE73]" />
-                100+ healing journeys supported
-              </div>
-              <div className="flex items-center gap-3 text-[10px] text-[#3A3A3A]/40 font-bold uppercase tracking-[0.2em]">
-                <ShieldCheck className="w-4 h-4 text-[#CBAE73]" />
-                Private & confidential
-              </div>
+              {trustDetails.map((detail: string, dIdx: number) => (
+                <div key={dIdx} className="flex items-center gap-3 text-[10px] text-[#3A3A3A]/40 font-bold uppercase tracking-[0.2em]">
+                  {getTrustIcon(dIdx)}
+                  {detail}
+                </div>
+              ))}
             </div>
           </div>
         </motion.div>
@@ -87,14 +125,14 @@ export default function Contact() {
           <motion.img 
             animate={{ scale: [1, 1.05, 1] }}
             transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-            src="/contact-image.jpg" 
+            src={pageConfig?.image_url || "/contact-image.jpg"} 
             alt="Contact Lumaflow Sanctuary" 
             className="w-full h-full object-cover rounded-[3rem] shadow-luxury" 
           />
 
           <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
             <p className="font-display text-3xl text-white italic text-center px-12 drop-shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000">
-              "You don’t have to do this alone."
+              {pageConfig?.right_quote || `"You don’t have to do this alone."`}
             </p>
           </div>
         </motion.div>

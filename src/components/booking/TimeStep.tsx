@@ -48,6 +48,7 @@ const TimeStep = () => {
         console.log('[TimeStep] Fetching slots for date:', selectedDate, 'duration:', selectedDuration);
         const slots = await bookingService.getAvailability(selectedDate, selectedDuration);
         console.log('[TimeStep] Received slots:', slots);
+        console.log('[TimeStep] Loaded available slots:', slots);
         setAvailableSlots(slots);
 
         // FALLBACK: If no slots available, find the next available date
@@ -90,7 +91,7 @@ const TimeStep = () => {
   const availableCount = availableSlots.filter(s => s.isAvailable).length;
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="w-full">
       <StepHeading 
         tag="Availability"
         title={availableCount > 0 ? "Find your stillness" : "Sanctuary in Preparation"}
@@ -101,7 +102,7 @@ const TimeStep = () => {
         }
       />
 
-      <div className="space-y-10">
+      <div className="space-y-6">
         <div className="flex flex-col items-center gap-6">
           <div className="flex items-center justify-center gap-8">
             <div className="flex items-center gap-3 px-6 py-2.5 bg-gold/[0.03] border border-gold/10 rounded-full">
@@ -119,8 +120,8 @@ const TimeStep = () => {
             </div>
           </div>
           
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-dark/30 italic">
-            Displaying in your local time ({userTimezone})
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-dark/30 italic text-center">
+            All times are based in New York Sanctuary time (EDT/EST) and translated to your local time ({userTimezone})
           </p>
         </div>
 
@@ -135,7 +136,7 @@ const TimeStep = () => {
         ) : (
           <div className="space-y-12">
             {availableCount > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="max-w-5xl mx-auto flex flex-wrap justify-center gap-8">
                 {availableSlots.map((slot, index) => (
                   <motion.button
                     key={slot.timeEST}
@@ -144,45 +145,99 @@ const TimeStep = () => {
                     transition={{ duration: 0.8, delay: index * 0.05 }}
                     onClick={() => slot.isAvailable && handleSelect(slot.timeEST)}
                     disabled={!slot.isAvailable}
+                    whileHover={slot.isAvailable ? {
+                      y: -5,
+                      scale: 1.015,
+                      boxShadow: '0 20px 40px -10px rgba(203, 174, 115, 0.12)',
+                    } : {}}
+                    whileTap={slot.isAvailable ? { scale: 0.99 } : {}}
                     className={cn(
-                      "group relative py-12 px-8 rounded-[3rem] border transition-all duration-700 backdrop-blur-md focus:outline-none overflow-hidden",
+                      "group relative p-4 rounded-[1.5rem] border transition-all duration-700 backdrop-blur-md focus:outline-none text-left flex flex-col justify-between w-[300px] h-[140px] overflow-hidden cursor-pointer",
                       selectedTime === slot.timeEST
-                        ? "bg-text-dark border-text-dark text-white shadow-luxury scale-[1.02]"
+                        ? "bg-text-dark border-text-dark text-white shadow-luxury"
                         : slot.isAvailable 
-                          ? "bg-white/40 border-text-dark/5 text-text-dark/60 hover:border-gold/30 hover:bg-white hover:text-text-dark"
-                          : "bg-black/[0.02] border-transparent text-text-dark/10 grayscale cursor-not-allowed"
+                          ? "bg-white/50 border-gold/10 text-text-dark hover:border-gold/30 hover:bg-white"
+                          : "bg-black/[0.02] border-transparent text-text-dark/20 grayscale cursor-not-allowed"
                     )}
                   >
-                    <div className="flex flex-col items-center gap-5 relative z-10">
-                      <Clock className={cn(
-                        "w-5 h-5 transition-colors duration-700", 
-                        selectedTime === slot.timeEST ? "text-gold" : "text-gold/30 group-hover:text-gold/60"
-                      )} />
-                      <div className="text-center">
-                        <span className="text-3xl font-display tracking-tight block">
-                          {formatTo12Hour(slot.timeEST)}
+                    {/* Top Row: Circadian Label & Clock */}
+                    <div className="w-full flex justify-between items-center">
+                      <span className={cn(
+                        "text-[7px] font-bold uppercase tracking-[0.25em] px-2 py-0.5 rounded-full border transition-colors duration-700",
+                        selectedTime === slot.timeEST 
+                          ? "bg-white/10 border-white/20 text-gold" 
+                          : "bg-gold/5 border-gold/10 text-gold"
+                      )}>
+                        Circadian Resonance
+                      </span>
+                      <div className={cn(
+                        "w-7 h-7 rounded-full flex items-center justify-center border transition-all duration-700",
+                        selectedTime === slot.timeEST 
+                          ? "bg-gold border-gold text-white" 
+                          : slot.isAvailable 
+                            ? "bg-gold/5 border-gold/10 text-gold group-hover:bg-gold/10" 
+                            : "bg-black/5 border-transparent text-text-dark/20"
+                      )}>
+                        <Clock className="w-3 h-3" />
+                      </div>
+                    </div>
+
+                    {/* Middle: Time Selection Info */}
+                    <div className="space-y-0.5">
+                      <span className={cn(
+                        "text-2xl font-display tracking-tight block transition-colors duration-700",
+                        selectedTime === slot.timeEST ? "text-white" : "text-text-dark"
+                      )}>
+                        {slot.timeESTLabel || formatTo12Hour(slot.timeEST)}
+                      </span>
+                      {slot.timeLocalLabel && slot.timeLocalLabel !== slot.timeESTLabel && (
+                        <span className={cn(
+                          "text-xs font-light block transition-colors duration-700",
+                          selectedTime === slot.timeEST ? "text-white/70" : "text-gold"
+                        )}>
+                          Local: {slot.timeLocalLabel}
                         </span>
-                        <span className="text-[10px] font-bold text-gold/60 uppercase tracking-widest mt-1 block">EST</span>
-                        
-                        {/* User Local Time Helper */}
-                        <p className={cn(
-                          "text-[9px] font-medium tracking-[0.1em] mt-3 opacity-40",
+                      )}
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "text-[9px] font-light transition-colors duration-700",
                           selectedTime === slot.timeEST ? "text-white/60" : "text-text-dark/40"
                         )}>
-                          Local: {slot.timeLocal}
-                        </p>
-
-                        {!slot.isAvailable && (
-                          <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-red-400/60 mt-2 block">Reserved</span>
-                        )}
+                          {selectedDuration}m Ritual
+                        </span>
                       </div>
-                      <span className="text-[9px] font-bold uppercase tracking-[0.3em] opacity-30 group-hover:opacity-60 transition-opacity">
-                        {slot.isAvailable ? 'Peak Resonance' : 'Session Full'}
+                    </div>
+
+                    {/* Bottom Row: Availability Status */}
+                    <div 
+                      className="w-full pt-2 border-t border-dashed flex items-center justify-between transition-colors duration-700"
+                      style={{ borderColor: selectedTime === slot.timeEST ? 'rgba(255,255,255,0.1)' : 'rgba(203,174,115,0.15)' }}
+                    >
+                      <span className={cn(
+                        "text-[9px] font-bold uppercase tracking-[0.25em] transition-colors duration-700",
+                        selectedTime === slot.timeEST 
+                          ? "text-gold" 
+                          : slot.isAvailable 
+                            ? "text-gold/80" 
+                            : "text-red-400/60"
+                      )}>
+                        {slot.isAvailable ? 'Available' : 'Reserved'}
+                      </span>
+                      
+                      <span className={cn(
+                        "text-[8px] font-bold uppercase tracking-[0.2em] opacity-30 group-hover:opacity-60 transition-opacity transition-colors duration-700",
+                        selectedTime === slot.timeEST ? "text-white" : "text-text-dark"
+                      )}>
+                        {slot.isAvailable ? 'Select' : 'Held'}
                       </span>
                     </div>
 
+                    {/* Luminous Bloom effects */}
                     {selectedTime === slot.timeEST && (
-                      <div className="absolute inset-0 bg-gradient-to-br from-gold/10 to-transparent pointer-events-none" />
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gold/15 blur-[35px] rounded-full -mr-8 -mt-8 pointer-events-none" />
+                    )}
+                    {slot.isAvailable && selectedTime !== slot.timeEST && (
+                      <div className="absolute top-0 right-0 w-14 h-14 bg-gold/5 blur-[25px] rounded-full -mr-7 -mt-7 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
                     )}
                   </motion.button>
                 ))}

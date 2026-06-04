@@ -209,7 +209,7 @@
       "journey": "Somatic Flow",
       "feeling": "heavy",
       "recommended_ritual": "Vitality Restoration",
-      "duration": 120,
+      "duration": 90,
       "recommended_plan": "somatic",
       "focus": "Energy Body Rejuvenation & Fascia Flow",
       "confidence_score": "Highly Aligned",
@@ -220,7 +220,7 @@
       "journey": "Somatic Flow",
       "feeling": "emotionally drained",
       "recommended_ritual": "Vitality Restoration",
-      "duration": 120,
+      "duration": 90,
       "recommended_plan": "somatic",
       "focus": "Deep Replenishment & Energy Body Reset",
       "confidence_score": "Highly Aligned",
@@ -297,7 +297,7 @@
       "journey": "Deep Meditation",
       "feeling": "stressed",
       "recommended_ritual": "Stillness Ritual",
-      "duration": 45,
+      "duration": 30,
       "recommended_plan": "meditation",
       "focus": "Focus Anchoring & Thought Uncoupling",
       "confidence_score": "Highly Aligned",
@@ -308,7 +308,7 @@
       "journey": "Deep Meditation",
       "feeling": "anxious",
       "recommended_ritual": "Stillness Ritual",
-      "duration": 45,
+      "duration": 30,
       "recommended_plan": "meditation",
       "focus": "Present-Moment Anchoring & Worry Release",
       "confidence_score": "Highly Aligned",
@@ -336,5 +336,61 @@
       "confidence_score": "Highly Aligned",
       "is_active": true
     }
-  ]
+  ],
+  "classes": {
+    "hero_title": "Your Path to\nInner Alignment",
+    "hero_subtitle": "\"Choose the practice that meets you where you are.\"",
+    "services": [
+      {
+        "title": "Breathwork",
+        "icon": "Wind",
+        "description": "Conscious breathing techniques to regulate your nervous system and release emotional blockages.",
+        "image": "/classes-image.png",
+        "benefits": [
+          "Stress reduction",
+          "Mental clarity",
+          "Emotional release"
+        ]
+      },
+      {
+        "title": "Somatic Movement",
+        "icon": "Heart",
+        "description": "Gently connect with your body's innate wisdom through mindful, grounded movement practices.",
+        "image": "/about-image.png",
+        "benefits": [
+          "Body awareness",
+          "Trauma release",
+          "Physical grounding"
+        ]
+      },
+      {
+        "title": "Meditation",
+        "icon": "Sparkles",
+        "description": "Guided sessions to anchor your mind in stillness and cultivate profound inner peace.",
+        "image": "/ambient-image.png",
+        "benefits": [
+          "Deep presence",
+          "Anxiety relief",
+          "Spiritual connection"
+        ]
+      }
+    ],
+    "cta_title": "Begin yourjourney inward..",
+    "cta_description": "Spaces are intentionally limited to preserve the sacred nature of each container. Reserve your spot in our next group session.",
+    "cta_button_text": "Book Your Session"
+  },
+  "contact": {
+    "hero_title": "Begin your conversation\nwith stillness",
+    "hero_subtitle": "We’re here to support you — gently, thoughtfully, at your pace.",
+    "form_title": "Inquiry",
+    "form_microcopy": "\"Take a moment. Breathe. Then share what’s on your heart.\"",
+    "button_text": "Reach Out Gently",
+    "trust_details": [
+      "Typically responds within 24 hours",
+      "100+ healing journeys supported",
+      "Private & confidential"
+    ],
+    "right_quote": "\"You don’t have to do this alone.\"",
+    "image_url": "/contact-image.jpg"
+  }
 }

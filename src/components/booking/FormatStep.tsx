@@ -8,7 +8,7 @@ import StepHeading from './shared/StepHeading';
 const formats = [
   {
     id: 'Virtual',
-    title: 'Virtual Session',
+    title: 'Virtual Sanctuary',
     description: 'Deeply personal guidance for emotional release from your own home.',
     benefit: 'Private Sanctuary',
     icon: Video
@@ -19,13 +19,6 @@ const formats = [
     description: 'A full nervous-system reset in a calming, curated physical space.',
     benefit: 'Complete Immersion',
     icon: HomeIcon
-  },
-  {
-    id: 'Group',
-    title: 'Collective Ritual',
-    description: 'Connect with the shared energy of a small, intentional community.',
-    benefit: 'Shared Resonance',
-    icon: Users
   }
 ];
 
@@ -45,7 +38,7 @@ const FormatStep = () => {
         subtitle="Choose the space that feels most supportive for your journey."
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
         {formats.map((format, index) => (
           <motion.button
             key={format.id}

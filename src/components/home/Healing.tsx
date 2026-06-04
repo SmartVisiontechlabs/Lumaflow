@@ -37,7 +37,7 @@ export default function Healing() {
   return (
     <>
       <div className="section-transition" />
-      <section id="transformation-journey" className="py-40 bg-transparent relative section-fade-top section-fade-bottom overflow-hidden scroll-mt-24">
+      <section id="transformation-journey" className="py-32 bg-transparent relative section-fade-top section-fade-bottom overflow-hidden scroll-mt-24">
         
         {/* Soft Ambient glow for sacred atmosphere */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70vw] h-[70vw] radial-glow opacity-5 select-none pointer-events-none" />
@@ -51,7 +51,7 @@ export default function Healing() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 2.0, ease: [0.22, 1, 0.36, 1] }}
-            className="text-center mb-36"
+            className="text-center mb-24"
           >
             <span className="text-[#CBAE73] text-[10px] font-bold tracking-[0.4em] uppercase mb-4 block animate-glow">The Journey</span>
             <h2 className="font-display text-4xl sm:text-5xl md:text-6xl text-text-dark font-light">

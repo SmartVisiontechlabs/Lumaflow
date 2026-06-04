@@ -46,7 +46,7 @@ export const recommendationMap: Record<EmotionalState, Recommendation> = {
   'emotionally drained': {
     ritual: 'The Vitality Restoration',
     focus: 'Energy Body Rejuvenation',
-    duration: 120,
+    duration: 90,
     insight: 'Burnout requires deep replenishment. This session combines restorative somatic work with high-frequency energy alignment.',
     quote: "Rest is not the absence of movement, but the presence of peace."
   },
@@ -87,7 +87,7 @@ export const ritualJourneyMap: Record<string, Recommendation[]> = {
     {
       ritual: 'The Vitality Restoration',
       focus: 'Energy Replenishment',
-      duration: 120,
+      duration: 90,
       insight: 'With the old weight gone, we now fill your space with pure, vibrant energy.',
       quote: "Nature abhors a vacuum; fill yours with light."
     }
@@ -158,14 +158,14 @@ export const followUpMap: Record<string, Recommendation[]> = {
     {
       ritual: 'The Vitality Restoration',
       focus: 'Deep Replenishment',
-      duration: 120,
+      duration: 90,
       insight: 'When empty, we must fill the cup from the source of all vitality.',
       quote: "Rest is not idleness; it is restoration."
     },
     {
       ritual: 'Gentle Nervous System Recovery',
       focus: 'Soft Reset',
-      duration: 45,
+      duration: 30,
       insight: 'A soft, supportive touch for a system that has given everything.',
       quote: "Gentleness is the highest form of power."
     },
@@ -188,7 +188,7 @@ export const followUpMap: Record<string, Recommendation[]> = {
     {
       ritual: 'Somatic Grounding Session',
       focus: 'Earth Connection',
-      duration: 45,
+      duration: 30,
       insight: 'Feeling the solid support beneath you when the world feels too fast.',
       quote: "The earth always holds you."
     },
@@ -211,7 +211,7 @@ export const followUpMap: Record<string, Recommendation[]> = {
     {
       ritual: 'Breath Regulation Ritual',
       focus: 'Vagal Toning',
-      duration: 45,
+      duration: 30,
       insight: 'Using the breath as a tool to signal safety to the brain.',
       quote: "Breathe, and the body remembers peace."
     },
@@ -284,7 +284,7 @@ export const getDynamicRecommendation = (journey: string, feeling: string): Dyna
       return {
         ritual: 'Vitality Restoration',
         focus: 'Energy Body Rejuvenation & Flow',
-        duration: 120,
+        duration: 90,
         insight: 'Replenish a fully depleted system. Gentle, passive somatic release postures help your muscles and fascia store vital energy.',
         quote: "Rest is the soil from which vitality grows."
       };
@@ -318,7 +318,7 @@ export const getDynamicRecommendation = (journey: string, feeling: string): Dyna
       return {
         ritual: 'Stillness Ritual',
         focus: 'Focus Anchoring & Thought Uncoupling',
-        duration: 45,
+        duration: 30,
         insight: 'Calm the racing chattering mind. We use mindfulness anchors and sound vibration to slow down rapid thought loops.',
         quote: "Quiet the mind, and the soul will speak."
       };

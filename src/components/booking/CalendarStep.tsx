@@ -1,4 +1,4 @@
-import React, { useState, memo, useCallback } from 'react';
+import React, { useState, useEffect, memo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   format, 
@@ -13,18 +13,75 @@ import {
   addDays, 
   isBefore, 
   startOfToday,
-  parseISO
+  parseISO,
+  getDay
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
 import { useBookingFlow } from '../../hooks/useBookingFlow';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 import SessionSummary from './shared/SessionSummary';
 
 const CalendarStep = () => {
   const { selectedDate, setDate, nextStep, prevStep } = useBookingFlow();
   
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [activeDays, setActiveDays] = useState<number[]>([1, 3, 5]); // Monday, Wednesday, Friday fallback defaults
   const today = startOfToday();
+
+  useEffect(() => {
+    const fetchSanctuaryData = async () => {
+      try {
+        if (!supabase) return;
+        const [blockedRes, settingsRes] = await Promise.all([
+          supabase
+            .from('blocked_slots')
+            .select('blocked_date, blocked_time'),
+          supabase
+            .from('availability_settings')
+            .select('*')
+        ]);
+        
+        if (blockedRes.error) {
+          console.error('Error fetching blocked slots:', blockedRes.error);
+        } else {
+          // Filter for full-day blocks
+          const fullDayBlocked = (blockedRes.data || [])
+            .filter((slot: any) => {
+              const bt = (slot.blocked_time || '').toLowerCase().trim();
+              return (
+                !bt ||
+                bt.includes('11:59') ||
+                bt.includes('23:59') ||
+                bt.includes('full') ||
+                bt.includes('entire') ||
+                bt.includes('whole')
+              );
+            })
+            .map((slot: any) => slot.blocked_date);
+          
+          setBlockedDates(fullDayBlocked);
+        }
+
+        if (settingsRes.error) {
+          console.error('Error fetching availability settings:', settingsRes.error);
+        } else if (settingsRes.data && settingsRes.data.length > 0) {
+          const active = settingsRes.data
+            .filter((s: any) => {
+              const activeVal = s.is_active !== undefined ? s.is_active : s.is_available;
+              return activeVal !== false;
+            })
+            .map((s: any) => s.day_of_week);
+          setActiveDays(active);
+        }
+      } catch (err) {
+        console.error('Failed to load blocked dates or active settings:', err);
+      }
+    };
+
+    fetchSanctuaryData();
+  }, []);
 
   const handleNextMonth = useCallback(() => setCurrentMonth(prev => addMonths(prev, 1)), []);
   const handlePrevMonth = useCallback(() => setCurrentMonth(prev => subMonths(prev, 1)), []);
@@ -49,7 +106,11 @@ const CalendarStep = () => {
   while (day <= endDate) {
     for (let i = 0; i < 7; i++) {
       const cloneDay = day;
-      const isDisabled = !isSameMonth(day, monthStart) || isBefore(day, today);
+      const formattedDateStr = format(day, 'yyyy-MM-dd');
+      const isBlocked = blockedDates.includes(formattedDateStr);
+      const dayOfWeek = getDay(cloneDay);
+      const isDayUnavailable = !activeDays.includes(dayOfWeek);
+      const isDisabled = !isSameMonth(day, monthStart) || isBefore(day, today) || isDayUnavailable || isBlocked;
       const isSelected = parsedSelectedDate && isSameDay(day, parsedSelectedDate);
       const isToday = isSameDay(day, today);
 
@@ -59,7 +120,7 @@ const CalendarStep = () => {
           disabled={isDisabled}
           onClick={() => onDateClick(cloneDay)}
           className={cn(
-            "relative aspect-square flex items-center justify-center rounded-[1.25rem] transition-all duration-700 text-xs font-light focus:outline-none overflow-hidden",
+            "relative aspect-square flex items-center justify-center rounded-xl transition-all duration-700 text-xs font-light focus:outline-none overflow-hidden py-2.5",
             isDisabled ? "opacity-10 cursor-default" : "hover:bg-white hover:shadow-luxury group/day",
             isSelected ? "bg-text-dark text-white shadow-luxury font-bold" : "text-text-dark/60",
             isToday && !isSelected && "ring-1 ring-gold/30"
@@ -80,7 +141,7 @@ const CalendarStep = () => {
       day = addDays(day, 1);
     }
     calendarRows.push(
-      <div className="grid grid-cols-7 gap-2" key={day.toString()}>
+      <div className="grid grid-cols-7 gap-1.5" key={day.toString()}>
         {days}
       </div>
     );
@@ -88,71 +149,54 @@ const CalendarStep = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-        
-        {/* LEFT PANEL: SUMMARY */}
-        <div className="lg:col-span-5 space-y-10 bg-white/40 backdrop-blur-2xl p-12 rounded-[3.5rem] border border-white/40 hidden lg:block shadow-luxury">
-          <SessionSummary />
-          <div className="pt-10 border-t border-gold/10">
-            <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold/60 mb-3">Ritual Commitment</p>
-            <p className="text-sm text-text-dark/40 font-light italic leading-relaxed font-display">
-              “Selecting your date begins the sacred alignment. Each session is a commitment to your own transformation.”
-            </p>
+    <div className="w-full max-w-[400px] mx-auto">
+      <div className="bg-white/80 backdrop-blur-3xl rounded-[2rem] p-5 shadow-luxury border border-white/30 relative overflow-hidden">
+        <div className="flex items-center justify-between px-4 mb-4">
+          <h3 className="font-display text-2xl text-text-dark tracking-tight">
+            {format(currentMonth, 'MMMM yyyy')}
+          </h3>
+          <div className="flex gap-4">
+            <button onClick={handlePrevMonth} className="p-3 rounded-full hover:bg-gold/10 text-text-dark/30 hover:text-gold transition-all"><ChevronLeft className="w-5 h-5" /></button>
+            <button onClick={handleNextMonth} className="p-3 rounded-full hover:bg-gold/10 text-text-dark/30 hover:text-gold transition-all"><ChevronRight className="w-5 h-5" /></button>
           </div>
         </div>
 
-        {/* RIGHT PANEL: CALENDAR */}
-        <div className="lg:col-span-7 w-full">
-          <div className="bg-white/80 backdrop-blur-3xl rounded-[3.5rem] p-10 shadow-luxury border border-white/30 relative overflow-hidden">
-            <div className="flex items-center justify-between px-4 mb-10">
-              <h3 className="font-display text-4xl text-text-dark tracking-tight">
-                {format(currentMonth, 'MMMM yyyy')}
-              </h3>
-              <div className="flex gap-4">
-                <button onClick={handlePrevMonth} className="p-3 rounded-full hover:bg-gold/10 text-text-dark/30 hover:text-gold transition-all"><ChevronLeft className="w-5 h-5" /></button>
-                <button onClick={handleNextMonth} className="p-3 rounded-full hover:bg-gold/10 text-text-dark/30 hover:text-gold transition-all"><ChevronRight className="w-5 h-5" /></button>
-              </div>
-            </div>
+        <div className="grid grid-cols-7 mb-4">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+            <div key={i} className="text-center text-[10px] font-bold text-text-dark/20 uppercase tracking-[0.4em]">{d}</div>
+          ))}
+        </div>
 
-            <div className="grid grid-cols-7 mb-6">
-              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                <div key={i} className="text-center text-[10px] font-bold text-text-dark/20 uppercase tracking-[0.4em]">{d}</div>
-              ))}
-            </div>
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentMonth.toString()}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
-                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-2"
-              >
-                {calendarRows}
-              </motion.div>
-            </AnimatePresence>
-
-            <div className="mt-10 pt-8 border-t border-text-dark/5 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.4em] text-text-dark/20">
-              <div className="flex gap-6">
-                <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-gold/40" /> Available</div>
-              </div>
-              <div className="flex items-center gap-3 italic">
-                <CalendarIcon className="w-4 h-4" /> local time
-              </div>
-            </div>
-          </div>
-          
-          <button 
-            onClick={prevStep}
-            className="mt-10 mx-auto flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.4em] text-gold/30 hover:text-gold transition-all duration-700 focus:outline-none group cursor-pointer relative z-50"
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentMonth.toString()}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+            className="space-y-1.5"
           >
-            <ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
-            Change Duration
-          </button>
+            {calendarRows}
+          </motion.div>
+        </AnimatePresence>
+
+        <div className="mt-6 pt-6 border-t border-text-dark/5 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.4em] text-text-dark/20">
+          <div className="flex gap-6">
+            <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-gold/40" /> Available</div>
+          </div>
+          <div className="flex items-center gap-3 italic">
+            <CalendarIcon className="w-4 h-4" /> local time
+          </div>
         </div>
       </div>
+      
+      <button 
+        onClick={prevStep}
+        className="mt-6 mx-auto flex items-center gap-2 text-[9px] font-bold uppercase tracking-[0.4em] text-gold/30 hover:text-gold transition-all duration-700 focus:outline-none group cursor-pointer relative z-50"
+      >
+        <ChevronLeft className="w-3 h-3 group-hover:-translate-x-1 transition-transform" />
+        Change Duration
+      </button>
     </div>
   );
 };

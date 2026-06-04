@@ -16,6 +16,9 @@ import CalendarStep from '../../components/booking/CalendarStep';
 import TimeStep from '../../components/booking/TimeStep';
 import ConfirmationStep from '../../components/booking/ConfirmationStep';
 import ResumeStep from '../../components/booking/ResumeStep';
+import { useAuth } from '../../providers/AuthProvider';
+import { bookingService } from '../../services/bookingService';
+import { useBookingStore } from '../../store/bookingStore';
 
 const stepComponents: Record<number, React.ComponentType> = {
   1: JourneyStep,
@@ -63,11 +66,38 @@ export default function BookPage() {
     fetchRecommendationMatrix
   } = useBookingFlow();
 
+  const { user, loading: authLoading } = useAuth();
+  const resumeFromDraftBooking = useBookingStore(state => state.resumeFromDraftBooking);
+
+  useEffect(() => {
+    if (authLoading) return;
+    
+    // Only check if user is logged in and not starting a package session via plan query
+    const params = new URLSearchParams(window.location.search);
+    const planSlug = params.get('plan');
+    if (planSlug) return;
+
+    if (user) {
+      bookingService.getActiveDraftBooking(user.id).then((draft) => {
+        if (draft) {
+          console.log('[BookPage] Active backend draft found. Prompting resume:', draft);
+          resumeFromDraftBooking(draft);
+        }
+      }).catch((err) => {
+        console.error('[BookPage] Failed to fetch active draft:', err);
+      });
+    }
+  }, [user, authLoading, resumeFromDraftBooking]);
+
   const confidenceConfig = confidence ? getConfidenceConfig(confidence as ConfidenceLevel) : null;
 
   const [showExitModal, setShowExitModal] = useState(false);
   const StepComponent = useMemo(() => stepComponents[currentStep], [currentStep]);
   const navigate = useNavigate();
+
+  const showSummary = useMemo(() => {
+    return ((currentStep > 1 || (entrySource === 'pricing' && currentStep === 1)) && currentStep < 9 && !showResumePrompt);
+  }, [currentStep, entrySource, showResumePrompt]);
 
   // If page is loaded directly, initialize booking state once with query parameter check
   useEffect(() => {
@@ -143,13 +173,13 @@ export default function BookPage() {
         />
       </div>
 
-      <div className="relative z-10 max-w-7xl mx-auto w-full flex-grow flex flex-col px-6">
+      <div className="relative z-10 max-w-6xl mx-auto w-full flex-grow flex flex-col px-6">
         
         {/* STICKY TOP HEADER SYSTEM (TABS + EXIT) */}
         {currentStep < 9 && !showResumePrompt && (
-          <div className="sticky top-[92px] z-40 px-4 md:px-0 mb-12 w-full flex items-center justify-center">
+          <div className="sticky top-[92px] z-40 px-4 md:px-0 mb-6 w-full flex items-center justify-center">
             <div className="w-full max-w-4xl bg-white/50 backdrop-blur-2xl border border-gold/[0.06] py-2.5 px-8 rounded-full shadow-[0_16px_40px_rgba(203,174,115,0.08)] transition-all flex items-center justify-between min-h-[60px] relative">
-              <div className="flex-grow mr-20">
+              <div className="flex-grow pr-36">
                 <BookingProgress />
               </div>
               
@@ -175,47 +205,46 @@ export default function BookPage() {
           </div>
         )}
 
-        {/* MAIN STEPS CONTENT AREA — pt-8 gives luxury breathing room below capsule */}
-        <div className="flex-grow flex flex-col lg:flex-row items-start justify-between pt-8 w-full gap-12">
-          
-          {/* Main Content */}
-          <div className="w-full lg:flex-1 max-w-4xl mx-auto scroll-mt-40">
-            <AnimatePresence mode="wait" initial={false}>
-              {showResumePrompt ? (
-                <ResumeStep key="resume-step" />
-              ) : (
-                <motion.div
-                  key={currentStep}
-                  variants={stepTransition}
-                  initial="initial"
-                  animate="animate"
-                  exit="exit"
-                  className="w-full"
-                >
-                  {entrySource === 'pricing' && currentStep === 1 && selectedPackage && (
-                    <motion.p 
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 1.2, delay: 0.2 }}
-                      className="text-center font-display italic text-gold/60 text-sm tracking-widest mb-8"
-                    >
-                      {getPricingMicrocopy(selectedPackage.name)}
-                    </motion.p>
-                  )}
-                  <StepComponent />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+        {/* MAIN STEPS CONTENT AREA — pt-4 gives luxury breathing room below capsule */}
+        {showSummary ? (
+          <div className="flex-grow w-full grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 items-start pt-4">
+            {/* Main Content */}
+            <div className="w-full scroll-mt-40">
+              <AnimatePresence mode="wait" initial={false}>
+                {showResumePrompt ? (
+                  <ResumeStep key="resume-step" />
+                ) : (
+                  <motion.div
+                    key={currentStep}
+                    variants={stepTransition}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="w-full"
+                  >
+                    {entrySource === 'pricing' && currentStep === 1 && selectedPackage && (
+                      <motion.p 
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 1.2, delay: 0.2 }}
+                        className="text-center font-display italic text-gold/60 text-sm tracking-widest mb-8"
+                      >
+                        {getPricingMicrocopy(selectedPackage.name)}
+                      </motion.p>
+                    )}
+                    <StepComponent />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-          {/* Right Side Summary (Desktop) */}
-          <AnimatePresence>
-            {((currentStep > 1 || (entrySource === 'pricing' && currentStep === 1)) && currentStep < 9 && !showResumePrompt) && (
+            {/* Right Side Summary (Desktop - 320px fixed) */}
+            <AnimatePresence>
               <motion.div 
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                className="hidden lg:block w-[320px] sticky top-[180px] shrink-0"
+                className="hidden lg:block w-[320px] sticky top-[180px]"
               >
                 <div className="bg-white/80 backdrop-blur-3xl border border-gold/10 p-8 rounded-[2rem] shadow-[0_10px_40px_rgba(203,174,115,0.08)]">
                   <h3 className="font-display text-2xl mb-6 text-text-dark tracking-tight">Healing Journey</h3>
@@ -338,9 +367,30 @@ export default function BookPage() {
                   </div>
                 </div>
               </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+            </AnimatePresence>
+          </div>
+        ) : (
+          <div className="flex-grow w-full flex justify-center pt-4">
+            <div className="w-full max-w-[840px] scroll-mt-40">
+              <AnimatePresence mode="wait" initial={false}>
+                {showResumePrompt ? (
+                  <ResumeStep key="resume-step" />
+                ) : (
+                  <motion.div
+                    key={currentStep}
+                    variants={stepTransition}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    className="w-full"
+                  >
+                    <StepComponent />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
 
       </div>
 

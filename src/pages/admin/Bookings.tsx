@@ -100,7 +100,8 @@ const AdminBookings = () => {
       // Trigger backend email delivery for production stability
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+        const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
         
         await fetch(`${API_URL}/bookings/rituals`, {
           method: 'POST',

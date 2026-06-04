@@ -32,7 +32,7 @@ export default function About() {
   return (
     <div className="min-h-screen bg-white selection:bg-[#CBAE73]/30">
       {/* 1. HERO SECTION */}
-      <section className="relative pt-64 pb-48 px-6 bg-[#F8F5F0] overflow-hidden">
+      <section className="relative pt-48 pb-36 px-6 bg-[#F8F5F0] overflow-hidden">
         {/* Soft radial glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60vw] h-[60vw] bg-white rounded-full blur-[120px] opacity-60" />
         
@@ -54,7 +54,7 @@ export default function About() {
       </section>
 
       {/* 2. FOUNDER SECTION */}
-      <section className="py-56 px-6">
+      <section className="py-40 px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-24 lg:gap-32 items-center">
           {/* Left: Alanna Image */}
           <motion.div
@@ -111,7 +111,7 @@ export default function About() {
       </section>
 
       {/* 3. BELIEF SYSTEM SECTION */}
-      <section className="py-64 px-6 bg-[#F8F5F0] relative overflow-hidden">
+      <section className="py-48 px-6 bg-[#F8F5F0] relative overflow-hidden">
         <div className="max-w-4xl mx-auto text-center">
           <div className="flex flex-col items-center">
             {beliefs.map((belief, idx) => (
@@ -136,7 +136,7 @@ export default function About() {
       </section>
 
       {/* 4. METHOD SECTION */}
-      <section className="py-56 px-6">
+      <section className="py-40 px-6">
         <div className="max-w-7xl mx-auto text-center space-y-32">
           <div className="space-y-6">
             <h2 className="font-display text-6xl text-[#3A3A3A] font-light">How we guide you</h2>
@@ -169,7 +169,7 @@ export default function About() {
       </section>
 
       {/* 5. TRUST SECTION */}
-      <section className="pb-64 px-6">
+      <section className="pb-48 px-6">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div
             initial={{ opacity: 0, scale: 0.98 }}
@@ -199,7 +199,7 @@ export default function About() {
       </section>
 
       {/* 6. FINAL CTA */}
-      <section className="py-64 px-6 bg-[#F8F5F0] relative overflow-hidden">
+      <section className="py-48 px-6 bg-[#F8F5F0] relative overflow-hidden">
         {/* Radial Background Glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70vw] h-[70vw] bg-white rounded-full blur-[140px] opacity-70" />
         

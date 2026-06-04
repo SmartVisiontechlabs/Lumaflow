@@ -8,11 +8,13 @@ const ResumeStep = () => {
     setShowResumePrompt, 
     resetBooking, 
     selectedRitual, 
-    emotionalState 
+    emotionalState,
+    goToStep
   } = useBookingFlow();
 
   const handleResume = () => {
     setShowResumePrompt(false);
+    goToStep(5);
   };
 
   const handleStartFresh = () => {

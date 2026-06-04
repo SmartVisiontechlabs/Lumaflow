@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useClientPortal } from '../../hooks/useClientPortal';
+import { useAuth } from '../../providers/AuthProvider';
 import { 
   User, 
   Mail, 
@@ -10,7 +10,8 @@ import {
 import { motion } from 'framer-motion';
 
 export default function Profile() {
-  const { profile, loading, error, updateProfile } = useClientPortal();
+  const { profile, loading, updateProfile } = useAuth();
+  const error = null; // useAuth handles loading internally and is robust
   const [fullName, setFullName] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);

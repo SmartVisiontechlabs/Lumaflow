@@ -23,6 +23,138 @@ const AdminSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [sanctuaryEmail, setSanctuaryEmail] = useState('rituals@lumaflow.com');
 
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false);
+  const [dbColumns, setDbColumns] = useState<string[]>([]);
+
+  const DAY_NAMES = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday'
+  ];
+
+  const fetchSchedule = async () => {
+    setIsLoadingSchedule(true);
+    try {
+      if (!supabase) return;
+      const { data, error } = await supabase
+        .from('availability_settings')
+        .select('*')
+        .order('day_of_week', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setDbColumns(Object.keys(data[0]));
+      }
+
+      const fullSchedule = Array.from({ length: 7 }, (_, i) => {
+        const existing = (data || []).find((s: any) => s.day_of_week === i);
+        if (existing) {
+          const activeVal = existing.is_active !== undefined ? existing.is_active : existing.is_available;
+          return {
+            ...existing,
+            start_time: existing.start_time.substring(0, 5),
+            end_time: existing.end_time.substring(0, 5),
+            is_active: activeVal !== false
+          };
+        }
+        
+        let start = '09:00';
+        let end = '17:00';
+        let is_active = false;
+        let buffer = 30;
+
+        if (i === 1) {
+          start = '09:00';
+          end = '13:00';
+          is_active = true;
+        } else if (i === 3) {
+          start = '11:00';
+          end = '16:00';
+          is_active = true;
+        } else if (i === 5) {
+          start = '08:00';
+          end = '12:00';
+          is_active = true;
+        }
+
+        return {
+          day_of_week: i,
+          start_time: start,
+          end_time: end,
+          buffer_minutes: buffer,
+          is_active: is_active
+        };
+      });
+
+      setSchedule(fullSchedule);
+    } catch (err) {
+      console.error('Error fetching schedule settings:', err);
+      showToast('Failed to load availability settings', 'error');
+    } finally {
+      setIsLoadingSchedule(false);
+    }
+  };
+
+  const handleSaveSchedule = async () => {
+    setIsSavingSchedule(true);
+    try {
+      if (!supabase) return;
+      
+      const payload = schedule.map(s => {
+        const item: any = {
+          day_of_week: s.day_of_week,
+          start_time: s.start_time.includes(':') && s.start_time.split(':').length === 2 ? `${s.start_time}:00` : s.start_time,
+          end_time: s.end_time.includes(':') && s.end_time.split(':').length === 2 ? `${s.end_time}:00` : s.end_time,
+          buffer_minutes: parseInt(s.buffer_minutes, 10),
+        };
+        
+        if (dbColumns.includes('is_available')) {
+          item.is_available = s.is_active;
+        }
+        if (dbColumns.includes('is_active') || dbColumns.length === 0) {
+          item.is_active = s.is_active;
+        }
+        return item;
+      });
+
+      const { error } = await supabase
+        .from('availability_settings')
+        .upsert(payload, { onConflict: 'day_of_week' });
+
+      if (error) throw error;
+      showToast('Availability settings archived successfully', 'success');
+      fetchSchedule();
+    } catch (err) {
+      console.error('Error saving schedule settings:', err);
+      showToast('Failed to archive availability settings', 'error');
+    } finally {
+      setIsSavingSchedule(false);
+    }
+  };
+
+  const handleToggleDay = (dayIndex: number) => {
+    setSchedule(prev => prev.map(item => 
+      item.day_of_week === dayIndex ? { ...item, is_active: !item.is_active } : item
+    ));
+  };
+
+  const handleFieldChange = (dayIndex: number, field: string, value: any) => {
+    setSchedule(prev => prev.map(item => 
+      item.day_of_week === dayIndex ? { ...item, [field]: value } : item
+    ));
+  };
+
+  useEffect(() => {
+    fetchSchedule();
+  }, []);
+
   // Toast state
   const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
     message: '',
@@ -163,34 +295,107 @@ const AdminSettings = () => {
 
             {activeSection === 'availability' && (
               <div className="space-y-10">
-                <div className="space-y-1">
-                  <h4 className="text-2xl font-display text-text-dark tracking-tight">Sanctuary Hours</h4>
-                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Global weekly availability logic</p>
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                  <div className="space-y-1">
+                    <h4 className="text-2xl font-display text-text-dark tracking-tight">Sanctuary Hours</h4>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Manage your weekly operating hours and buffers</p>
+                  </div>
+                  <button 
+                    onClick={handleSaveSchedule}
+                    disabled={isSavingSchedule || isLoadingSchedule}
+                    className="flex items-center justify-center gap-3 px-8 py-4 bg-text-dark text-white rounded-xl text-[9px] font-bold uppercase tracking-[0.4em] shadow-button hover:bg-gold transition-all duration-700 disabled:opacity-50"
+                  >
+                    <Save className={cn("w-3.5 h-3.5 text-gold", isSavingSchedule && "animate-pulse")} />
+                    {isSavingSchedule ? 'Saving...' : 'Save Hours'}
+                  </button>
                 </div>
 
-                <div className="space-y-8">
-                  {[
-                    { day: 'Monday — Friday', hours: '08:00 AM – 04:00 PM EST' },
-                    { day: 'Saturday', hours: '10:00 AM – 02:00 PM EST' },
-                    { day: 'Sunday', hours: 'Closed for Restoration' },
-                  ].map((item) => (
-                    <div key={item.day} className="flex items-center justify-between p-8 bg-cream/30 border border-text-dark/5 rounded-[2rem] group hover:bg-white transition-all duration-700">
-                      <div className="flex items-center gap-6">
-                        <Clock className="w-5 h-5 text-gold/40" />
-                        <span className="text-xs font-bold text-text-dark tracking-widest uppercase">{item.day}</span>
-                      </div>
-                      <span className="text-[10px] font-bold text-gold/60 uppercase tracking-[0.2em]">{item.hours}</span>
-                    </div>
-                  ))}
-                </div>
+                {isLoadingSchedule ? (
+                  <div className="flex justify-center py-12">
+                    <div className="w-8 h-8 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {schedule.map((item) => {
+                      const dayName = DAY_NAMES[item.day_of_week];
+                      return (
+                        <div 
+                          key={item.day_of_week} 
+                          className={cn(
+                            "flex flex-col md:flex-row md:items-center justify-between p-6 bg-cream/30 border rounded-2xl transition-all duration-500 gap-4",
+                            item.is_active ? "border-gold/20 bg-white" : "border-text-dark/5 opacity-60"
+                          )}
+                        >
+                          <div className="flex items-center gap-4 min-w-[150px]">
+                            {/* Switch */}
+                            <div 
+                              onClick={() => handleToggleDay(item.day_of_week)}
+                              className={cn(
+                                "w-12 h-6 rounded-full p-1 cursor-pointer transition-all duration-300 relative",
+                                item.is_active ? "bg-gold" : "bg-text-dark/10"
+                              )}
+                            >
+                              <div className={cn(
+                                "w-4 h-4 rounded-full bg-white transition-all duration-300 shadow-sm",
+                                item.is_active ? "translate-x-6" : "translate-x-0"
+                              )} />
+                            </div>
+                            <span className="text-[11px] font-bold text-text-dark tracking-widest uppercase">{dayName}</span>
+                          </div>
+
+                          {item.is_active ? (
+                            <div className="flex flex-wrap items-center gap-6">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/30">Start</span>
+                                <input 
+                                  type="time" 
+                                  value={item.start_time}
+                                  onChange={(e) => handleFieldChange(item.day_of_week, 'start_time', e.target.value)}
+                                  className="bg-cream/20 border border-text-dark/5 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-gold/30 text-text-dark"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/30">End</span>
+                                <input 
+                                  type="time" 
+                                  value={item.end_time}
+                                  onChange={(e) => handleFieldChange(item.day_of_week, 'end_time', e.target.value)}
+                                  className="bg-cream/20 border border-text-dark/5 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-gold/30 text-text-dark"
+                                />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/30">Buffer</span>
+                                <select 
+                                  value={item.buffer_minutes}
+                                  onChange={(e) => handleFieldChange(item.day_of_week, 'buffer_minutes', e.target.value)}
+                                  className="bg-cream/20 border border-text-dark/5 px-3 py-2 rounded-lg text-xs focus:outline-none focus:border-gold/30 text-text-dark"
+                                >
+                                  <option value="0">0m Buffer</option>
+                                  <option value="15">15m Buffer</option>
+                                  <option value="30">30m Buffer</option>
+                                  <option value="45">45m Buffer</option>
+                                  <option value="60">60m Buffer</option>
+                                </select>
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-bold text-text-dark/20 uppercase tracking-[0.2em]">Sanctuary Closed</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="p-8 bg-gold/5 border border-gold/10 rounded-[2.5rem] flex items-center gap-6">
-                  <div className="p-4 bg-white rounded-2xl">
+                  <div className="p-4 bg-white rounded-2xl shadow-sm">
                     <Clock className="w-5 h-5 text-gold" />
                   </div>
                   <div>
                     <p className="text-[11px] font-bold text-text-dark uppercase tracking-widest">Dynamic Time Generation</p>
-                    <p className="text-[9px] text-text-dark/40 uppercase tracking-[0.2em] mt-1">Slots are generated in 30-minute intervals based on selected ritual duration.</p>
+                    <p className="text-[9px] text-text-dark/40 uppercase tracking-[0.2em] mt-1 leading-relaxed">
+                      Slots are generated in 30-minute intervals based on selected ritual duration.
+                    </p>
                   </div>
                 </div>
               </div>

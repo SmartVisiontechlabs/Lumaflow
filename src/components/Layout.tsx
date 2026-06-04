@@ -18,11 +18,28 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
     navigate('/');
   };
 
+  const navLinks = isAuthenticated
+    ? [
+        { name: 'Home', path: '/' },
+        { name: 'Classes', path: '/classes' },
+        { name: 'Pricing', path: '/pricing' },
+        { name: 'My Sanctuary', path: '/client/dashboard' },
+        { name: 'Rituals', path: '/client/bookings' },
+        { name: 'Membership', path: '/client/membership' },
+      ]
+    : [
+        { name: 'Home', path: '/' },
+        { name: 'About', path: '/about' },
+        { name: 'Classes', path: '/classes' },
+        { name: 'Pricing', path: '/pricing' },
+        { name: 'Contact', path: '/contact' },
+        { name: 'Book Ritual', path: '/book' },
+      ];
+
   const menuItems = [
     { name: 'Dashboard', path: '/client/dashboard', icon: LayoutDashboard },
-    { name: 'Upcoming Session', path: '/client/dashboard', icon: Clock },
+    { name: 'My Sessions', path: '/client/bookings', icon: Calendar },
     { name: 'Membership', path: '/client/membership', icon: Sparkles },
-    { name: 'Booking History', path: '/client/bookings', icon: Calendar },
     { name: 'Profile', path: '/client/profile', icon: User },
   ];
 
@@ -44,23 +61,20 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
         <div className="flex items-center w-[200px] h-[64px]">
           <Link to="/" className="flex items-center h-full w-full">
             <img
-              src="/gold-logo.png"
+               src="/gold-logo.png"
               alt="Lumaflow"
               className="h-full w-auto object-contain drop-shadow-[0_0_8px_rgba(203,174,115,0.6)] brightness-110"
             />
           </Link>
         </div>
 
-        <div className="hidden md:flex items-center gap-12 text-[11px] font-bold uppercase tracking-[0.3em] text-white/80">
-          {['Home', 'About', 'Classes', 'Pricing', 'Contact'].map(link => {
-            let path = link === 'Home' ? '/' : `/${link.toLowerCase()}`;
-            return (
-              <Link key={link} to={path} className="relative group py-2 hover:text-[#CBAE73] transition-colors duration-500">
-                {link}
-                <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-[#CBAE73] transition-all duration-500 group-hover:w-full" />
-              </Link>
-            );
-          })}
+        <div className="hidden md:flex items-center gap-10 text-[11px] font-bold uppercase tracking-[0.3em] text-white/80">
+          {navLinks.map(link => (
+            <Link key={link.name} to={link.path} className="relative group py-2 hover:text-[#CBAE73] transition-colors duration-500">
+              {link.name}
+              <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-[#CBAE73] transition-all duration-500 group-hover:w-full" />
+            </Link>
+          ))}
         </div>
 
         <div className="flex items-center justify-end relative">
@@ -71,10 +85,16 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
                   e.stopPropagation();
                   setIsOpen(!isOpen);
                 }}
-                className="bg-[#CBAE73] text-black px-6 py-2.5 rounded-full text-[10px] font-bold tracking-[0.25em] uppercase transition-all duration-500 shadow-[0_6px_20px_rgba(203,174,115,0.3)] hover:scale-102 flex items-center gap-3 cursor-pointer select-none"
+                className="flex items-center gap-3 group focus:outline-none cursor-pointer select-none"
               >
-                <span>My Sanctuary</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-500 ${isOpen ? 'rotate-180' : ''}`} />
+                {/* Gold glowing initials avatar */}
+                <div className="w-10 h-10 rounded-full bg-[#CBAE73]/10 border border-[#CBAE73]/30 hover:border-[#CBAE73] flex items-center justify-center text-[11px] font-bold text-[#CBAE73] tracking-widest transition-all duration-500 shadow-[0_0_15px_rgba(203,174,115,0.15)] group-hover:shadow-[0_0_20px_rgba(203,174,115,0.3)] group-hover:scale-105">
+                  {initials}
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 group-hover:text-[#CBAE73] transition-colors duration-500 hidden sm:inline-block">
+                  {profile?.full_name?.split(' ')[0] || 'Sanctuary'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 text-white/40 group-hover:text-[#CBAE73] transition-all duration-500 ${isOpen ? 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
@@ -94,7 +114,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
                       </div>
                       <div className="space-y-0.5 truncate">
                         <p className="text-xs font-bold text-white/90 truncate">{profile?.full_name || 'Client Sanctuary'}</p>
-                        <p className="text-[8px] font-bold uppercase tracking-widest text-[#CBAE73]/60 truncate">Client Member</p>
+                        <p className="text-[8px] font-bold uppercase tracking-widest text-[#CBAE73]/60 truncate">Sanctuary seeker</p>
                       </div>
                     </div>
 
@@ -112,25 +132,13 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
                         </Link>
                       ))}
 
-                      {/* Custom book ritual link inside dropdown */}
-                      <button
-                        onClick={() => {
-                          setIsOpen(false);
-                          openBooking();
-                        }}
-                        className="w-full text-left flex items-center gap-4 px-6 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/60 hover:bg-white/5 hover:text-[#CBAE73] transition-all duration-500 cursor-pointer"
-                      >
-                        <Compass className="w-4 h-4 text-[#CBAE73]/40" />
-                        Book Ritual
-                      </button>
-
                       {/* Logout */}
                       <button
                         onClick={handleLogout}
                         className="w-full text-left flex items-center gap-4 px-6 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 hover:bg-red-500/5 hover:text-red-400 border-t border-white/5 mt-2 pt-4 transition-all duration-500 cursor-pointer"
                       >
                         <LogOut className="w-4 h-4 text-white/10" />
-                        Sign Out
+                        Logout
                       </button>
                     </div>
                   </motion.div>
