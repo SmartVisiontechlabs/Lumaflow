@@ -4,13 +4,19 @@ import { useBookingStore } from '../store/bookingStore';
 
 import { useAuth } from '../providers/AuthProvider';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, LogOut, LayoutDashboard, Calendar, Sparkles, User, Compass, Clock } from 'lucide-react';
+import { ChevronDown, LogOut, LayoutDashboard, Calendar, Sparkles, User, Compass, Clock, Menu, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
   const { isAuthenticated, profile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
 
   const handleLogout = async () => {
     setIsOpen(false);
@@ -77,7 +83,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
           ))}
         </div>
 
-        <div className="flex items-center justify-end relative">
+        <div className="flex items-center justify-end relative gap-4">
           {isAuthenticated ? (
             <div className="relative">
               <button
@@ -153,8 +159,41 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
               Book Ritual
             </button>
           )}
+
+          {/* Mobile Hamburger Toggle */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden flex items-center justify-center p-2 text-white/80 hover:text-[#CBAE73] focus:outline-none transition-colors duration-300"
+            aria-label="Toggle mobile menu"
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
       </div>
+
+      {/* Sliding Mobile Drawer Menu */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            className="md:hidden absolute top-[88px] left-0 w-full bg-[#1A1A1A]/95 border-b border-[#CBAE73]/20 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[999] flex flex-col px-8 py-6 gap-4"
+          >
+            {navLinks.map((link) => (
+              <Link
+                key={link.name}
+                to={link.path}
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-[11px] font-bold uppercase tracking-[0.3em] text-white/80 hover:text-[#CBAE73] transition-colors duration-500 py-3 border-b border-white/5 last:border-0"
+              >
+                {link.name}
+              </Link>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </nav>
   );
 });

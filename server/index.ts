@@ -15,6 +15,7 @@ import cmsRoutes from './routes/cmsRoutes';
 import zoomRoutes from './routes/zoom';
 import adminRoutes from './routes/adminRoutes';
 import { reminderScheduler } from './services/reminderScheduler';
+import { availabilityService } from './services/availabilityService';
 
 const app = express();
 
@@ -59,8 +60,16 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req: any, res, buf) => {
+    if (req.originalUrl.startsWith('/api/payments/webhook')) {
+      req.rawBody = buf;
+    }
+  }
+}));
 app.use('/uploads', express.static(path.join(process.cwd(), 'public', 'uploads')));
+
 
 // API Routes
 app.use('/api/bookings', bookingRoutes);
@@ -83,6 +92,23 @@ setInterval(() => {
 
 // Run immediately on startup
 reminderScheduler.checkAndSendReminders();
+
+// Prune past blocked slots every 24 hours
+const PRUNE_INTERVAL = 24 * 60 * 60 * 1000;
+
+setInterval(() => {
+  availabilityService.prunePastBlockedSlots().catch(err => {
+    console.error('Pruning Error:', err);
+  });
+}, PRUNE_INTERVAL);
+
+// Run immediately on startup
+availabilityService.prunePastBlockedSlots().catch(err => {
+  console.error('Startup Pruning Error:', err);
+});
+availabilityService.seedAvailabilitySettings().catch(err => {
+  console.error('Startup Seeding Error:', err);
+});
 
 app.listen(PORT, () => {
   console.log(`

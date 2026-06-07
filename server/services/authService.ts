@@ -5,7 +5,7 @@ export const authService = {
    * Checks if user has an account. If not, auto-creates their authentication user
    * and inserts their profile record.
    */
-  async provisionUserAccount(email: string, fullName: string): Promise<{ userId: string | null; isNew: boolean; actionLink?: string }> {
+  async provisionUserAccount(email: string, fullName: string): Promise<{ userId: string | null; isNew: boolean }> {
     try {
       console.log(`[authService] Checking account status for: ${email}`);
 
@@ -20,37 +20,11 @@ export const authService = {
 
       if (userId) {
         console.log(`[authService] Existing user profile found with ID: ${userId}`);
-        
-        // Generate secure silent reauthentication link using Supabase Admin
-        let actionLink: string | undefined;
-        if (supabaseAdmin) {
-          try {
-            const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/dashboard`;
-            console.log(`[authService] Generating silent reauth link for existing user: ${email}`);
-            const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-              type: 'magiclink',
-              email,
-              options: {
-                redirectTo
-              }
-            });
-            if (linkErr) {
-              console.error('[authService] Error generating silent reauth link:', linkErr);
-            } else if (linkData?.properties?.action_link) {
-              actionLink = linkData.properties.action_link;
-              console.log('[authService] Silent reauth link generated successfully');
-            }
-          } catch (e) {
-            console.error('[authService] Exception generating silent reauth link:', e);
-          }
-        }
-        
-        return { userId, isNew: false, actionLink };
+        return { userId, isNew: false };
       }
 
       const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/dashboard`;
       let newUserId: string | null = null;
-      let actionLink: string | undefined;
 
       if (supabaseAdmin) {
         console.log(`[authService] Programmatically creating user and profile for: ${email}`);
@@ -66,26 +40,23 @@ export const authService = {
           console.error('[authService] Error programmatically creating user:', createError);
         } else if (userData?.user) {
           newUserId = userData.user.id;
-          console.log(`[authService] Programmatically created user successfully. ID: ${newUserId}`);
+          console.log(`[NEW USER CREATED] Programmatically created user successfully. ID: ${newUserId}`);
 
-          // Programmatically generate reauth action link for this new user so they can auto login
+          // Trigger a native Supabase magic link email to the new user so they can access their dashboard
           try {
-            console.log(`[authService] Generating silent auto-login action link for new user: ${email}`);
-            const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-              type: 'magiclink',
+            console.log(`[authService] Dispatching native magic link login email to new user: ${email}`);
+            const { error: otpError } = await supabase.auth.signInWithOtp({
               email,
               options: {
-                redirectTo
+                shouldCreateUser: false, // already created
+                emailRedirectTo: redirectTo
               }
             });
-            if (linkErr) {
-              console.error('[authService] Error generating action link for new user:', linkErr);
-            } else if (linkData?.properties?.action_link) {
-              actionLink = linkData.properties.action_link;
-              console.log('[authService] Auto-login action link generated successfully for new user');
+            if (otpError) {
+              console.error('[authService] Error dispatching native magic link:', otpError);
             }
           } catch (e) {
-            console.error('[authService] Exception generating action link for new user:', e);
+            console.error('[authService] Exception dispatching native magic link:', e);
           }
         }
       }
@@ -102,7 +73,7 @@ export const authService = {
         });
 
         if (otpError) {
-          console.error('[authService] Error triggering OTP during provisioning:', otpError);
+          console.error('[authService] Error triggering OTP during provisioning fallback:', otpError);
         }
 
         // Poll RPC to wait for trigger on_auth_user_created to run and create profiles
@@ -113,7 +84,7 @@ export const authService = {
           });
           if (polledId) {
             newUserId = polledId;
-            console.log(`[authService] Profile successfully detected! ID: ${newUserId}`);
+            console.log(`[NEW USER CREATED] Profile successfully detected! ID: ${newUserId}`);
             break;
           }
           await new Promise((resolve) => setTimeout(resolve, 500));
@@ -124,10 +95,42 @@ export const authService = {
         }
       }
 
-      return { userId: newUserId, isNew: true, actionLink };
+      return { userId: newUserId, isNew: true };
     } catch (err) {
       console.error('[authService] Unexpected error in provisionUserAccount:', err);
       return { userId: null, isNew: false };
+    }
+  },
+
+  /**
+   * Generates a passwordless magic login link programmatically via Admin API (without email delivery)
+   */
+  async generateAutoLoginLink(email: string, redirectTo: string): Promise<string | null> {
+    if (!supabaseAdmin) {
+      console.warn('[authService] supabaseAdmin is not available. Cannot generate auto login link.');
+      return null;
+    }
+    try {
+      console.log(`[authService] Programmatically generating auto-login action link for: ${email}`);
+      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+        options: {
+          redirectTo
+        }
+      });
+
+      if (error) {
+        console.error('[authService] Error generating action link:', error);
+        return null;
+      }
+
+      const actionLink = data.properties?.action_link;
+      console.log('[authService] Auto-login action link generated successfully.');
+      return actionLink || null;
+    } catch (err) {
+      console.error('[authService] Unexpected error generating action link:', err);
+      return null;
     }
   },
 
@@ -160,4 +163,3 @@ export const authService = {
     }
   }
 };
-

@@ -14,8 +14,8 @@ const ResumeStep = () => {
 
   const handleResume = () => {
     setShowResumePrompt(false);
-    goToStep(5);
   };
+
 
   const handleStartFresh = () => {
     resetBooking();

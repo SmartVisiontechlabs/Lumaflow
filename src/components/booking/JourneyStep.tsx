@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useBookingFlow } from '../../hooks/useBookingFlow';
 import { cn } from '../../lib/utils';
 import StepHeading from './shared/StepHeading';
+import { useCmsStore } from '../../store/cmsStore';
 
 interface JourneyOption {
   id: string;
@@ -31,6 +32,22 @@ const journeys: JourneyOption[] = [
 const JourneyStep = () => {
   const { journeyType, setJourneyType, nextStep } = useBookingFlow();
   const [hasSelected, setHasSelected] = useState(false);
+  const offerings = useCmsStore(state => state.offerings);
+  const fetchCMS = useCmsStore(state => state.fetchCMS);
+
+  useEffect(() => {
+    fetchCMS();
+  }, [fetchCMS]);
+
+  const activeOfferings = offerings.filter(o => o.is_active !== false);
+
+  const displayJourneys: JourneyOption[] = activeOfferings.length > 0
+    ? activeOfferings.map(o => ({
+        id: o.title || '',
+        title: o.title || '',
+        description: o.description || o.benefit || ''
+      }))
+    : journeys;
 
   const handleSelect = (id: string) => {
     if (hasSelected) return;
@@ -56,7 +73,7 @@ const JourneyStep = () => {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {journeys.map((journey, index) => (
+        {displayJourneys.map((journey, index) => (
           <motion.button
             key={journey.id}
             initial={{ opacity: 0, y: 15 }}
@@ -118,9 +135,10 @@ const JourneyStep = () => {
             className="text-center mt-16"
           >
             <span className="font-display italic text-gold text-sm tracking-widest block">
-              {journeyType === 'Breathwork' && '“A pathway for release has been chosen.”'}
-              {journeyType === 'Somatic Flow' && '“A pathway for embodiment has been chosen.”'}
-              {journeyType === 'Deep Meditation' && '“A pathway for stillness has been chosen.”'}
+              {journeyType === 'Breathwork' ? '“A pathway for release has been chosen.”' :
+               journeyType === 'Somatic Flow' ? '“A pathway for embodiment has been chosen.”' :
+               journeyType === 'Deep Meditation' ? '“A pathway for stillness has been chosen.”' :
+               `“A pathway for ${journeyType.toLowerCase()} has been chosen.”`}
             </span>
           </motion.div>
         )}
@@ -130,3 +148,4 @@ const JourneyStep = () => {
 };
 
 export default memo(JourneyStep);
+

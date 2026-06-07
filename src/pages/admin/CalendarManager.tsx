@@ -139,8 +139,8 @@ const CalendarManager = () => {
   };
 
   return (
-    <div className="space-y-12 h-full flex flex-col">
-      <div className="flex justify-between items-end px-4 relative z-10">
+    <div className="space-y-6 lg:space-y-12 min-h-full lg:h-full flex flex-col">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 px-4 relative z-10">
         <div className="space-y-1">
           <h3 className="text-2xl font-display text-text-dark tracking-tight">Chronological Availability</h3>
           <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Managing Sanctuary Stillness</p>
@@ -156,16 +156,16 @@ const CalendarManager = () => {
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-12 min-h-0">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-12 min-h-0">
         {/* Calendar Grid */}
-        <div className="lg:col-span-2 bg-white/40 backdrop-blur-xl border border-text-dark/5 rounded-[3rem] p-12 shadow-luxury flex flex-col">
-          <div className="grid grid-cols-7 mb-8 text-center">
+        <div className="lg:col-span-2 bg-white/40 backdrop-blur-xl border border-text-dark/5 rounded-[2rem] sm:rounded-[3rem] p-4 sm:p-12 shadow-luxury flex flex-col">
+          <div className="grid grid-cols-7 mb-6 text-center">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <span key={day} className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/20">{day}</span>
+              <span key={day} className="text-[9px] font-bold uppercase tracking-wider sm:tracking-[0.4em] text-text-dark/20">{day}</span>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-4 flex-1">
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-4 flex-1">
             {calendarDays.map((day, i) => {
               const blocked = getBlockedForDate(day);
               const isSelected = selectedDate && isSameDay(day, selectedDate);
@@ -180,7 +180,7 @@ const CalendarManager = () => {
                   onClick={() => !isDisabled && setSelectedDate(day)}
                   disabled={isDisabled}
                   className={cn(
-                    "aspect-square rounded-2xl p-4 flex flex-col items-center justify-center relative transition-all duration-500 group border",
+                    "aspect-square rounded-xl sm:rounded-2xl p-1 sm:p-4 flex flex-col items-center justify-center relative transition-all duration-500 group border",
                     isSelected ? "bg-text-dark border-text-dark text-white shadow-luxury z-10" :
                     blocked ? "bg-red-50/50 border-red-100 text-red-400" :
                     isToday(day) ? "bg-gold/5 border-gold/20 text-gold" :
@@ -188,16 +188,16 @@ const CalendarManager = () => {
                     "bg-white/40 border-text-dark/5 text-text-dark/60 hover:bg-white hover:border-gold/30"
                   )}
                 >
-                  <span className="text-sm font-bold tracking-tight">{format(day, 'd')}</span>
+                  <span className="text-xs sm:text-sm font-bold tracking-tight">{format(day, 'd')}</span>
                   
                   {blocked && (
-                    <div className="absolute top-3 right-3">
-                      <Lock className="w-2.5 h-2.5 opacity-40" />
+                    <div className="absolute top-1 right-1 sm:top-3 sm:right-3">
+                      <Lock className="w-2 h-2 sm:w-2.5 sm:h-2.5 opacity-40" />
                     </div>
                   )}
 
                   {!isDisabled && !blocked && !isSelected && (
-                    <div className="mt-2 w-1 h-1 bg-gold/20 rounded-full group-hover:bg-gold transition-all duration-500" />
+                    <div className="mt-1 sm:mt-2 w-1 h-1 bg-gold/20 rounded-full group-hover:bg-gold transition-all duration-500" />
                   )}
                 </motion.button>
               );

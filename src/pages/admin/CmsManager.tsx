@@ -520,23 +520,94 @@ export default function CmsManager() {
     try {
       const dbPayload = {
         title: editingPath.title,
-        description: editingPath.benefit,
-        duration: editingPath.duration_minutes,
-        price: editingPath.price,
-        is_active: editingPath.is_active
+        description: editingPath.benefit || '',
+        duration: editingPath.duration_minutes || 60,
+        price: editingPath.price || 0,
+        is_active: editingPath.is_active !== false,
+        is_featured: editingPath.is_featured === true,
+        sort_order: editingPath.sort_order || 0,
+        image_url: editingPath.image_url || '/breathwork.jpg'
       };
 
-      await cmsService.updateHealingPath(editingPath.id, dbPayload as any);
-      await useCmsStore.getState().refetchCMS();
-      showToast('Offering changes synchronized.', 'success');
+      if (editingPath.id) {
+        // Update existing path
+        await cmsService.updateHealingPath(editingPath.id, dbPayload as any);
+        showToast('Offering changes synchronized.', 'success');
+      } else {
+        // Create new path
+        await cmsService.createHealingPath(dbPayload as any);
+        showToast('New offering created successfully.', 'success');
+      }
       
-      const newPaths = paths.map(p => p.id === editingPath.id ? editingPath : p);
-      setPaths(newPaths);
-      setPristineState(prev => ({ ...prev, paths: JSON.parse(JSON.stringify(newPaths)) }));
+      await useCmsStore.getState().refetchCMS();
+      const freshOfferings = useCmsStore.getState().offerings;
+      const mappedPaths = freshOfferings.map(p => ({
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        description: p.description,
+        duration: p.duration,
+        price: p.price,
+        image_url: p.image_url,
+        is_featured: p.is_featured,
+        is_active: p.is_active,
+        sort_order: p.sort_order,
+
+        // Mapped client properties
+        benefit: p.description,
+        duration_minutes: p.duration,
+        cta_text: p.cta_text,
+        display_order: p.display_order,
+        created_at: p.created_at
+      }));
+      setPaths(mappedPaths);
+      setPristineState(prev => ({ ...prev, paths: JSON.parse(JSON.stringify(mappedPaths)) }));
       setEditingPath(null);
     } catch (e) {
       console.error(e);
-      showToast('Failed to update offering details.', 'error');
+      showToast(editingPath.id ? 'Failed to update offering details.' : 'Failed to create new offering.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete healing path / offering
+  const handleDeletePath = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this offering? This will also remove it from the home page and booking gateways.')) return;
+    setIsSaving(true);
+    try {
+      await cmsService.deleteHealingPath(id);
+      showToast('Offering deleted successfully.', 'success');
+      await useCmsStore.getState().refetchCMS();
+      
+      const freshOfferings = useCmsStore.getState().offerings;
+      const mappedPaths = freshOfferings.map(p => ({
+        id: p.id,
+        slug: p.slug,
+        title: p.title,
+        description: p.description,
+        duration: p.duration,
+        price: p.price,
+        image_url: p.image_url,
+        is_featured: p.is_featured,
+        is_active: p.is_active,
+        sort_order: p.sort_order,
+
+        // Mapped client properties
+        benefit: p.description,
+        duration_minutes: p.duration,
+        cta_text: p.cta_text,
+        display_order: p.display_order,
+        created_at: p.created_at
+      }));
+      setPaths(mappedPaths);
+      setPristineState(prev => ({ ...prev, paths: JSON.parse(JSON.stringify(mappedPaths)) }));
+      if (editingPath?.id === id) {
+        setEditingPath(null);
+      }
+    } catch (e) {
+      console.error(e);
+      showToast('Failed to delete offering.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -580,32 +651,76 @@ export default function CmsManager() {
     try {
       const payload: any = {
         name: editingPackage.name,
-        description: editingPackage.description,
+        description: editingPackage.description || '',
         price: Number(editingPackage.price) || 0,
         total_credits: Number(editingPackage.total_credits) || 0,
-        is_featured: editingPackage.is_featured || false,
-        is_active: editingPackage.is_active || false
+        is_featured: editingPackage.is_featured === true,
+        is_active: editingPackage.is_active !== false,
+        validity_months: Number(editingPackage.validity_months) || 1
       };
 
-      // Conditionally add validity_months if editingPackage contains it
-      if (editingPackage.validity_months !== undefined) {
-        payload.validity_months = Number(editingPackage.validity_months) || 1;
+      if (editingPackage.id) {
+        // Update existing package
+        const { error } = await supabase
+          .from('packages')
+          .update(payload)
+          .eq('id', editingPackage.id);
+
+        if (error) throw error;
+        showToast('Package details updated successfully.', 'success');
+      } else {
+        // Insert new package
+        const slug = editingPackage.slug || editingPackage.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+        const { error } = await supabase
+          .from('packages')
+          .insert({
+            ...payload,
+            slug
+          });
+
+        if (error) throw error;
+        showToast('New package created successfully.', 'success');
       }
 
-      const { error } = await supabase
+      // Reload packages list from database
+      const { data } = await supabase
         .from('packages')
-        .update(payload)
-        .eq('id', editingPackage.id);
-
-      if (error) throw error;
-      showToast('Package details updated successfully.', 'success');
-
-      const newPkgs = packages.map(p => p.id === editingPackage.id ? editingPackage : p);
-      setPackages(newPkgs);
+        .select('*')
+        .order('created_at', { ascending: true });
+      setPackages(data || []);
       setEditingPackage(null);
     } catch (e: any) {
       console.error(e);
-      showToast(e.message || 'Failed to save package updates.', 'error');
+      showToast(e.message || 'Failed to save package.', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Delete package
+  const handleDeletePackage = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this package? This will affect new client purchases.')) return;
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('packages')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      showToast('Package deleted successfully.', 'success');
+      
+      const { data } = await supabase
+        .from('packages')
+        .select('*')
+        .order('created_at', { ascending: true });
+      setPackages(data || []);
+      if (editingPackage?.id === id) {
+        setEditingPackage(null);
+      }
+    } catch (e: any) {
+      console.error(e);
+      showToast(e.message || 'Failed to delete package.', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -1316,16 +1431,38 @@ export default function CmsManager() {
 
         {/* TAB 5: HEALING PATHS / OFFERINGS */}
         {activeTab === 'paths' && (
-          <div className="space-y-10">
-            <div>
-              <h4 className="text-2xl font-display text-text-dark tracking-tight">Sanctuary Offerings</h4>
-              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Edit Core paths (Breathwork, Somatic Flow, Meditation)</p>
+          <div className="space-y-10 animate-fadeIn">
+            <div className="flex justify-between items-end">
+              <div>
+                <h4 className="text-2xl font-display text-text-dark tracking-tight">Sanctuary Offerings</h4>
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Manage Core Somatic Healing Paths</p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingPath({
+                    title: '',
+                    benefit: '',
+                    duration_minutes: 60,
+                    price: 150,
+                    is_active: true,
+                    is_featured: false,
+                    image_url: '/breathwork.jpg',
+                    sort_order: paths.length + 1
+                  } as any);
+                }}
+                className="flex items-center gap-2 px-6 py-3 bg-text-dark hover:bg-gold text-white text-[9px] font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+              >
+                <Plus className="w-3 h-3 text-gold" />
+                Add Offering
+              </button>
             </div>
 
             {editingPath ? (
               <div className="bg-cream/40 border border-text-dark/5 p-8 rounded-3xl space-y-6">
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">Modifying: {editingPath.title}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">
+                    {editingPath.id ? `Modifying: ${editingPath.title}` : 'Add New Sanctuary Offering'}
+                  </span>
                   <button 
                     onClick={() => setEditingPath(null)} 
                     className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/40 hover:text-text-dark cursor-pointer"
@@ -1339,7 +1476,7 @@ export default function CmsManager() {
                     <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Offering Title</label>
                     <input
                       type="text"
-                      value={editingPath.title}
+                      value={editingPath.title || ''}
                       onChange={e => setEditingPath(prev => ({ ...prev!, title: e.target.value }))}
                       className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
                     />
@@ -1349,7 +1486,7 @@ export default function CmsManager() {
                     <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Short Benefit description</label>
                     <input
                       type="text"
-                      value={editingPath.benefit}
+                      value={editingPath.benefit || ''}
                       onChange={e => setEditingPath(prev => ({ ...prev!, benefit: e.target.value }))}
                       className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
                     />
@@ -1359,7 +1496,7 @@ export default function CmsManager() {
                     <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Base Duration (Minutes)</label>
                     <input
                       type="number"
-                      value={editingPath.duration_minutes}
+                      value={editingPath.duration_minutes || 60}
                       onChange={e => setEditingPath(prev => ({ ...prev!, duration_minutes: parseInt(e.target.value) || 60 }))}
                       className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
                     />
@@ -1369,10 +1506,62 @@ export default function CmsManager() {
                     <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Standard Price ($)</label>
                     <input
                       type="number"
-                      value={editingPath.price}
+                      value={editingPath.price || 0}
                       onChange={e => setEditingPath(prev => ({ ...prev!, price: parseFloat(e.target.value) || 0 }))}
                       className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
                     />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Sort Order</label>
+                    <input
+                      type="number"
+                      value={editingPath.sort_order || 0}
+                      onChange={e => setEditingPath(prev => ({ ...prev!, sort_order: parseInt(e.target.value) || 0 }))}
+                      className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/40">Image Path / URL</label>
+                    <input
+                      type="text"
+                      value={editingPath.image_url || '/breathwork.jpg'}
+                      onChange={e => setEditingPath(prev => ({ ...prev!, image_url: e.target.value }))}
+                      className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-white border border-text-dark/5 rounded-2xl">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/40">Featured Offering</span>
+                      <p className="text-[8px] text-text-dark/20 uppercase tracking-wider">Highlight on frontend</p>
+                    </div>
+                    <div 
+                      onClick={() => setEditingPath(prev => ({ ...prev!, is_featured: !prev?.is_featured }))}
+                      className="w-10 h-6 bg-text-dark/5 rounded-full p-1 cursor-pointer"
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded-full transition-all duration-300",
+                        editingPath.is_featured ? "bg-gold translate-x-4" : "bg-text-dark/15"
+                      )} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-white border border-text-dark/5 rounded-2xl">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/40">Active Status</span>
+                      <p className="text-[8px] text-text-dark/20 uppercase tracking-wider">Show in client flows</p>
+                    </div>
+                    <div 
+                      onClick={() => setEditingPath(prev => ({ ...prev!, is_active: prev?.is_active !== false ? false : true }))}
+                      className="w-10 h-6 bg-text-dark/5 rounded-full p-1 cursor-pointer"
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded-full transition-all duration-300",
+                        editingPath.is_active !== false ? "bg-gold translate-x-4" : "bg-text-dark/15"
+                      )} />
+                    </div>
                   </div>
                 </div>
 
@@ -1396,17 +1585,42 @@ export default function CmsManager() {
                       <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold">{path.duration_minutes} Min Journey</span>
                       <span className="text-sm font-bold text-text-dark">${path.price}</span>
                     </div>
-                    <h5 className="font-display text-2xl text-text-dark">{path.title}</h5>
+                    <h5 className="font-display text-2xl text-text-dark flex items-center gap-2">
+                      {path.title}
+                      {path.is_featured && <span className="text-[8px] bg-gold/10 text-gold px-2 py-0.5 rounded-full uppercase tracking-wider">Featured</span>}
+                      {!path.is_active && <span className="text-[8px] bg-red-100 text-red-500 px-2 py-0.5 rounded-full uppercase tracking-wider">Inactive</span>}
+                    </h5>
                     <p className="text-xs text-text-dark/60 leading-relaxed font-light">{path.benefit}</p>
                   </div>
 
-                  <button
-                    onClick={() => setEditingPath(path)}
-                    className="mt-8 flex items-center justify-center gap-2 w-full py-3.5 bg-cream hover:bg-gold/15 text-[10px] text-text-dark font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer"
-                  >
-                    <Edit className="w-3 h-3 text-gold" />
-                    Edit Offering
-                  </button>
+                  <div className="mt-8 flex gap-3">
+                    <button
+                      onClick={() => {
+                        setEditingPath({
+                          id: path.id,
+                          title: path.title || '',
+                          benefit: path.benefit || '',
+                          duration_minutes: path.duration_minutes || 60,
+                          price: path.price || 0,
+                          sort_order: path.display_order !== undefined ? path.display_order : (path as any).sort_order || 0,
+                          image_url: (path as any).image_url || '/breathwork.jpg',
+                          is_active: path.is_active !== false,
+                          is_featured: (path as any).is_featured === true
+                        });
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="flex-grow flex items-center justify-center gap-2 py-3.5 bg-cream hover:bg-gold/15 text-[10px] text-text-dark font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+                    >
+                      <Edit className="w-3 h-3 text-gold" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeletePath(path.id)}
+                      className="flex items-center justify-center gap-2 px-4 py-3.5 bg-red-50 hover:bg-red-100 text-[10px] text-red-500 hover:text-red-700 font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer border border-red-100"
+                    >
+                      <Trash className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1882,15 +2096,37 @@ export default function CmsManager() {
         {/* TAB 9: PACKAGES CMS */}
         {activeTab === 'packages' && (
           <div className="space-y-8 animate-fadeIn">
-            <div>
-              <h4 className="text-2xl font-display text-text-dark tracking-tight">Packages & Validity Settings</h4>
-              <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Modify package names, pricing, credits, and subscription validity durations.</p>
+            <div className="flex justify-between items-end">
+              <div>
+                <h4 className="text-2xl font-display text-text-dark tracking-tight">Packages & Validity Settings</h4>
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">Modify package names, pricing, credits, and subscription validity durations.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingPackage({
+                    name: '',
+                    slug: '',
+                    price: 99,
+                    total_credits: 3,
+                    validity_months: 3,
+                    description: '',
+                    is_active: true,
+                    is_featured: false
+                  });
+                }}
+                className="flex items-center gap-2 px-6 py-3 bg-text-dark hover:bg-gold text-white text-[9px] font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+              >
+                <Plus className="w-3 h-3 text-gold" />
+                Add Package
+              </button>
             </div>
 
             {editingPackage ? (
               <div className="bg-cream/40 border border-text-dark/5 p-8 rounded-3xl space-y-6 text-left">
                 <div className="flex justify-between items-center">
-                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">Modifying Package: {editingPackage.name}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">
+                    {editingPackage.id ? `Modifying Package: ${editingPackage.name}` : 'Add New Package'}
+                  </span>
                   <button 
                     onClick={() => setEditingPackage(null)} 
                     className="text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/40 hover:text-text-dark cursor-pointer"
@@ -1948,6 +2184,38 @@ export default function CmsManager() {
                       className="w-full bg-white border border-text-dark/5 py-4 px-6 rounded-2xl text-xs focus:outline-none min-h-[80px]"
                     />
                   </div>
+
+                  <div className="flex items-center justify-between p-4 bg-white border border-text-dark/5 rounded-2xl">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/40">Featured Package</span>
+                      <p className="text-[8px] text-text-dark/20 uppercase tracking-wider">Highlight on Investment page</p>
+                    </div>
+                    <div 
+                      onClick={() => setEditingPackage(prev => ({ ...prev!, is_featured: !prev?.is_featured }))}
+                      className="w-10 h-6 bg-text-dark/5 rounded-full p-1 cursor-pointer"
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded-full transition-all duration-300",
+                        editingPackage.is_featured ? "bg-gold translate-x-4" : "bg-text-dark/15"
+                      )} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-white border border-text-dark/5 rounded-2xl">
+                    <div>
+                      <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/40">Active Status</span>
+                      <p className="text-[8px] text-text-dark/20 uppercase tracking-wider">Show in client flows</p>
+                    </div>
+                    <div 
+                      onClick={() => setEditingPackage(prev => ({ ...prev!, is_active: prev?.is_active !== false ? false : true }))}
+                      className="w-10 h-6 bg-text-dark/5 rounded-full p-1 cursor-pointer"
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded-full transition-all duration-300",
+                        editingPackage.is_active !== false ? "bg-gold translate-x-4" : "bg-text-dark/15"
+                      )} />
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex justify-end pt-4">
@@ -1970,20 +2238,46 @@ export default function CmsManager() {
                       <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold">{pkg.total_credits} Session{pkg.total_credits > 1 ? 's' : ''}</span>
                       <span className="text-sm font-bold text-text-dark">${pkg.price}</span>
                     </div>
-                    <h5 className="font-display text-2xl text-text-dark">{pkg.name}</h5>
+                    <h5 className="font-display text-2xl text-text-dark flex items-center gap-2">
+                      {pkg.name}
+                      {pkg.is_featured && <span className="text-[8px] bg-gold/10 text-gold px-2 py-0.5 rounded-full uppercase tracking-wider">Featured</span>}
+                      {!pkg.is_active && <span className="text-[8px] bg-red-100 text-red-500 px-2 py-0.5 rounded-full uppercase tracking-wider">Inactive</span>}
+                    </h5>
                     <p className="text-xs text-text-dark/60 leading-relaxed font-light">{pkg.description}</p>
                     <div className="pt-2 border-t border-text-dark/5 text-[9px] font-bold uppercase tracking-wider text-text-dark/40">
                       Validity: {pkg.validity_months !== undefined ? pkg.validity_months : 1} Month{(pkg.validity_months !== undefined ? pkg.validity_months : 1) > 1 ? 's' : ''}
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => setEditingPackage(pkg)}
-                    className="mt-8 flex items-center justify-center gap-2 w-full py-3.5 bg-cream hover:bg-gold/15 text-[10px] text-text-dark font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer"
-                  >
-                    <Edit className="w-3 h-3 text-gold" />
-                    Edit Package
-                  </button>
+                  <div className="mt-8 flex gap-3">
+                    <button
+                      onClick={() => {
+                        console.log('Edit package clicked:', pkg);
+                        setEditingPackage({
+                          id: pkg.id,
+                          name: pkg.name || '',
+                          slug: pkg.slug || '',
+                          price: pkg.price || 0,
+                          total_credits: pkg.total_credits || 0,
+                          validity_months: pkg.validity_months !== undefined ? pkg.validity_months : 1,
+                          description: pkg.description || '',
+                          is_active: pkg.is_active !== false,
+                          is_featured: pkg.is_featured === true
+                        });
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="flex-grow flex items-center justify-center gap-2 py-3.5 bg-cream hover:bg-gold/15 text-[10px] text-text-dark font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+                    >
+                      <Edit className="w-3 h-3 text-gold" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeletePackage(pkg.id)}
+                      className="flex items-center justify-center gap-2 px-4 py-3.5 bg-red-50 hover:bg-red-100 text-[10px] text-red-500 hover:text-red-700 font-bold uppercase tracking-widest rounded-xl transition-all cursor-pointer border border-red-100"
+                    >
+                      <Trash className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

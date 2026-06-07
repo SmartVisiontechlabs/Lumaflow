@@ -39,24 +39,38 @@ export default function BookingProgress() {
           const isLocked = currentStep < step.id;
 
           return (
-            <div key={step.id} className="flex flex-col items-center gap-3 relative shrink-0">
+            <div key={step.id} className="flex flex-col items-center gap-1.5 relative shrink-0">
               <button
                 disabled={isLocked}
                 onClick={() => goToStep(step.id)}
                 className={cn(
-                  "relative z-10 text-[9px] font-bold uppercase tracking-[0.3em] transition-all duration-700 focus:outline-none whitespace-nowrap",
+                  "relative z-10 flex flex-col items-center gap-1.5 text-[9px] font-bold uppercase tracking-[0.3em] transition-all duration-700 focus:outline-none whitespace-nowrap",
                   isActive ? "text-gold scale-110" : 
                   isCompleted ? "text-gold/60 hover:text-gold" : 
                   "text-text-dark/25"
                 )}
               >
-                {step.label}
+                {/* Text Label: Hidden on mobile unless active */}
+                <span className={cn(
+                  "transition-all duration-500",
+                  isActive ? "block" : "block max-[375px]:hidden"
+                )}>
+                  {step.label}
+                </span>
+
+                {/* Mobile Step Dot: Only visible on mobile (< 375px) */}
+                <span className={cn(
+                  "w-1.5 h-1.5 rounded-full transition-all duration-500 min-[376px]:hidden",
+                  isActive ? "bg-gold scale-125 shadow-[0_0_8px_rgba(203,174,115,0.6)]" :
+                  isCompleted ? "bg-gold/60" :
+                  "bg-text-dark/15"
+                )} />
               </button>
               
               {isActive && (
                 <motion.div 
                   layoutId="active-step-indicator"
-                  className="absolute -bottom-2 w-1 h-1 bg-gold rounded-full"
+                  className="absolute -bottom-2 w-1 h-1 bg-gold rounded-full max-[375px]:hidden"
                 />
               )}
             </div>

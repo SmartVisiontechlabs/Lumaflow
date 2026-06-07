@@ -11,14 +11,7 @@ const ClientLogin = () => {
   const [isSent, setIsSent] = useState(false);
   const navigate = useNavigate();
 
-  // Check if they are already logged in
-  React.useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        navigate('/client/dashboard');
-      }
-    });
-  }, [navigate]);
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

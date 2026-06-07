@@ -54,5 +54,16 @@ export const availabilityController = {
     } catch (error) {
       res.status(500).json({ error: 'Failed to retrieve sanctuary blocks.' });
     }
+  },
+
+  async updateSettings(req: Request, res: Response) {
+    try {
+      console.log('Received PUT /api/availability/settings payload:', JSON.stringify(req.body, null, 2));
+      const data = await availabilityService.updateAvailabilitySettings(req.body);
+      res.json(data);
+    } catch (error: any) {
+      console.error('❌ Error updating availability settings:', error.message || error);
+      res.status(500).json({ error: 'Failed to archive availability settings.', details: error.message || error });
+    }
   }
 };

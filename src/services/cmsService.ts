@@ -312,6 +312,38 @@ export const cmsService = {
   },
 
   /**
+   * Create healing path (Admin)
+   */
+  async createHealingPath(path: Omit<Offering, 'id'>): Promise<Offering> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/cms/offerings`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(path)
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to create offering');
+    }
+    return await response.json();
+  },
+
+  /**
+   * Delete healing path (Admin)
+   */
+  async deleteHealingPath(id: string): Promise<void> {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_URL}/cms/offerings/${id}`, {
+      method: 'DELETE',
+      headers
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete offering');
+    }
+  },
+
+  /**
    * Fetch recommendation matrix from database
    */
   async getRecommendationMatrix(): Promise<IntelligenceMatrixEntry[]> {

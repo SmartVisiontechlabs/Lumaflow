@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase';
 import { emailService } from './emailService';
 import { fromZonedTime } from 'date-fns-tz';
 import { addHours, isBefore, subHours, subDays } from 'date-fns';
+import { settingsService } from './settingsService';
 
 const PROVIDER_TIMEZONE = 'America/New_York';
 
@@ -12,6 +13,19 @@ export const reminderScheduler = {
   async checkAndSendReminders() {
     console.log('--- RUNNING REMINDER SCHEDULER ---');
     const now = new Date();
+
+    const config = await settingsService.getCommunicationConfig().catch(() => ({
+      bookingConfirmations: true,
+      reminder24h: true,
+      prep1h: true,
+      adminNotifications: true
+    }));
+
+    if (!config.reminder24h && !config.prep1h) {
+      console.log('[Scheduler] All scheduled reminders (24h and prep) are disabled in settings.');
+      console.log('--- SCHEDULER FINISHED ---');
+      return;
+    }
 
     // 1. Fetch upcoming confirmed bookings
     const { data: bookings, error } = await supabase
@@ -52,13 +66,13 @@ export const reminderScheduler = {
 
       // --- 24-HOUR REMINDER CHECK ---
       const reminder24hThreshold = subDays(sessionStartTime, 1);
-      if (isBefore(reminder24hThreshold, now) && isBefore(now, sessionStartTime)) {
+      if (config.reminder24h && isBefore(reminder24hThreshold, now) && isBefore(now, sessionStartTime)) {
         await this.triggerEmailIfMissing(booking, 'reminder_24h', () => emailService.sendReminder24h(booking));
       }
 
       // --- 1-HOUR PREP CHECK ---
       const prep1hThreshold = subHours(sessionStartTime, 1);
-      if (isBefore(prep1hThreshold, now) && isBefore(now, sessionStartTime)) {
+      if (config.prep1h && isBefore(prep1hThreshold, now) && isBefore(now, sessionStartTime)) {
         await this.triggerEmailIfMissing(booking, 'prep_1h', () => emailService.sendPrep1h(booking));
 
         // --- FUTURE WHATSAPP INTEGRATION PLACEHOLDER ---

@@ -8,5 +8,6 @@ router.get('/', availabilityController.get);
 router.get('/blocked', adminAuth, availabilityController.listBlocked);
 router.post('/block', adminAuth, availabilityController.block);
 router.delete('/block/:id', adminAuth, availabilityController.unblock);
+router.put('/settings', adminAuth, availabilityController.updateSettings);
 
 export default router;

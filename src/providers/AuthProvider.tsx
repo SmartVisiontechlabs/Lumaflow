@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { fromZonedTime } from 'date-fns-tz';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export interface UserProfile {
   id: string;
@@ -86,6 +87,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [membership, setMembership] = useState<MembershipCredits | null>(null);
@@ -207,22 +210,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   useEffect(() => {
+    let checkDone = false;
+    
+    // Check if we are in an auth redirect flow (hash or search code)
+    const hash = window.location.hash;
+    const search = window.location.search;
+    const isRedirectFlow = hash.includes('access_token=') || hash.includes('id_token=') || search.includes('code=') || search.includes('token=');
+
     // Initial fetch
     supabase.auth.getUser().then(({ data: { user: authUser } }) => {
-      fetchPortalData(authUser);
+      if (checkDone) return;
+      if (isRedirectFlow && !authUser) {
+        console.log('[AuthProvider] Auth redirect flow detected, deferring initial loading resolution.');
+        // Set a safety timeout to resolve loading if onAuthStateChange doesn't fire
+        setTimeout(() => {
+          if (!checkDone) {
+            console.log('[AuthProvider] Defer safety timeout fired.');
+            fetchPortalData(null);
+            checkDone = true;
+          }
+        }, 3000);
+      } else {
+        fetchPortalData(authUser);
+        checkDone = true;
+      }
+    }).catch(() => {
+      if (checkDone) return;
+      if (!isRedirectFlow) {
+        fetchPortalData(null);
+        checkDone = true;
+      }
     });
 
     // Listen to changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log(`[AuthProvider] Auth state changed: ${event}`);
       if (session) {
         fetchPortalData(session.user);
+        checkDone = true;
+        
+        // Rule 9: Clear temporary success/booking items from localStorage/sessionStorage
+        localStorage.removeItem('pending_booking_id');
+        try {
+          for (let i = sessionStorage.length - 1; i >= 0; i--) {
+            const key = sessionStorage.key(i);
+            if (key && key.startsWith('magic_link_sent_for_')) {
+              sessionStorage.removeItem(key);
+            }
+          }
+        } catch (e) {
+          console.error('Error clearing temporary sessionStorage items:', e);
+        }
       } else {
-        fetchPortalData(null);
+        if (!isRedirectFlow || event === 'SIGNED_OUT') {
+          fetchPortalData(null);
+          checkDone = true;
+        }
       }
     });
 
     return () => subscription.unsubscribe();
   }, [fetchPortalData]);
+
+  const isAuthenticated = !!user;
+
+  useEffect(() => {
+    if (loading) return;
+
+    const path = location.pathname;
+
+    if (isAuthenticated) {
+      if (path === '/client/login') {
+        console.log('[AuthProvider Central Redirect] Authenticated user on login page. Redirecting to dashboard.');
+        navigate('/client/dashboard', { replace: true });
+      }
+    } else {
+      if (path.startsWith('/client') && path !== '/client/login') {
+        console.log('[AuthProvider Central Redirect] Unauthenticated user on protected route. Redirecting to login.');
+        navigate('/client/login', { replace: true });
+      }
+    }
+  }, [isAuthenticated, loading, location.pathname, navigate]);
 
   const value: AuthContextType = {
     user,

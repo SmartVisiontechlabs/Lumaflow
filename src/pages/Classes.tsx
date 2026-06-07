@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Wind, Heart, Sparkles, CheckCircle2 } from 'lucide-react';
 import { useBookingStore } from '../store/bookingStore';
 import { cmsService } from '../services/cmsService';
+import SEOMetadata from '../components/seo/SEOMetadata';
 
 export default function Classes() {
   const openBooking = useBookingStore(state => state.openBooking);
@@ -59,6 +60,7 @@ export default function Classes() {
 
   return (
     <div className="min-h-screen bg-cream selection:bg-gold/30">
+      <SEOMetadata />
       {/* HERO SECTION */}
       <section className="relative pt-36 pb-24 px-6 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-white via-cream to-cream pointer-events-none" />
@@ -132,7 +134,7 @@ export default function Classes() {
                   <img 
                     src={service.image} 
                     alt={service.title} 
-                    className="w-full h-[500px] object-cover rounded-[3rem] relative z-10 shadow-luxury"
+                    className="w-full h-[300px] sm:h-[400px] lg:h-[500px] object-cover rounded-[3rem] relative z-10 shadow-luxury"
                   />
                 </motion.div>
 

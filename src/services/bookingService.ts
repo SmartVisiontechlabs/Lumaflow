@@ -1,10 +1,20 @@
 import { Booking, BookingStatus } from '../types/booking';
 import { generateBookingReference } from '../utils/bookingUtils';
+import { supabase } from '../lib/supabase';
 
 const STORAGE_KEY = 'lumaflow_production_bookings';
 
 const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
+
+async function getAuthHeaders() {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+  };
+}
 
 /**
  * PRODUCTION BOOKING SERVICE
@@ -14,7 +24,7 @@ export const bookingService = {
   /**
    * Checks if an email account exists in the database
    */
-  async checkEmail(email: string): Promise<{ exists: boolean; userId: string | null }> {
+  async checkEmail(email: string): Promise<{ exists: boolean }> {
     try {
       const response = await fetch(`${API_URL}/bookings/check-email`, {
         method: 'POST',
@@ -27,29 +37,6 @@ export const bookingService = {
       return await response.json();
     } catch (error) {
       console.error('[bookingService] checkEmail error:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Silently restores a user session based on their email
-   */
-  async restoreSession(email: string): Promise<{ access_token: string; refresh_token: string }> {
-    try {
-      const response = await fetch(`${API_URL}/bookings/restore-session`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-      if (!response.ok) {
-        const errJson = await response.json().catch(() => ({}));
-        throw new Error(errJson.error || 'Failed to silently restore your session.');
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('[bookingService] restoreSession error:', error);
       throw error;
     }
   },
@@ -114,11 +101,10 @@ export const bookingService = {
    */
   async confirmCreditBooking(bookingId: string, userId?: string): Promise<Booking> {
     try {
+      const headers = await getAuthHeaders();
       const response = await fetch(`${API_URL}/bookings/confirm-credit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ bookingId, userId }),
       });
 
@@ -138,7 +124,14 @@ export const bookingService = {
    */
   async getActiveDraftBooking(userId: string): Promise<Booking | null> {
     try {
-      const response = await fetch(`${API_URL}/bookings/active-draft?userId=${userId}`);
+      const headers = await getAuthHeaders();
+      // Exclude application/json from header to prevent potential CORS issues on GET
+      const authHeaders = { ...headers } as any;
+      delete authHeaders['Content-Type'];
+      
+      const response = await fetch(`${API_URL}/bookings/active-draft?userId=${userId}`, {
+        headers: authHeaders
+      });
       if (!response.ok) {
         return null;
       }
@@ -148,6 +141,7 @@ export const bookingService = {
       return null;
     }
   },
+
 
   /**
    * Retrieves all bookings (Local fallback)

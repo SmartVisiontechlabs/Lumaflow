@@ -59,7 +59,6 @@ const ConfirmationStep = () => {
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
-  const [isVerifying, setIsVerifying] = useState(false);
 
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicatePkgName, setDuplicatePkgName] = useState('');
@@ -98,45 +97,8 @@ const ConfirmationStep = () => {
     return false;
   };
 
-  const handleSilentRestore = async () => {
-    setIsVerifying(true);
-    setOtpError(null);
-    try {
-      console.log('[ConfirmationStep] Silently restoring session for email:', email);
-      const tokenData = await bookingService.restoreSession(email);
-      
-      const { error } = await supabase.auth.setSession({
-        access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token
-      });
-      
-      if (error) throw error;
-      
-      // Fetch active packages directly to run duplicate check instantly before refresh resolves
-      const { data: pkgs } = await supabase
-        .from('user_packages')
-        .select('*')
-        .eq('user_email', email)
-        .eq('status', 'active');
-      
-      // Update auth provider state
-      await refresh();
-      
-      // Close the modal
-      setShowAuthModal(false);
 
-      if (pkgs && pkgs.length > 0) {
-        checkDuplicatePlan(pkgs);
-      }
 
-      console.log('[ConfirmationStep] Silent session restore succeeded');
-    } catch (err: any) {
-      console.error('Silent restore failed:', err);
-      setOtpError(err.message || 'Failed to silently verify sanctuary account.');
-    } finally {
-      setIsVerifying(false);
-    }
-  };
 
   const bookableCredits = remainingCredits;
 
@@ -558,7 +520,7 @@ const ConfirmationStep = () => {
         </div>
       </motion.div>
 
-      {/* LUXURY WELCOME BACK SILENT AUTH MODAL */}
+      {/* LUXURY WELCOME BACK MODAL */}
       <AnimatePresence>
         {showAuthModal && (
           <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4">
@@ -566,9 +528,7 @@ const ConfirmationStep = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => {
-                if (!isVerifying) setShowAuthModal(false);
-              }}
+              onClick={() => setShowAuthModal(false)}
               className="absolute inset-0 bg-[#1A1A1A]/40 backdrop-blur-md"
             />
 
@@ -583,7 +543,6 @@ const ConfirmationStep = () => {
                 onClick={() => setShowAuthModal(false)}
                 className="absolute top-6 right-6 text-text-dark/40 hover:text-gold transition-colors p-1 cursor-pointer"
                 aria-label="Close modal"
-                disabled={isVerifying}
               >
                 <CloseIcon className="w-5 h-5" />
               </button>
@@ -598,38 +557,23 @@ const ConfirmationStep = () => {
                     Welcome Back
                   </h4>
                   <p className="text-xs text-text-dark/60 font-light leading-relaxed">
-                    We found your sanctuary account. <br />Continue your booking securely.
+                    We found your sanctuary account. <br />Continue to booking.
                   </p>
                 </div>
 
-                {otpError && (
-                  <p className="text-[10px] text-red-500 font-bold uppercase tracking-wider italic">
-                    “{otpError}”
-                  </p>
-                )}
-
                 <button
-                  onClick={handleSilentRestore}
-                  disabled={isVerifying}
-                  className="w-full py-4 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  onClick={() => setShowAuthModal(false)}
+                  className="w-full py-4 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-md flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  {isVerifying ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Restoring Sanctuary...
-                    </>
-                  ) : (
-                    <>
-                      Continue Booking
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </>
-                  )}
+                  Continue to Booking
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
 
       {/* Journey Already Active Modal */}
       <AnimatePresence>

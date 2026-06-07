@@ -22,13 +22,33 @@ const formatTo12Hour = (time24: string): string => {
   }
 };
 
+const maskEmail = (emailStr: string): string => {
+  if (!emailStr) return '';
+  const [localPart, domain] = emailStr.split('@');
+  if (!localPart || !domain) return emailStr;
+  if (localPart.length <= 2) {
+    return `${localPart}***@${domain}`;
+  }
+  return `${localPart.substring(0, 2)}***@${domain}`;
+};
+
+const getMailClientUrl = (email: string): string | null => {
+  if (!email) return null;
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (domain === 'gmail.com') return 'https://mail.google.com';
+  if (domain === 'outlook.com' || domain === 'hotmail.com' || domain === 'live.com') return 'https://outlook.live.com';
+  if (domain === 'yahoo.com') return 'https://mail.yahoo.com';
+  if (domain === 'icloud.com') return 'https://www.icloud.com/mail';
+  return null;
+};
+
 const BookingSuccess = () => {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const ref = searchParams.get('ref');
   const navigate = useNavigate();
   const { setBookingReference, resetBooking } = useBookingStore();
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
   
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [bookingData, setBookingData] = useState<any>(null);
@@ -39,7 +59,12 @@ const BookingSuccess = () => {
   const [redirectCount, setRedirectCount] = useState<number | null>(null);
   const [hasSession, setHasSession] = useState<boolean | null>(null);
   const [isNewUser, setIsNewUser] = useState<boolean>(false);
-  const [reauthLink, setReauthLink] = useState<string | null>(null);
+  const [loginUrl, setLoginUrl] = useState<string | null>(null);
+
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [magicLinkSending, setMagicLinkSending] = useState(false);
+  const [magicLinkError, setMagicLinkError] = useState<string | null>(null);
+  const magicLinkInitiated = useRef(false);
 
   const copyToClipboard = (text: string, type: 'url' | 'password' | 'address') => {
     navigator.clipboard.writeText(text);
@@ -121,11 +146,11 @@ const BookingSuccess = () => {
           const booking = response.booking || response;
           console.log("extracted booking object:", booking);
           setIsNewUser(response.isNew ?? false);
-          if (response.actionLink) {
-            setReauthLink(response.actionLink);
-          }
           setBookingData(booking);
           setBookingReference(booking.bookingReference);
+          if (response.loginUrl) {
+            setLoginUrl(response.loginUrl);
+          }
           setStatus('success');
         }
       } catch (err: any) {
@@ -139,27 +164,126 @@ const BookingSuccess = () => {
   }, [sessionId, ref, setBookingReference, searchParams]);
 
   useEffect(() => {
-    if (status === 'success' && (isAuthenticated || hasSession || reauthLink)) {
-      setRedirectCount(6);
-      const timer = setInterval(() => {
-        setRedirectCount((prev) => {
-          if (prev === null || prev <= 1) {
-            clearInterval(timer);
-            resetBooking();
-            if (isAuthenticated || hasSession) {
-              navigate('/client/dashboard');
-            } else if (reauthLink) {
-              console.log('[BookingSuccess] Executing silent auto-login via action link...');
-              window.location.href = reauthLink;
-            }
-            return null;
+    const evaluateSessionState = async () => {
+      // Wait until status is success, bookingData is loaded, and useAuth is done loading
+      if (status !== 'success' || !bookingData || loading || hasSession === null) {
+        return;
+      }
+
+      // Save pending_booking_id for state restoration
+      localStorage.setItem('pending_booking_id', bookingData.id);
+
+      const bookingEmail = bookingData.email;
+      const currentSessionEmail = user?.email;
+      const sessionExists = isAuthenticated || hasSession;
+
+      console.log(`[BookingSuccess] Evaluating Session Decision Tree:`, {
+        sessionExists,
+        currentSessionEmail,
+        bookingEmail,
+        loginUrl
+      });
+
+      // 1. Session Exists & Matches? Or do we have loginUrl?
+      const sessionMatches = sessionExists && currentSessionEmail && currentSessionEmail.toLowerCase() === bookingEmail.toLowerCase();
+      
+      if (sessionMatches || loginUrl) {
+        if (redirectCount === null) {
+          setRedirectCount(5);
+        }
+        return;
+      }
+
+      // If session exists but email is wrong, sign out first
+      if (sessionExists && currentSessionEmail && currentSessionEmail.toLowerCase() !== bookingEmail.toLowerCase()) {
+        console.log('[BookingSuccess] Wrong session detected. Signing out...');
+        await supabase.auth.signOut();
+        setHasSession(false);
+        return;
+      }
+
+      // 2. Session Exists: NO & No loginUrl -> Send Magic Link -> Email Sent Screen
+      const sentKey = `magic_link_sent_for_${bookingData.id}`;
+      if (sessionStorage.getItem(sentKey)) {
+        setMagicLinkSent(true);
+        return;
+      }
+
+      if (magicLinkInitiated.current) return;
+      magicLinkInitiated.current = true;
+
+      setMagicLinkSending(true);
+      setMagicLinkError(null);
+      try {
+        console.log(`[BookingSuccess] Sending auto magic link to booking email: ${bookingEmail}`);
+        const redirectTo = `${window.location.origin}/client/dashboard`;
+        const { error: otpError } = await supabase.auth.signInWithOtp({
+          email: bookingEmail,
+          options: {
+            shouldCreateUser: true,
+            emailRedirectTo: redirectTo
           }
-          return prev - 1;
         });
-      }, 1000);
-      return () => clearInterval(timer);
+        if (otpError) throw otpError;
+        sessionStorage.setItem(sentKey, 'true');
+        setMagicLinkSent(true);
+      } catch (err: any) {
+        console.error('[BookingSuccess] Error triggering auto magic link:', err);
+        setMagicLinkError(err.message || 'Failed to send secure access link.');
+      } finally {
+        setMagicLinkSending(false);
+      }
+    };
+
+    evaluateSessionState();
+  }, [status, bookingData, loading, hasSession, isAuthenticated, user, navigate, resetBooking, loginUrl, redirectCount]);
+
+  // Countdown timer for automatic redirect
+  useEffect(() => {
+    if (redirectCount === null) return;
+    if (redirectCount <= 0) {
+      resetBooking();
+      if (loginUrl) {
+        console.log('[BookingSuccess] Countdown finished. Logging in programmatically via loginUrl...');
+        window.location.href = loginUrl;
+      } else {
+        console.log('[BookingSuccess] Countdown finished. Redirecting to dashboard...');
+        navigate('/client/dashboard', { replace: true });
+      }
+      return;
     }
-  }, [status, isAuthenticated, hasSession, reauthLink, navigate, resetBooking]);
+
+    const timer = setTimeout(() => {
+      setRedirectCount(prev => prev !== null ? prev - 1 : null);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [redirectCount, loginUrl, navigate, resetBooking]);
+
+  const handleResendLink = async () => {
+    if (!bookingData?.email) return;
+    setMagicLinkSending(true);
+    setMagicLinkError(null);
+    try {
+      const redirectTo = `${window.location.origin}/client/dashboard`;
+      const { error } = await supabase.auth.signInWithOtp({
+        email: bookingData.email,
+        options: {
+          shouldCreateUser: true,
+          emailRedirectTo: redirectTo
+        }
+      });
+      if (error) throw error;
+      setMagicLinkSent(true);
+      const sentKey = `magic_link_sent_for_${bookingData.id}`;
+      sessionStorage.setItem(sentKey, 'true');
+    } catch (err: any) {
+      console.error('Error resending magic link:', err);
+      setMagicLinkError(err.message || 'Failed to send secure access link.');
+    } finally {
+      setMagicLinkSending(false);
+    }
+  };
 
 
   if (status === 'loading' || loading || hasSession === null) {
@@ -261,11 +385,15 @@ Preparation Checklist:
     resetBooking();
     if (isAuthenticated || hasSession) {
       navigate('/client/dashboard');
-    } else if (reauthLink) {
-      console.log('[BookingSuccess] Redirecting to silent reauth action link...');
-      window.location.href = reauthLink;
+    } else if (loginUrl) {
+      window.location.href = loginUrl;
     } else {
-      navigate('/client/login');
+      const mailUrl = getMailClientUrl(bookingData?.email);
+      if (mailUrl) {
+        window.open(mailUrl, '_blank');
+      } else {
+        window.open('https://mail.google.com', '_blank');
+      }
     }
   };
 
@@ -273,11 +401,8 @@ Preparation Checklist:
     resetBooking();
     if (isAuthenticated || hasSession) {
       navigate('/client/bookings');
-    } else if (reauthLink) {
-      console.log('[BookingSuccess] Redirecting to silent reauth action link...');
-      window.location.href = reauthLink;
-    } else {
-      navigate('/client/login');
+    } else if (loginUrl) {
+      window.location.href = loginUrl;
     }
   };
 
@@ -393,25 +518,45 @@ Preparation Checklist:
               Welcome back to LumaFlow. Your active sanctuary session has been recognized. You will be redirected to your dashboard automatically.
             </p>
           </div>
-        ) : isNewUser ? (
-          <div className="bg-gold/5 border border-gold/15 rounded-[3rem] p-8 max-w-xl mx-auto backdrop-blur-md shadow-luxury text-center space-y-3">
-            <p className="text-xs font-bold text-gold uppercase tracking-[0.3em]">Welcome to LumaFlow Sanctuary</p>
+        ) : loginUrl ? (
+          <div className="bg-white/40 border border-gold/20 rounded-[3rem] p-8 max-w-xl mx-auto backdrop-blur-md shadow-luxury text-center space-y-3">
+            <p className="text-[11px] font-bold text-gold uppercase tracking-[0.25em]">Portal Secured</p>
             <p className="text-xs text-text-dark/70 font-light leading-relaxed">
-              We have created your sacred portal. A magic login link has been dispatched to your email. Click the link in your inbox to enter your sanctuary dashboard.
+              Welcome back to your sanctuary. We are preparing your client portal dashboard.
             </p>
+            <div className="flex items-center justify-center gap-2 text-gold text-xs font-medium uppercase tracking-wider pt-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Securing connection...
+            </div>
           </div>
         ) : (
-          <div className="bg-white/40 border border-gold/20 rounded-[3rem] p-8 max-w-xl mx-auto backdrop-blur-md shadow-luxury text-center space-y-4">
-            <p className="text-xs font-bold text-gold uppercase tracking-[0.3em]">Welcome Back</p>
-            <p className="text-xs text-text-dark/70 font-light leading-relaxed">
-              You already have a sanctuary account associated with your email. Click below to immediately enter your sanctuary.
+          <div className="bg-gold/5 border border-gold/15 rounded-[3rem] p-8 max-w-xl mx-auto backdrop-blur-md shadow-luxury text-center space-y-4">
+            <p className="text-xs font-bold text-gold uppercase tracking-[0.3em]">
+              {magicLinkSending ? "Dispatching Portal Link..." : "We've sent a secure access link to your email"}
             </p>
-            <button
-              onClick={handleEnterSanctuary}
-              className="px-8 py-4 bg-text-dark hover:bg-gold text-white hover:text-black text-[10px] font-bold uppercase tracking-[0.2em] rounded-full transition-all duration-500 shadow-luxury flex items-center justify-center gap-2 mx-auto"
-            >
-              Enter My Sanctuary
-            </button>
+            
+            <div className="py-3 px-6 bg-white/50 rounded-2xl border border-gold/10 inline-block">
+              <span className="font-mono text-sm text-text-dark tracking-wide font-medium">
+                {bookingData?.email ? maskEmail(bookingData.email) : '...'}
+              </span>
+            </div>
+
+            {magicLinkError ? (
+              <p className="text-[11px] text-red-500 font-light">
+                {magicLinkError}. Please click "Resend Link" to try again.
+              </p>
+            ) : (
+              <p className="text-xs text-text-dark/70 font-light leading-relaxed max-w-md mx-auto">
+                A passwordless magic login link has been sent to your email. Click the link in your inbox to step instantly into your sanctuary dashboard.
+              </p>
+            )}
+
+            {magicLinkSending && (
+              <div className="flex items-center justify-center gap-2 text-gold text-xs font-medium uppercase tracking-wider">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Aligning portal credentials...
+              </div>
+            )}
           </div>
         )}
 
@@ -629,19 +774,40 @@ Preparation Checklist:
 
         {/* Buttons Grid */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 max-w-2xl mx-auto pt-6">
-          <button
-            onClick={handleEnterSanctuary}
-            className="w-full sm:w-auto px-10 py-5 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury"
-          >
-            Enter My Sanctuary
-          </button>
-          
-          <button
-            onClick={handleViewBooking}
-            className="w-full sm:w-auto px-10 py-5 bg-white/60 hover:bg-white text-text-dark border border-text-dark/5 rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft"
-          >
-            {(isAuthenticated || hasSession) ? "View Updated Journey" : "View Booking"}
-          </button>
+          {(isAuthenticated || hasSession || loginUrl) ? (
+            <>
+              <button
+                onClick={handleEnterSanctuary}
+                className="w-full sm:w-auto px-10 py-5 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury"
+              >
+                Enter My Sanctuary
+              </button>
+              
+              <button
+                onClick={handleViewBooking}
+                className="w-full sm:w-auto px-10 py-5 bg-white/60 hover:bg-white text-text-dark border border-text-dark/5 rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft"
+              >
+                View Updated Journey
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={handleEnterSanctuary}
+                className="w-full sm:w-auto px-10 py-5 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury"
+              >
+                Open My Sanctuary
+              </button>
+
+              <button
+                onClick={handleResendLink}
+                disabled={magicLinkSending}
+                className="w-full sm:w-auto px-10 py-5 bg-white/60 hover:bg-white text-text-dark border border-text-dark/5 rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft disabled:opacity-50"
+              >
+                {magicLinkSending ? "Sending..." : "Resend Link"}
+              </button>
+            </>
+          )}
 
           <button
             onClick={handleAddToCalendar}

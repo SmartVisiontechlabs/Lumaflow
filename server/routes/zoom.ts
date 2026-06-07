@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { zoomService } from '../services/zoomService';
+import { requireSession, adminAuth } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -7,7 +8,7 @@ const router = Router();
  * GET /api/zoom/test
  * Verifies connectivity to the Zoom API by generating an OAuth token.
  */
-router.get('/test', async (req: Request, res: Response) => {
+router.get('/test', requireSession, adminAuth, async (req: Request, res: Response) => {
   try {
     console.log('📬 [Zoom Routes] GET /api/zoom/test - Connectivity test initiated');
     
@@ -38,7 +39,7 @@ router.get('/test', async (req: Request, res: Response) => {
  * POST /api/zoom/create-test-meeting
  * Automatically schedules a test meeting in Zoom for verification.
  */
-router.post('/create-test-meeting', async (req: Request, res: Response) => {
+router.post('/create-test-meeting', requireSession, adminAuth, async (req: Request, res: Response) => {
   try {
     console.log('📬 [Zoom Routes] POST /api/zoom/create-test-meeting - Creating test meeting');
     

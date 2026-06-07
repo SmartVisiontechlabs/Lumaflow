@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Wind, Heart, Sparkles, Star } from 'lucide-react';
 import { useBookingStore } from '../store/bookingStore';
+import SEOMetadata from '../components/seo/SEOMetadata';
 
 export default function About() {
   const openBooking = useBookingStore(state => state.openBooking);
@@ -31,6 +32,10 @@ export default function About() {
 
   return (
     <div className="min-h-screen bg-white selection:bg-[#CBAE73]/30">
+      <SEOMetadata 
+        title="About Alanna | Founder & Somatic Guide | LumaFlow" 
+        description="Meet Alanna, the founder of LumaFlow. Learn about somatic breathwork, conscious movement, and our philosophy of stillness."
+      />
       {/* 1. HERO SECTION */}
       <section className="relative pt-48 pb-36 px-6 bg-[#F8F5F0] overflow-hidden">
         {/* Soft radial glow */}
@@ -68,7 +73,7 @@ export default function About() {
             <img 
               src="/alanna-new.jpeg" 
               alt="Alanna - Lumaflow Guide" 
-              className="w-full h-[650px] object-cover rounded-[2.5rem] shadow-luxury transition-transform duration-700 group-hover:scale-[1.03]"
+              className="w-full h-[350px] sm:h-[500px] lg:h-[650px] object-cover rounded-[2.5rem] shadow-luxury transition-transform duration-700 group-hover:scale-[1.03]"
             />
           </motion.div>
 

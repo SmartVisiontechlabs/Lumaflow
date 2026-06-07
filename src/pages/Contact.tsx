@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldCheck, Clock, Heart } from 'lucide-react';
 import { cmsService } from '../services/cmsService';
+import SEOMetadata from '../components/seo/SEOMetadata';
 
 export default function Contact() {
   const [pageConfig, setPageConfig] = useState<any>(null);
@@ -40,6 +41,7 @@ export default function Contact() {
 
   return (
     <div className="pt-36 pb-24 px-6 max-w-7xl mx-auto min-h-screen">
+      <SEOMetadata />
       <div className="grid md:grid-cols-2 gap-16 lg:gap-24 items-center">
         
         {/* LEFT: FORM SECTION */}

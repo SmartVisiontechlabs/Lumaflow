@@ -86,7 +86,7 @@ const ClientProtectedRoute = () => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) return <Loading />;
-  return isAuthenticated ? <Outlet /> : <Navigate to="/client/login" replace />;
+  return isAuthenticated ? <Outlet /> : <Loading />;
 };
 
 // Luxury Lumaflow Loading Screen
@@ -143,8 +143,8 @@ export default function App() {
   }
 
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Suspense fallback={<Loading />}>
           <Routes>
             {/* Public Routes */}
@@ -187,7 +187,7 @@ export default function App() {
             </Route>
           </Routes>
         </Suspense>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

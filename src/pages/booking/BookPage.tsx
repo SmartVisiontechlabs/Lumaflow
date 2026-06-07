@@ -19,6 +19,7 @@ import ResumeStep from '../../components/booking/ResumeStep';
 import { useAuth } from '../../providers/AuthProvider';
 import { bookingService } from '../../services/bookingService';
 import { useBookingStore } from '../../store/bookingStore';
+import SEOMetadata from '../../components/seo/SEOMetadata';
 
 const stepComponents: Record<number, React.ComponentType> = {
   1: JourneyStep,
@@ -158,6 +159,7 @@ export default function BookPage() {
 
   return (
     <div className="min-h-screen bg-cream relative flex flex-col pt-0 pb-20">
+      <SEOMetadata />
       
       {/* CINEMATIC LUMINOUS BACKGROUND */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
