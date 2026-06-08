@@ -43,39 +43,40 @@ export const emailService = {
    * Sends the initial booking confirmation to client and admin
    */
   async sendBookingConfirmation(booking: Booking) {
-    console.log('--- EMAIL PIPELINE STARTED ---');
-    console.log('RESEND API KEY EXISTS:', !!process.env.RESEND_API_KEY);
-    console.log('SENDER:', `LumaFlow <${FROM_EMAIL}>`);
-    console.log('BOOKING REFERENCE:', booking.bookingReference);
+    try {
+      console.log('--- EMAIL PIPELINE STARTED ---');
+      console.log('RESEND API KEY EXISTS:', !!process.env.RESEND_API_KEY);
+      console.log('SENDER:', `LumaFlow <${FROM_EMAIL}>`);
+      console.log('BOOKING REFERENCE:', booking.bookingReference);
 
-    const config = await settingsService.getCommunicationConfig().catch(() => ({
-      bookingConfirmations: true,
-      reminder24h: true,
-      prep1h: true,
-      adminNotifications: true
-    }));
+      const config = await settingsService.getCommunicationConfig().catch(() => ({
+        bookingConfirmations: true,
+        reminder24h: true,
+        prep1h: true,
+        adminNotifications: true
+      }));
 
-    const timeESTFormatted = booking.practitionerTime || (format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST');
-    const timeLocal = booking.clientLocalTime || getLocalTimeForEST(booking.selectedDate, booking.selectedTime, booking.timezone);
+      const timeESTFormatted = booking.practitionerTime || (format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST');
+      const timeLocal = booking.clientLocalTime || getLocalTimeForEST(booking.selectedDate, booking.selectedTime, booking.timezone);
 
 
-    // Calendar Integration Data
-    const PROVIDER_TIMEZONE = 'America/New_York';
-    const startUTC = fromZonedTime(`${booking.selectedDate} ${booking.selectedTime}:00`, PROVIDER_TIMEZONE);
-    const endUTC = addMinutes(
-      startUTC,
-      Number(booking.duration || 60)
-    );
+      // Calendar Integration Data
+      const PROVIDER_TIMEZONE = 'America/New_York';
+      const startUTC = fromZonedTime(`${booking.selectedDate} ${booking.selectedTime}:00`, PROVIDER_TIMEZONE);
+      const endUTC = addMinutes(
+        startUTC,
+        Number(booking.duration || 60)
+      );
 
-    const calendarDates = `${formatInTimeZone(startUTC, 'UTC', "yyyyMMdd'T'HHmmss'Z'")}/${formatInTimeZone(endUTC, 'UTC', "yyyyMMdd'T'HHmmss'Z'")}`;
-    const calendarTitle = encodeURIComponent('LumaFlow Healing Session');
-    
-    const isVirtual = booking.sessionFormat?.toLowerCase() === 'virtual';
-    const locationStr = isVirtual 
-      ? (booking.zoomJoinUrl || 'Zoom link details to be sent')
-      : 'LumaFlow Sanctuary, Soho, Manhattan, NY';
+      const calendarDates = `${formatInTimeZone(startUTC, 'UTC', "yyyyMMdd'T'HHmmss'Z'")}/${formatInTimeZone(endUTC, 'UTC', "yyyyMMdd'T'HHmmss'Z'")}`;
+      const calendarTitle = encodeURIComponent('LumaFlow Healing Session');
+      
+      const isVirtual = booking.sessionFormat?.toLowerCase() === 'virtual';
+      const locationStr = isVirtual 
+        ? (booking.zoomJoinUrl || 'Zoom link details to be sent')
+        : 'LumaFlow Sanctuary, Soho, Manhattan, NY';
 
-    const rawDetails = isVirtual ? `
+      const rawDetails = isVirtual ? `
 Client: ${booking.fullName}
 Ritual: ${booking.selectedSession}
 Reference: ${booking.bookingReference}
@@ -104,14 +105,14 @@ Preparation Checklist:
 - Press the LumaFlow buzzer at the entrance
 `.trim();
 
-    const calendarDetails = encodeURIComponent(rawDetails);
-    const calendarLocation = encodeURIComponent(locationStr);
+      const calendarDetails = encodeURIComponent(rawDetails);
+      const calendarLocation = encodeURIComponent(locationStr);
 
-    const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${calendarTitle}&dates=${calendarDates}&details=${calendarDetails}&location=${calendarLocation}`;
+      const googleCalendarUrl = `https://www.google.com/calendar/render?action=TEMPLATE&text=${calendarTitle}&dates=${calendarDates}&details=${calendarDetails}&location=${calendarLocation}`;
 
-    // Generate ICS content
-    const icsDescription = rawDetails.replace(/\n/g, '\\n');
-    const icsContent = `
+      // Generate ICS content
+      const icsDescription = rawDetails.replace(/\n/g, '\\n');
+      const icsContent = `
 BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:-//LumaFlow//Sanctuary//EN
@@ -125,36 +126,36 @@ LOCATION:${locationStr}
 DESCRIPTION:${icsDescription}
 END:VEVENT
 END:VCALENDAR
-    `.trim();
+      `.trim();
 
-    const icsDataUri = `data:text/calendar;charset=utf8,${encodeURIComponent(icsContent)}`;
+      const icsDataUri = `data:text/calendar;charset=utf8,${encodeURIComponent(icsContent)}`;
 
-    // 1. Send to USER (only if enabled)
-    if (config.bookingConfirmations) {
-      try {
-        console.log('SENDING USER EMAIL:', booking.email);
-        const clientResult = await resend.emails.send({
-          from: `LumaFlow <${FROM_EMAIL}>`,
-          to: booking.email,
-          replyTo: 'support@thelumaflow.com',
-          subject: 'Your LumaFlow Booking Confirmation',
-          react: BookingConfirmationEmail({
-            fullName: booking.fullName,
-            ritual: booking.selectedSession,
-            date: format(parse(booking.selectedDate, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy'),
-            timeEST: timeESTFormatted,
-            timeLocal: timeLocal,
-            duration: booking.duration,
-            reference: booking.bookingReference,
-            intentions: booking.intentions,
-            googleCalendarUrl,
-            icsDataUri,
-            sessionFormat: booking.sessionFormat || 'Virtual',
-            zoomJoinUrl: booking.zoomJoinUrl,
-            zoomMeetingId: booking.zoomMeetingId,
-            meetingPassword: booking.meetingPassword,
-          }),
-          text: `
+      // 1. Send to USER (only if enabled)
+      if (config.bookingConfirmations) {
+        try {
+          console.log('SENDING USER EMAIL:', booking.email);
+          const clientResult = await resend.emails.send({
+            from: `LumaFlow <${FROM_EMAIL}>`,
+            to: booking.email,
+            replyTo: 'support@thelumaflow.com',
+            subject: 'Your LumaFlow Booking Confirmation',
+            react: BookingConfirmationEmail({
+              fullName: booking.fullName,
+              ritual: booking.selectedSession,
+              date: format(parse(booking.selectedDate, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy'),
+              timeEST: timeESTFormatted,
+              timeLocal: timeLocal,
+              duration: booking.duration,
+              reference: booking.bookingReference,
+              intentions: booking.intentions,
+              googleCalendarUrl,
+              icsDataUri,
+              sessionFormat: booking.sessionFormat || 'Virtual',
+              zoomJoinUrl: booking.zoomJoinUrl,
+              zoomMeetingId: booking.zoomMeetingId,
+              meetingPassword: booking.meetingPassword,
+            }),
+            text: `
 Your Sanctuary Has Been Reserved
 
 Hello ${booking.fullName},
@@ -192,66 +193,67 @@ Preparation Checklist:
 Add to Google Calendar: ${googleCalendarUrl}
 
 If you need support, reply to this email.
-          `.trim(),
-        });
+            `.trim(),
+          });
 
-        if (clientResult.error) {
-          console.error('USER EMAIL FAILED:', clientResult.error.message);
-          await this.logEmail(booking.id, 'confirmation_client', booking.email, 'failed', clientResult.error.message);
-          throw new Error(`Client email failed: ${clientResult.error.message}`);
-        } else {
-          console.log('[EMAIL SENT]');
-          await this.logEmail(booking.id, 'confirmation_client', booking.email, 'sent');
+          if (clientResult.error) {
+            console.error('USER EMAIL FAILED:', clientResult.error.message);
+            await this.logEmail(booking.id, 'confirmation_client', booking.email, 'failed', clientResult.error.message);
+            console.warn(`[emailService] Gracefully continuing after client email error: ${clientResult.error.message}`);
+          } else {
+            console.log('[EMAIL SENT]');
+            await this.logEmail(booking.id, 'confirmation_client', booking.email, 'sent');
+          }
+        } catch (userEmailError: any) {
+          console.error('USER EMAIL FAILED (CRITICAL):', userEmailError.message);
         }
-      } catch (userEmailError: any) {
-        console.error('USER EMAIL FAILED (CRITICAL):', userEmailError.message);
-        throw userEmailError;
+      } else {
+        console.log('Skipping client booking confirmation email due to admin settings.');
       }
-    } else {
-      console.log('Skipping client booking confirmation email due to admin settings.');
-    }
 
-    // 2. Send to ADMIN (only if enabled)
-    if (config.adminNotifications) {
-      try {
-        console.log('SENDING ADMIN EMAIL:', ADMIN_EMAIL);
-        const adminResult = await resend.emails.send({
-          from: `LumaFlow <${FROM_EMAIL}>`,
-          to: ADMIN_EMAIL,
-          subject: `🌙 New Sanctuary Booking: ${booking.fullName}`,
-          react: AdminNotificationEmail({
-            fullName: booking.fullName,
-            email: booking.email,
-            emotion: booking.emotion,
-            ritual: booking.selectedSession,
-            duration: booking.duration,
-            intentions: booking.intentions,
-            date: booking.selectedDate,
-            timeEST: timeESTFormatted,
-            reference: booking.bookingReference,
+      // 2. Send to ADMIN (only if enabled)
+      if (config.adminNotifications) {
+        try {
+          console.log('SENDING ADMIN EMAIL:', ADMIN_EMAIL);
+          const adminResult = await resend.emails.send({
+            from: `LumaFlow <${FROM_EMAIL}>`,
+            to: ADMIN_EMAIL,
+            subject: `🌙 New Sanctuary Booking: ${booking.fullName}`,
+            react: AdminNotificationEmail({
+              fullName: booking.fullName,
+              email: booking.email,
+              emotion: booking.emotion,
+              ritual: booking.selectedSession,
+              duration: booking.duration,
+              intentions: booking.intentions,
+              date: booking.selectedDate,
+              timeEST: timeESTFormatted,
+              reference: booking.bookingReference,
 
-            googleCalendarUrl,
-            icsDataUri,
-          }),
-        });
+              googleCalendarUrl,
+              icsDataUri,
+            }),
+          });
 
-        if (adminResult.error) {
-          console.error('ADMIN EMAIL FAILED:', adminResult.error.message);
-          await this.logEmail(booking.id, 'confirmation_admin', ADMIN_EMAIL, 'failed', adminResult.error.message);
-          throw new Error(`Admin email failed: ${adminResult.error.message}`);
-        } else {
-          console.log('[ADMIN EMAIL SENT]');
-          await this.logEmail(booking.id, 'confirmation_admin', ADMIN_EMAIL, 'sent');
+          if (adminResult.error) {
+            console.error('ADMIN EMAIL FAILED:', adminResult.error.message);
+            await this.logEmail(booking.id, 'confirmation_admin', ADMIN_EMAIL, 'failed', adminResult.error.message);
+            console.warn(`[emailService] Gracefully continuing after admin email error: ${adminResult.error.message}`);
+          } else {
+            console.log('[ADMIN EMAIL SENT]');
+            await this.logEmail(booking.id, 'confirmation_admin', ADMIN_EMAIL, 'sent');
+          }
+        } catch (adminEmailError: any) {
+          console.error('ADMIN EMAIL FAILED (CRITICAL):', adminEmailError.message);
         }
-      } catch (adminEmailError: any) {
-        console.error('ADMIN EMAIL FAILED (CRITICAL):', adminEmailError.message);
-        throw adminEmailError;
+      } else {
+        console.log('Skipping admin booking confirmation email due to admin settings.');
       }
-    } else {
-      console.log('Skipping admin booking confirmation email due to admin settings.');
-    }
 
-    console.log('--- EMAIL PIPELINE FINISHED ---');
+      console.log('--- EMAIL PIPELINE FINISHED ---');
+    } catch (pipelineError: any) {
+      console.error('❌ [emailService] CRITICAL PIPELINE EXCEPTION:', pipelineError.message || pipelineError);
+    }
   },
 
   /**

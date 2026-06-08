@@ -12,20 +12,22 @@ export const availabilityService = {
     console.log('Selected Duration:', duration);
     console.log('Server Timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
 
+    const client = supabaseAdmin || supabase;
+
     // Fetch bookings + blocked slots + availability settings
     const [bookingsResponse, blockedResponse, settingsResponse] = await Promise.all([
-      supabase
+      client
         .from('bookings')
         .select('*')
         .eq('selected_date', date)
         .neq('booking_status', 'cancelled'),
 
-      supabase
+      client
         .from('blocked_slots')
         .select('*')
         .eq('blocked_date', date),
 
-      supabase
+      client
         .from('availability_settings')
         .select('*')
     ]);
@@ -121,7 +123,8 @@ export const availabilityService = {
    * Blocks a specific date or time range
    */
   async blockSlot(data: any) {
-    const { data: result, error } = await supabase
+    const client = supabaseAdmin || supabase;
+    const { data: result, error } = await client
       .from('blocked_slots')
       .insert({
         blocked_date: data.date,
@@ -141,7 +144,8 @@ export const availabilityService = {
    * Unblocks a previously blocked slot
    */
   async unblockSlot(id: string) {
-    const { error } = await supabase
+    const client = supabaseAdmin || supabase;
+    const { error } = await client
       .from('blocked_slots')
       .delete()
       .eq('id', id);
@@ -154,7 +158,8 @@ export const availabilityService = {
    * Retrieves all blocked slots for a period
    */
   async getBlockedSlots(start: string, end: string) {
-    const { data, error } = await supabase
+    const client = supabaseAdmin || supabase;
+    const { data, error } = await client
       .from('blocked_slots')
       .select('*')
       .gte('blocked_date', start)
