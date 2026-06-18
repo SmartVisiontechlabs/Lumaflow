@@ -216,6 +216,7 @@ const Footer = memo(() => (
 
       <div className="flex flex-col items-center md:items-end gap-8">
         <div className="flex gap-8 text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
+          <Link to="/services" className="hover:text-gold transition-colors">Services</Link>
           <a href="#" className="hover:text-gold transition-colors">Instagram</a>
           <a href="#" className="hover:text-gold transition-colors">Spotify</a>
           <Link to="/contact" className="hover:text-gold transition-colors">Contact</Link>

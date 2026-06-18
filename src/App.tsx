@@ -7,6 +7,7 @@ import { trackPageView } from './lib/analytics';
 const Home = lazy(() => import('./pages/Home'));
 const About = lazy(() => import('./pages/About'));
 const Classes = lazy(() => import('./pages/Classes'));
+const Services = lazy(() => import('./pages/Services'));
 const Pricing = lazy(() => import('./pages/Pricing'));
 const Contact = lazy(() => import('./pages/Contact'));
 const BookingSuccess = lazy(() => import('./pages/booking/BookingSuccess'));
@@ -166,6 +167,7 @@ export default function App() {
               <Route index element={<Home />} />
               <Route path="about" element={<About />} />
               <Route path="classes" element={<Classes />} />
+              <Route path="services" element={<Services />} />
               <Route path="pricing" element={<Pricing />} />
               <Route path="contact" element={<Contact />} />
               <Route path="book" element={<BookPage />} />
