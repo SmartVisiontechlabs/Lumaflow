@@ -699,61 +699,34 @@ export default function CmsManager() {
 
   // Delete package
   const handleDeletePackage = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this package? This will affect new client purchases.')) return;
+    if (!confirm('Are you sure you want to delete this package? This will permanently delete the package and unlink it from past bookings and client credit history.')) return;
     setIsSaving(true);
     try {
-      // 1. Check if package is referenced in user_packages
-      const { data: userPkgs, error: checkError1 } = await supabase
+      // 1. Unlink this package from all user_packages to prevent foreign key violation
+      const { error: unlinkUserPkgsErr } = await supabase
         .from('user_packages')
-        .select('id')
-        .eq('package_id', id)
-        .limit(1);
+        .update({ package_id: null })
+        .eq('package_id', id);
 
-      if (checkError1) throw checkError1;
+      if (unlinkUserPkgsErr) throw unlinkUserPkgsErr;
 
-      // 2. Check if package is referenced in bookings
-      const { data: bookingsPkgs, error: checkError2 } = await supabase
+      // 2. Unlink this package from all bookings to prevent foreign key violation
+      const { error: unlinkBookingsErr } = await supabase
         .from('bookings')
-        .select('id')
-        .eq('package_id', id)
-        .limit(1);
+        .update({ package_id: null })
+        .eq('package_id', id);
 
-      if (checkError2) throw checkError2;
+      if (unlinkBookingsErr) throw unlinkBookingsErr;
 
-      const isReferenced = (userPkgs && userPkgs.length > 0) || (bookingsPkgs && bookingsPkgs.length > 0);
+      // 3. Now delete the package
+      const { error: deleteError } = await supabase
+        .from('packages')
+        .delete()
+        .eq('id', id);
 
-      if (isReferenced) {
-        console.log('Package is referenced by active purchases or bookings. Deactivating it directly.');
-        const { error: updateError } = await supabase
-          .from('packages')
-          .update({ is_active: false })
-          .eq('id', id);
-        
-        if (updateError) throw updateError;
-        showToast('Package is referenced by active clients. It has been deactivated to preserve their history.', 'info');
-      } else {
-        // Safe to delete from database
-        const { error } = await supabase
-          .from('packages')
-          .delete()
-          .eq('id', id);
+      if (deleteError) throw deleteError;
 
-        if (error) {
-          if (error.code === '23503' || error.status === 409) {
-            const { error: updateError } = await supabase
-              .from('packages')
-              .update({ is_active: false })
-              .eq('id', id);
-            
-            if (updateError) throw updateError;
-            showToast('Package is referenced by active clients. It has been deactivated to preserve their history.', 'info');
-          } else {
-            throw error;
-          }
-        } else {
-          showToast('Package deleted successfully.', 'success');
-        }
-      }
+      showToast('Package deleted successfully.', 'success');
       
       const { data } = await supabase
         .from('packages')
