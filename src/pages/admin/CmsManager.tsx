@@ -707,8 +707,23 @@ export default function CmsManager() {
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
-      showToast('Package deleted successfully.', 'success');
+      if (error) {
+        // Check for foreign key constraint violation (Postgres code 23503 or HTTP 409)
+        if (error.code === '23503' || error.status === 409 || error.message?.toLowerCase().includes('foreign key')) {
+          console.log('Package is referenced by other records. Deactivating it instead.');
+          const { error: updateError } = await supabase
+            .from('packages')
+            .update({ is_active: false })
+            .eq('id', id);
+          
+          if (updateError) throw updateError;
+          showToast('Package is referenced by active clients. It has been deactivated to preserve their history.', 'info');
+        } else {
+          throw error;
+        }
+      } else {
+        showToast('Package deleted successfully.', 'success');
+      }
       
       const { data } = await supabase
         .from('packages')
