@@ -59,7 +59,7 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
       // Try generating login link for idempotency page reload as well
       let loginUrl: string | undefined = undefined;
       try {
-        const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/dashboard`;
+        const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`;
         const autoLogin = await authService.generateAutoLoginLink(existingBooking.email, redirectTo);
         if (autoLogin) loginUrl = autoLogin;
       } catch (e) {
@@ -85,7 +85,7 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
 
     let loginUrl: string | undefined = undefined;
     try {
-      const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/dashboard`;
+      const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`;
       const autoLogin = await authService.generateAutoLoginLink(meta.email, redirectTo);
       if (autoLogin) loginUrl = autoLogin;
     } catch (e) {
@@ -381,6 +381,12 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
         journeyType: meta.journeyType || '',
         userId: userId || null
       });
+    }
+
+    if (isNew) {
+      const welcomeLink = loginUrl || `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`;
+      console.log(`[confirmPaymentSession] Dispatching Welcome Email to new user: ${booking.email} with link: ${welcomeLink}`);
+      await emailService.sendWelcomeEmail(booking.email, booking.fullName, welcomeLink, booking);
     }
 
     return { booking, isNew, loginUrl };

@@ -14,10 +14,13 @@ import paymentRoutes from './routes/paymentRoutes';
 import cmsRoutes from './routes/cmsRoutes';
 import zoomRoutes from './routes/zoom';
 import adminRoutes from './routes/adminRoutes';
+import authRoutes from './routes/authRoutes';
+import clientRoutes from './routes/clientRoutes';
 import { reminderScheduler } from './services/reminderScheduler';
 import { availabilityService } from './services/availabilityService';
 
 const app = express();
+
 
 // --- PRODUCTION CORS CONFIG ---
 const allowedOrigins = [
@@ -78,6 +81,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/cms', cmsRoutes);
 app.use('/api/zoom', zoomRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/client', clientRoutes);
 
 const PORT = process.env.PORT || 3001;
 

@@ -1,21 +1,25 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth, LiveBooking } from '../../providers/AuthProvider';
 import { 
   Calendar, 
   Clock, 
   Video, 
-  Award, 
+  Compass, 
   Sparkles,
+  CreditCard,
+  History,
+  CheckCircle,
   HelpCircle,
-  ExternalLink,
-  Compass,
-  Check,
-  ArrowRight
+  ArrowRight,
+  ChevronDown,
+  Info
 } from 'lucide-react';
 import { fromZonedTime } from 'date-fns-tz';
 import { format, parseISO } from 'date-fns';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../lib/utils';
+import { supabase } from '../../lib/supabase';
 
 // Helper to calculate Google Calendar Link
 function getGoogleCalendarUrl(booking: LiveBooking) {
@@ -78,68 +82,58 @@ Preparation Checklist:
   }
 }
 
-// Custom Premium SVG Progress Ring Component
-const ProgressRing = ({ value, max }: { value: number; max: number }) => {
-  const size = 160;
-  const strokeWidth = 8;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const strokeDashoffset = max > 0 ? circumference - (value / max) * circumference : circumference;
-
-  return (
-    <div className="relative flex items-center justify-center">
-      <svg
-        height={size}
-        width={size}
-        className="transform -rotate-90 filter drop-shadow-[0_0_12px_rgba(203,174,115,0.15)]"
-      >
-        {/* Background track circle */}
-        <circle
-          stroke="rgba(203, 174, 115, 0.08)"
-          fill="transparent"
-          strokeWidth={strokeWidth}
-          r={radius}
-          cx={size / 2}
-          cy={size / 2}
-        />
-        {/* Foreground animated value circle */}
-        <motion.circle
-          stroke="#CBAE73"
-          fill="transparent"
-          strokeWidth={strokeWidth}
-          strokeDasharray={`${circumference} ${circumference}`}
-          initial={{ strokeDashoffset: circumference }}
-          animate={{ strokeDashoffset }}
-          transition={{ duration: 1.8, ease: [0.22, 1, 0.36, 1] }}
-          r={radius}
-          cx={size / 2}
-          cy={size / 2}
-          strokeLinecap="round"
-        />
-      </svg>
-      <div className="absolute flex flex-col items-center justify-center text-center">
-        <span className="text-3xl font-display text-text-dark tracking-tighter font-light">
-          {value} / {max}
-        </span>
-        <span className="text-[8px] font-bold text-[#CBAE73] uppercase tracking-[0.25em] mt-1 font-semibold">
-          Remaining
-        </span>
-      </div>
-    </div>
-  );
-};
-
 export default function Dashboard() {
-  const { bookings, membership, activePackages, upcomingBooking, remainingCredits, loading, profile } = useAuth();
+  const { bookings, loading: authLoading, profile } = useAuth();
+  
+  // API fetched states
+  const [upcomingBooking, setUpcomingBooking] = useState<LiveBooking | null>(null);
+  const [stats, setStats] = useState({ completedRituals: 0, remainingCredits: 0, upcomingBookings: 0 });
+  const [apiLoading, setApiLoading] = useState(true);
+
+  // Countdown timers
   const [countdown, setCountdown] = useState<string>('');
-  const [countdownHero, setCountdownHero] = useState<string>('');
   const [canJoin, setCanJoin] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [rescheduleMessage, setRescheduleMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setApiLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const headers = { 'Authorization': `Bearer ${session.access_token}` };
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+        const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
+
+        const [upcomingRes, statsRes] = await Promise.all([
+          fetch(`${API_URL}/client/upcoming-booking`, { headers }),
+          fetch(`${API_URL}/client/journey-stats`, { headers })
+        ]);
+
+        if (upcomingRes.ok) {
+          const upcomingData = await upcomingRes.json();
+          setUpcomingBooking(upcomingData.upcomingBooking);
+        }
+        if (statsRes.ok) {
+          const statsData = await statsRes.json();
+          setStats(statsData);
+        }
+      } catch (err) {
+        console.error('[Dashboard] Error loading API data:', err);
+      } finally {
+        setApiLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   // Ticking countdown timer logic
   useEffect(() => {
     if (!upcomingBooking) {
       setCountdown('');
-      setCountdownHero('');
       setCanJoin(false);
       return;
     }
@@ -158,16 +152,13 @@ export default function Dashboard() {
 
       if (isOngoing) {
         setCountdown('Ritual Journey In Progress');
-        setCountdownHero('Ritual In Progress');
       } else if (timeDiff < 0) {
         setCountdown('Ritual Concluded');
-        setCountdownHero('Ritual Concluded');
         clearInterval(interval);
       } else {
-        // Calculate days, hours, mins, secs
         const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24));
         const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const mins = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+        const mins = Math.floor((timeDiff % (1000 * 60)) / (1000 * 60));
         const secs = Math.floor((timeDiff % (1000 * 60)) / 1000);
 
         let parts = [];
@@ -177,26 +168,40 @@ export default function Dashboard() {
         parts.push(`${secs}s`);
         
         setCountdown(`Commencing in: ${parts.join(' ')}`);
-
-        // Hero clean countdown format e.g. "2 Days • 4 Hours" or "4 Hours • 12 Mins"
-        let heroParts = [];
-        if (days > 0) {
-          heroParts.push(`${days} Day${days > 1 ? 's' : ''}`);
-        }
-        if (hours > 0 || days > 0) {
-          heroParts.push(`${hours} Hour${hours > 1 ? 's' : ''}`);
-        }
-        if (days === 0 && hours === 0) {
-          heroParts.push(`${mins} Min${mins > 1 ? 's' : ''}`);
-        }
-        setCountdownHero(heroParts.slice(0, 2).join(' • '));
       }
     }, 1000);
 
     return () => clearInterval(interval);
   }, [upcomingBooking]);
 
-  if (loading) {
+  const handleRescheduleClick = () => {
+    setRescheduleMessage(
+      'Sanctuary rescheduling is managed with care. Please contact us at support@thelumaflow.com or through our contact page to reschedule your appointed ritual.'
+    );
+    setTimeout(() => setRescheduleMessage(null), 8000);
+  };
+
+  const formatBookingDate = (dateStr: string) => {
+    try {
+      return format(parseISO(dateStr), 'MMMM d, yyyy');
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const formatBookingTime = (timeStr: string) => {
+    try {
+      const [h, m] = timeStr.split(':');
+      const hour = parseInt(h);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${m} ${ampm}`;
+    } catch (e) {
+      return timeStr;
+    }
+  };
+
+  if (authLoading || apiLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="w-10 h-10 border-2 border-gold/20 border-t-gold rounded-full animate-spin" />
@@ -204,7 +209,7 @@ export default function Dashboard() {
     );
   }
 
-  // Filter completed and past bookings for the Ritual Journey Timeline
+  // Filter completed and past bookings for the Ritual Chronology
   const pastBookings = bookings.filter((b) => {
     if (b.booking_status === 'cancelled') return true;
     if (upcomingBooking && b.id === upcomingBooking.id) return false;
@@ -214,79 +219,19 @@ export default function Dashboard() {
     return startUTC.getTime() + durationMs <= new Date().getTime();
   });
 
-  // Construct Timeline Items
-  const timelineItems: Array<{
-    ritualName: string;
-    date: string;
-    time: string;
-    format: string;
-    isUpcoming: boolean;
-    isCompleted: boolean;
-    isCancelled: boolean;
-  }> = [];
+  const timelineItems = pastBookings.map((pb) => ({
+    ritualName: pb.selected_session,
+    date: pb.selected_date,
+    time: pb.selected_time,
+    format: pb.session_format,
+    isCompleted: pb.booking_status === 'completed',
+    isCancelled: pb.booking_status === 'cancelled'
+  }));
 
-  if (upcomingBooking) {
-    timelineItems.push({
-      ritualName: upcomingBooking.selected_session,
-      date: upcomingBooking.selected_date,
-      time: upcomingBooking.selected_time,
-      format: upcomingBooking.session_format,
-      isUpcoming: true,
-      isCompleted: false,
-      isCancelled: false
-    });
-  }
-
-  pastBookings.forEach((pb) => {
-    timelineItems.push({
-      ritualName: pb.selected_session,
-      date: pb.selected_date,
-      time: pb.selected_time,
-      format: pb.session_format,
-      isUpcoming: false,
-      isCompleted: pb.booking_status === 'completed',
-      isCancelled: pb.booking_status === 'cancelled'
-    });
-  });
-
-  // Completed and reserved counts
-  const completedSessionsCount = bookings.filter(b => b.booking_status === 'completed').length;
-  const reservedCount = bookings.filter(b => b.booking_status === 'confirmed').length;
-  
-  let totalCreditsPossible = 0;
-  if (membership) {
-    totalCreditsPossible = membership.total_credits;
-  } else if (activePackages && activePackages.length > 0) {
-    totalCreditsPossible = activePackages.reduce((sum: number, p: any) => sum + (p.total_credits || 0), 0);
-  } else {
-    totalCreditsPossible = remainingCredits + completedSessionsCount;
-  }
-
-  const remainingCount = remainingCredits;
-  const progressPercent = totalCreditsPossible > 0 ? Math.round((remainingCount / totalCreditsPossible) * 100) : 0;
   const firstName = profile?.full_name ? profile.full_name.split(' ')[0] : 'Member';
-
-  const activePackagesDetails = (activePackages || []).map(pkgRecord => {
-    return {
-      id: pkgRecord.id,
-      name: bookings.find(b => b.package_id === pkgRecord.package_id)?.package_name || 
-            (pkgRecord.package_id === 'ecca0c9b-42c6-4fbe-aec5-a1651ab6a29b' ? '10-Class Package' :
-             pkgRecord.package_id === 'e69dfd27-1da5-4584-b410-72b1ea76c48f' ? 'Starter Healing Journey' :
-             pkgRecord.package_id === '772407fa-1b48-4f0f-80d5-1b343ada98c1' ? 'Single Session' : 'Active Package'),
-      price: bookings.find(b => b.package_id === pkgRecord.package_id)?.package_price ||
-             (pkgRecord.package_id === 'ecca0c9b-42c6-4fbe-aec5-a1651ab6a29b' ? 350 :
-              pkgRecord.package_id === 'e69dfd27-1da5-4584-b410-72b1ea76c48f' ? 99 :
-              pkgRecord.package_id === '772407fa-1b48-4f0f-80d5-1b343ada98c1' ? 45 : 0),
-      remaining: pkgRecord.remaining_credits,
-      total: pkgRecord.total_credits
-    };
-  });
 
   // State Chips Helper
   const getChipStyle = (item: typeof timelineItems[0]) => {
-    if (item.isUpcoming) {
-      return "bg-[#CBAE73]/10 border border-[#CBAE73]/40 text-[#CBAE73] text-[8px] font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full shadow-[0_0_10px_rgba(203,174,115,0.1)]";
-    }
     if (item.isCancelled) {
       return "bg-red-500/5 border border-red-500/20 text-red-400 text-[8px] font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full";
     }
@@ -294,225 +239,287 @@ export default function Dashboard() {
   };
 
   const getChipLabel = (item: typeof timelineItems[0]) => {
-    if (item.isUpcoming) return "Confirmed Sanctuary Session";
     if (item.isCancelled) return "Sanctuary Released";
     return "Restoration Complete";
   };
 
   return (
-    <div className="space-y-16 pb-24 pt-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="space-y-12 pb-24 pt-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       
-      {/* 1. Welcome Hero Section */}
-      <div className="relative bg-white/30 border border-white/60 p-12 lg:p-20 rounded-[3.5rem] shadow-luxury overflow-hidden backdrop-blur-xl">
-        <div className="absolute top-[-30%] right-[-10%] w-[500px] h-[500px] bg-gold/5 blur-[120px] rounded-full pointer-events-none" />
-        <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-gold/5 blur-[90px] rounded-full pointer-events-none" />
-        
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-12 relative z-10">
-          <div className="space-y-8 max-w-3xl">
-            <div className="inline-flex items-center gap-2.5 px-4.5 py-2 bg-gold/10 border border-gold/10 rounded-full">
-              <Sparkles className="w-3.5 h-3.5 text-gold" />
-              <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-[#CBAE73] select-none">
-                Your Sanctuary Awaits
-              </span>
-            </div>
+      {/* Welcome Greeting Header */}
+      <div className="text-left space-y-2">
+        <h2 className="font-display text-4xl sm:text-5xl text-text-dark tracking-tight font-light">
+          Settle in, <span className="italic text-gold font-normal">{firstName}</span>
+        </h2>
+        <p className="text-xs text-text-dark/40 font-light font-sans tracking-wide">
+          Welcome to your sanctuary portal. Quiet the noise and align your energies.
+        </p>
+      </div>
+
+      {/* FEATURE 1: Upcoming Ritual Card at the very top */}
+      <div className="w-full">
+        {upcomingBooking ? (
+          <div className="bg-white/40 border border-white/60 backdrop-blur-xl rounded-[2.5rem] p-8 sm:p-10 shadow-luxury relative overflow-hidden text-left">
+            <div className="absolute top-[-30%] right-[-10%] w-[400px] h-[400px] bg-gold/5 blur-[100px] rounded-full pointer-events-none" />
             
-            <h1 className="font-display text-5xl sm:text-7xl text-text-dark tracking-tight leading-[1.05] font-light">
-              Settle in, <br />
-              <span className="italic text-[#CBAE73] font-normal">{firstName}</span>
-            </h1>
+            <div className="flex flex-col lg:flex-row justify-between lg:items-start gap-8">
+              {/* Left Column: Ritual metadata */}
+              <div className="space-y-6 flex-1">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-bold text-gold/80 uppercase tracking-[0.3em]">
+                    Upcoming Ritual
+                  </span>
+                  <h3 className="font-display text-3xl sm:text-4xl text-text-dark tracking-tight leading-tight font-light">
+                    {upcomingBooking.selected_session}
+                  </h3>
+                </div>
 
-            <p className="text-base font-light text-text-dark/50 leading-relaxed max-w-xl">
-              Step into a space of high-frequency restoration. Below is your current alignment status and upcoming chronologies.
-            </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-2">
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-[0.25em] text-text-dark/30">Date</p>
+                    <p className="text-sm text-text-dark/80 font-semibold">{formatBookingDate(upcomingBooking.selected_date)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-[0.25em] text-text-dark/30">Time</p>
+                    <p className="text-sm text-text-dark/80 font-semibold">{formatBookingTime(upcomingBooking.selected_time)}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-[0.25em] text-text-dark/30">Timezone</p>
+                    <p className="text-sm text-text-dark/60 font-semibold">{upcomingBooking.timezone || 'America/New_York'}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] font-bold uppercase tracking-[0.25em] text-text-dark/30">Format</p>
+                    <p className="text-sm text-text-dark/60 font-semibold">
+                      {upcomingBooking.session_format.toLowerCase() === 'virtual' ? 'Virtual Experience' : 'In-Person Experience'}
+                    </p>
+                  </div>
+                </div>
 
-            {upcomingBooking && countdownHero && (
-              <div className="pt-2 flex items-center gap-4 text-xs font-bold text-text-dark/40 uppercase tracking-widest">
-                <span>Next Ritual:</span>
-                <span className="text-gold font-display font-medium text-xl tracking-normal">
-                  {countdownHero}
-                </span>
+                {/* Status indicator */}
+                <div className="flex items-center gap-3.5 pt-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest bg-[#CBAE73]/10 border border-[#CBAE73]/30 text-gold shadow-[0_0_10px_rgba(203,174,115,0.1)]">
+                    Confirmed
+                  </span>
+                  <span className="text-[10px] text-text-dark/40 font-light italic">
+                    "{countdown}"
+                  </span>
+                </div>
               </div>
-            )}
-          </div>
 
-          <div className="flex flex-col gap-4 min-w-[280px] w-full lg:w-auto">
-            {upcomingBooking ? (
-              <>
-                {upcomingBooking.session_format.toLowerCase() === 'virtual' ? (
+              {/* Right Column: Dynamic Action Buttons */}
+              <div className="flex flex-col gap-3 min-w-[200px] w-full lg:w-auto self-stretch lg:self-start justify-center">
+                {upcomingBooking.session_format.toLowerCase() === 'virtual' && upcomingBooking.zoom_join_url && (
                   <a
                     href={canJoin ? upcomingBooking.zoom_join_url : undefined}
                     target="_blank"
                     rel="noreferrer"
                     className={cn(
-                      "w-full py-6 px-12 rounded-full text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-700 relative overflow-hidden group shadow-luxury border",
+                      "w-full py-4.5 px-8 rounded-2xl text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-2.5 transition-all duration-700 relative overflow-hidden group border",
                       canJoin 
-                        ? 'bg-text-dark text-white border-text-dark hover:bg-gold hover:text-black cursor-pointer' 
-                        : 'bg-white/40 text-text-dark/25 border-text-dark/5 cursor-not-allowed'
+                        ? 'bg-text-dark text-white border-text-dark hover:bg-gold hover:text-black cursor-pointer shadow-luxury' 
+                        : 'bg-white/30 text-text-dark/25 border-text-dark/5 cursor-not-allowed'
                     )}
                   >
-                    <Video className={cn("w-4 h-4 transition-transform duration-500 group-hover:scale-110", canJoin ? "text-gold" : "text-text-dark/20")} />
-                    Enter Sanctuary
+                    <Video className={cn("w-4 h-4", canJoin ? "text-gold animate-pulse" : "text-text-dark/10")} />
+                    Join Session
                     {canJoin && (
-                      <span className="absolute inset-0 border border-gold/40 rounded-full animate-ping opacity-60 pointer-events-none" />
+                      <span className="absolute inset-0 border border-gold/30 rounded-2xl animate-ping opacity-50 pointer-events-none" />
                     )}
                   </a>
-                ) : (
-                  <div className="w-full py-6 px-12 rounded-full bg-white/40 border border-text-dark/5 text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 text-text-dark/40 select-none">
-                    <Compass className="w-4 h-4 text-gold/60" />
-                    Sanctuary In-Person
-                  </div>
                 )}
                 
+                <button
+                  onClick={() => setShowDetails(!showDetails)}
+                  className="w-full py-4 px-8 bg-white/60 hover:bg-white text-text-dark/60 hover:text-text-dark border border-text-dark/5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-2 transition-all duration-500 shadow-soft"
+                >
+                  <span>View Details</span>
+                  <ChevronDown className={cn("w-3.5 h-3.5 text-gold transition-transform duration-500", showDetails && "rotate-180")} />
+                </button>
+
+                <button
+                  onClick={handleRescheduleClick}
+                  className="w-full py-4 px-8 bg-white/40 hover:bg-white/60 text-text-dark/40 hover:text-text-dark/60 border border-text-dark/5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500"
+                >
+                  Reschedule
+                </button>
+
                 <a
                   href={getGoogleCalendarUrl(upcomingBooking)}
                   target="_blank"
                   rel="noreferrer"
-                  className="w-full py-5.5 px-12 bg-white/60 hover:bg-white text-text-dark/60 hover:text-text-dark border border-text-dark/5 rounded-full text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-500 shadow-soft"
+                  className="w-full py-3.5 px-8 text-center text-text-dark/40 hover:text-gold text-[9px] font-semibold uppercase tracking-widest transition-colors duration-300"
                 >
-                  <Calendar className="w-4 h-4 text-gold" />
-                  Calendar Sync
+                  + Sync Google Calendar
                 </a>
-              </>
-            ) : (
-              <a
-                href="/book"
-                className="w-full py-6 px-12 bg-[#CBAE73] hover:bg-[#CBAE73]/95 text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] flex items-center justify-center gap-3 transition-all duration-700 hover:scale-[1.02] shadow-luxury"
-              >
-                Book Your Next Ritual
-                <ArrowRight className="w-4 h-4" />
-              </a>
-            )}
+              </div>
+            </div>
+
+            {/* Expandable Details Area */}
+            <AnimatePresence>
+              {showDetails && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                  className="overflow-hidden border-t border-text-dark/5 mt-8 pt-8"
+                >
+                  <div className="grid md:grid-cols-2 gap-8 text-xs text-text-dark/60 leading-relaxed font-medium">
+                    <div className="space-y-4">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold/80">Sanctuary Instructions</p>
+                      {upcomingBooking.session_format.toLowerCase() === 'virtual' ? (
+                        <ul className="list-disc pl-4 space-y-2">
+                          <li>Find a quiet space where you will not be disturbed for {upcomingBooking.duration} minutes.</li>
+                          <li>Wear loose-fitting, warm, and comfortable clothing.</li>
+                          <li>Have a glass of water or hot herbal tea close to your sanctuary mat.</li>
+                          <li>We recommend using high-quality over-ear headphones to fully receive the sound vibrations.</li>
+                          <li>Please test your internet connection and video setup 10 minutes prior to session start.</li>
+                        </ul>
+                      ) : (
+                        <ul className="list-disc pl-4 space-y-2">
+                          <li>Please wear loose-fitting, comfortable clothing suitable for breathing and laying down.</li>
+                          <li>Kindly arrive 10 minutes before your appointment time to settle your energy in the lounge.</li>
+                          <li>Avoid heavy meals or caffeine for at least 2 hours prior to your scheduled ritual.</li>
+                          <li>Press the LumaFlow sanctuary buzzer at the entrance of our Soho location.</li>
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="space-y-4 bg-white/20 p-6 rounded-2xl border border-text-dark/5">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold/80">Credentials & Details</p>
+                      <div className="space-y-2 font-mono text-[11px]">
+                        <p>Reference: {upcomingBooking.booking_reference}</p>
+                        <p>Ritual: {upcomingBooking.selected_session}</p>
+                        <p>Duration: {upcomingBooking.duration} Minutes</p>
+                        <p>Location: {upcomingBooking.session_format.toLowerCase() === 'virtual' ? 'Virtual (Zoom Client)' : 'LumaFlow Soho Sanctuary'}</p>
+                        {upcomingBooking.session_format.toLowerCase() === 'virtual' && upcomingBooking.zoom_meeting_id && (
+                          <>
+                            <p className="border-t border-text-dark/5 pt-2 mt-2">Meeting ID: {upcomingBooking.zoom_meeting_id}</p>
+                            <p>Password: {upcomingBooking.meeting_password || 'N/A'}</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Reschedule Message Notification */}
+            <AnimatePresence>
+              {rescheduleMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="mt-6 p-4 bg-white/60 border border-gold/20 rounded-2xl flex items-start gap-3 shadow-soft"
+                >
+                  <Info className="w-4 h-4 text-gold shrink-0 mt-0.5" />
+                  <p className="text-xs text-text-dark/70 font-medium leading-relaxed">
+                    {rescheduleMessage}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <div className="bg-white/40 border border-white/60 backdrop-blur-xl rounded-[2.5rem] p-12 shadow-luxury text-center space-y-6 relative overflow-hidden">
+            <div className="absolute top-[-30%] right-[-10%] w-[300px] h-[300px] bg-gold/5 blur-[80px] rounded-full pointer-events-none" />
+            <Sparkles className="w-8 h-8 text-gold/40 mx-auto" />
+            <p className="text-sm text-text-dark/60 font-light tracking-wide italic">
+              Your next ritual has not yet been scheduled.
+            </p>
+            <Link
+              to="/book"
+              className="inline-flex py-4 px-10 bg-[#CBAE73] hover:bg-[#CBAE73]/90 text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury"
+            >
+              Book A Ritual
+            </Link>
+          </div>
+        )}
+      </div>
+
+      {/* FEATURE 2: Journey Statistics Card directly below Upcoming Session */}
+      <div className="space-y-6 text-left">
+        <h3 className="font-display text-2xl text-text-dark font-light tracking-tight">Your Journey</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Card 1: Completed Rituals */}
+          <div className="bg-white/40 border border-white/60 p-8 rounded-[2rem] shadow-luxury flex flex-col justify-between min-h-[140px] relative overflow-hidden group">
+            <div className="absolute top-[-20%] right-[-10%] w-[120px] h-[120px] bg-gold/5 blur-[35px] rounded-full pointer-events-none" />
+            <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-[0.2em]">
+              Completed Rituals
+            </span>
+            <div className="flex justify-between items-end mt-4">
+              <span className="text-5xl font-display text-text-dark leading-none font-light">
+                {stats.completedRituals}
+              </span>
+              <CheckCircle className="w-6 h-6 text-gold/40" />
+            </div>
+            <p className="text-[9px] font-semibold text-text-dark/30 uppercase tracking-wider mt-3">
+              Total somatic completions
+            </p>
+          </div>
+
+          {/* Card 2: Remaining Credits */}
+          <div className="bg-white/40 border border-white/60 p-8 rounded-[2rem] shadow-luxury flex flex-col justify-between min-h-[140px] relative overflow-hidden group">
+            <div className="absolute top-[-20%] right-[-10%] w-[120px] h-[120px] bg-gold/5 blur-[35px] rounded-full pointer-events-none" />
+            <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-[0.2em]">
+              Remaining Credits
+            </span>
+            <div className="flex justify-between items-end mt-4">
+              <span className="text-5xl font-display text-text-dark leading-none font-light">
+                {stats.remainingCredits}
+              </span>
+              <CreditCard className="w-6 h-6 text-gold/40" />
+            </div>
+            <p className="text-[9px] font-semibold text-text-dark/30 uppercase tracking-wider mt-3">
+              Sanctuary balances ready to book
+            </p>
+          </div>
+
+          {/* Card 3: Upcoming Rituals */}
+          <div className="bg-white/40 border border-white/60 p-8 rounded-[2rem] shadow-luxury flex flex-col justify-between min-h-[140px] relative overflow-hidden group">
+            <div className="absolute top-[-20%] right-[-10%] w-[120px] h-[120px] bg-gold/5 blur-[35px] rounded-full pointer-events-none" />
+            <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-[0.2em]">
+              Upcoming Rituals
+            </span>
+            <div className="flex justify-between items-end mt-4">
+              <span className="text-5xl font-display text-text-dark leading-none font-light">
+                {stats.upcomingBookings}
+              </span>
+              <Calendar className="w-6 h-6 text-gold/40" />
+            </div>
+            <p className="text-[9px] font-semibold text-text-dark/30 uppercase tracking-wider mt-3">
+              Appointed upcoming journeys
+            </p>
           </div>
         </div>
       </div>
 
-      {/* 2. Content Grids with Extra Whitespace */}
+      {/* 3. Ritual Chronology and Sub-Details */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         
-        {/* Left Grid: Upcoming & Momentum (7 cols) */}
-        <div className="lg:col-span-7 space-y-12">
-          
-          {/* Upcoming Session Details Card */}
-          {upcomingBooking && (
-            <div className="bg-white/30 border border-white/60 p-10 rounded-[3rem] shadow-luxury backdrop-blur-md space-y-8">
-              <div className="flex justify-between items-center pb-6 border-b border-gold/10">
-                <h3 className="font-display text-2xl text-text-dark font-light">Upcoming Appointed Ritual</h3>
-                <span className="text-[10px] font-bold text-text-dark/30 uppercase tracking-[0.2em]">
-                  Ref: {upcomingBooking.booking_reference}
-                </span>
-              </div>
-              
-              <div className="grid sm:grid-cols-2 gap-8">
-                <div className="space-y-6">
-                  <div className="space-y-2">
-                    <p className="text-[8px] font-bold uppercase tracking-[0.3em] text-gold/60">Ritual</p>
-                    <p className="font-display text-3xl text-text-dark tracking-tight leading-snug font-light">
-                      {upcomingBooking.selected_session}
-                    </p>
-                  </div>
-
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center gap-3 text-xs text-text-dark/60 font-medium">
-                      <Calendar className="w-4 h-4 text-gold" />
-                      <span>{upcomingBooking.selected_date}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-text-dark/60 font-medium">
-                      <Clock className="w-4 h-4 text-gold" />
-                      <span>{upcomingBooking.selected_time} ({upcomingBooking.timezone})</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs text-text-dark/60 font-medium">
-                      <Award className="w-4 h-4 text-gold" />
-                      <span>{upcomingBooking.duration} mins • {upcomingBooking.session_format}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-white/50 border border-text-dark/5 p-8 rounded-[2rem] flex flex-col justify-between space-y-6 shadow-soft">
-                  <div className="space-y-2">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold/80">Ritual Timeline</p>
-                    <p className="text-xs text-text-dark/50 leading-relaxed font-light italic">
-                      "{countdown}"
-                    </p>
-                  </div>
-                  {upcomingBooking.session_format.toLowerCase() === 'virtual' && upcomingBooking.zoom_join_url && (
-                    <div className="space-y-1.5 pt-3 border-t border-text-dark/5 text-[9px] font-medium text-text-dark/40">
-                      <p>Meeting ID: {upcomingBooking.zoom_meeting_id || 'N/A'}</p>
-                      <p>Password: {upcomingBooking.meeting_password || 'N/A'}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+        {/* Left Column: Past Ritual Chronology (7 cols) */}
+        <div className="lg:col-span-7 bg-white/30 border border-white/60 p-8 sm:p-10 rounded-[2.5rem] shadow-luxury backdrop-blur-md space-y-6">
+          <div className="space-y-1 text-left flex justify-between items-center">
+            <div>
+              <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Ritual Chronology</h3>
+              <p className="text-xs text-text-dark/40 font-light mt-0.5">Your progress through the LumaFlow transformation paths.</p>
             </div>
-          )}
-
-          {/* Membership Visual Card (Healing Momentum) */}
-          <div className="bg-white/30 border border-white/60 p-10 rounded-[3rem] shadow-luxury backdrop-blur-md flex flex-col md:flex-row items-center justify-between gap-12 relative overflow-hidden">
-            <div className="absolute top-[-10%] left-[-10%] w-[200px] h-[200px] bg-gold/5 blur-[60px] rounded-full pointer-events-none" />
-            
-            <div className="space-y-8 max-w-sm text-left">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
-                  <Sparkles className="w-4 h-4 text-gold" />
-                </div>
-                <span className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/40">Healing Journey Progress</span>
-              </div>
-              
-              <div className="space-y-3">
-                <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Sanctuary Momentum</h3>
-                <div className="space-y-2 pt-2">
-                  <div className="flex justify-between text-xs text-text-dark/70 font-light">
-                    <span>Completed Journey:</span>
-                    <span className="font-semibold text-gold">{completedSessionsCount} / {totalCreditsPossible} Completed</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-text-dark/70 font-light">
-                    <span>Ritual Reserved:</span>
-                    <span className="font-semibold text-gold">{reservedCount} {reservedCount === 1 ? 'Ritual' : 'Rituals'} Reserved</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-text-dark/70 font-light">
-                    <span>Remaining Balance:</span>
-                    <span className="font-semibold text-gold">{remainingCount} Remaining</span>
-                  </div>
-                  {activePackagesDetails.map((pkg, pIdx) => (
-                    <div key={pkg.id || pIdx} className="flex justify-between text-xs text-text-dark/70 font-light border-t border-text-dark/5 pt-2 mt-2">
-                      <span>Package:</span>
-                      <span className="font-semibold text-gold">{pkg.name} (${pkg.price}) — {pkg.remaining}/{pkg.total} remaining</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest text-text-dark/30 pt-3 border-t border-text-dark/5">
-                <span>Total: {totalCreditsPossible}</span>
-                <span>Active: {remainingCount}</span>
-                <span>Progress: {progressPercent}%</span>
-              </div>
-            </div>
-
-            <div className="flex-shrink-0 bg-white/40 p-6 rounded-[2.5rem] border border-white/60 shadow-soft">
-              <ProgressRing value={remainingCount} max={totalCreditsPossible} />
-            </div>
+            <History className="w-5 h-5 text-gold/40" />
           </div>
 
-        </div>
-
-        {/* Right Grid: Ritual Journey Timeline V2 (5 cols) */}
-        <div className="lg:col-span-5 bg-white/30 border border-white/60 p-10 rounded-[3rem] shadow-luxury backdrop-blur-md space-y-8">
-          <div className="space-y-2 text-left">
-            <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Ritual Chronology</h3>
-            <p className="text-xs text-text-dark/40 font-light">Your progress through the LumaFlow transformation paths.</p>
-          </div>
-
-          <div className="space-y-6 custom-scrollbar max-h-[560px] overflow-y-auto pr-2">
+          <div className="space-y-4 custom-scrollbar max-h-[460px] overflow-y-auto pr-2">
             {timelineItems.length > 0 ? (
               timelineItems.map((item, idx) => (
                 <div 
                   key={idx} 
-                  className="bg-white/40 border border-white/60 p-6 rounded-[2rem] hover:shadow-luxury hover:scale-[1.01] transition-all duration-500 flex flex-col gap-4 text-left group"
+                  className="bg-white/40 border border-white/60 p-5 rounded-2xl hover:shadow-luxury transition-all duration-300 flex flex-col gap-3.5 text-left group"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <h4 className={cn(
-                      "text-sm font-bold text-text-dark transition-colors duration-500", 
-                      item.isUpcoming ? "text-text-dark font-bold" : "text-text-dark/60 font-semibold",
+                      "text-xs font-bold text-text-dark/80 group-hover:text-text-dark transition-colors duration-300", 
                       item.isCancelled && "line-through opacity-50"
                     )}>
                       {item.ritualName}
@@ -522,11 +529,11 @@ export default function Dashboard() {
                     </span>
                   </div>
                   
-                  <div className="flex items-center justify-between border-t border-gold/5 pt-4 text-[10px] text-text-dark/40 font-medium">
-                    <span>{item.date}</span>
-                    <span className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between border-t border-gold/5 pt-3.5 text-[9px] text-text-dark/40 font-medium">
+                    <span>{formatBookingDate(item.date)}</span>
+                    <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3 text-gold/60" />
-                      {item.time} ({item.format})
+                      {formatBookingTime(item.time)} ({item.format})
                     </span>
                   </div>
                 </div>
@@ -536,6 +543,43 @@ export default function Dashboard() {
                 <p className="text-xs text-text-dark/30 italic">No ritual history found. Reserve your first session to begin the timeline.</p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Right Column: Healing Sanctuary Guide (5 cols) */}
+        <div className="lg:col-span-5 bg-white/30 border border-white/60 p-8 sm:p-10 rounded-[2.5rem] shadow-luxury backdrop-blur-md space-y-6">
+          <div className="flex items-center gap-3 text-left">
+            <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
+              <Compass className="w-4 h-4 text-gold animate-breathe" />
+            </div>
+            <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Sanctuary Compass</h3>
+          </div>
+          
+          <div className="space-y-4 text-xs text-text-dark/70 leading-relaxed font-medium text-left">
+            <p>
+              Your dashboard aggregates all booking references and active credits. You can always view completed somatic breathwork sessions and payments directly in the portal.
+            </p>
+            <p>
+              If your next session is Virtual, the <strong>Join Session</strong> button will activate 15 minutes prior to the appointed hour. Please check your audio headphones and device compatibility beforehand.
+            </p>
+            <p>
+              If your next session is In-Person, we request that you arrive at our Soho Lounge 10 minutes early to settle in and enjoy a warm herbal tea before your ritual begins.
+            </p>
+          </div>
+
+          <div className="pt-6 border-t border-text-dark/5 flex flex-col gap-3">
+            <Link
+              to="/book"
+              className="w-full py-4.5 px-6 bg-text-dark hover:bg-gold text-white text-center rounded-xl text-[10px] font-bold uppercase tracking-[0.25em] transition-all duration-500 shadow-button"
+            >
+              Book New Session
+            </Link>
+            <a
+              href="/pricing"
+              className="w-full py-4 px-6 bg-white/50 hover:bg-white text-text-dark/60 text-center rounded-xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 border border-text-dark/5 shadow-soft"
+            >
+              Explore Packages
+            </a>
           </div>
         </div>
 

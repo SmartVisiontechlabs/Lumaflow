@@ -24,7 +24,7 @@ export default function Hero() {
   const handleHeroClick = () => {
     if (isAuthenticated) {
       if (upcomingBooking) {
-        navigate('/client/dashboard');
+        navigate('/dashboard');
       } else {
         openBooking(null, { entrySource: 'hero' });
         navigate('/book');
@@ -105,8 +105,8 @@ export default function Hero() {
         <div className="lg:col-span-7 flex flex-col items-start text-left space-y-12">
           {isLoading || !hero ? (
             <div className="space-y-8 relative w-full animate-pulse">
-              <div className="flex items-center gap-5 text-[10px] font-bold uppercase tracking-[0.5em] text-gold/40">
-                <div className="w-8 h-[1px] bg-gold/20" />
+              <div className="flex items-center gap-4 text-[14px] lg:text-[16px] font-semibold uppercase tracking-[0.3em] text-[#8E6F3D]/50">
+                <div className="w-10 h-[1.5px] bg-[#B8955A]/30" />
                 <span>A Sacred Space for Awakening</span>
               </div>
               
@@ -132,8 +132,8 @@ export default function Hero() {
               transition={{ duration: 2.2, ease: [0.22, 1, 0.36, 1] }}
               className="space-y-8 relative w-full"
             >
-              <div className="flex items-center gap-5 text-[10px] font-bold uppercase tracking-[0.5em] text-gold/60 z-10 relative">
-                <div className="w-8 h-[1px] bg-gold/30" />
+              <div className="flex items-center gap-4 text-[14px] lg:text-[16px] font-semibold uppercase tracking-[0.3em] text-[#8E6F3D] z-10 relative">
+                <div className="w-10 h-[1.5px] bg-[#B8955A] flex-shrink-0" />
                 <span>{isAuthenticated && profile?.full_name ? `Welcome Back, ${profile.full_name.split(' ')[0]}` : 'A Sacred Space for Awakening'}</span>
               </div>
               
@@ -207,14 +207,14 @@ export default function Hero() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 2, duration: 2 }}
-            className="flex items-center gap-12 pt-4 relative z-10"
+            className="flex flex-wrap items-center gap-4 pt-4 relative z-10"
           >
-            <div className="flex items-center gap-3.5 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30">
-              <ShieldCheck className="w-3.5 h-3.5 text-gold/30" />
+            <div className="flex items-center gap-2.5 px-4 py-2 bg-[#B8955A]/5 border border-[#B8955A]/15 rounded-full text-[13px] lg:text-[14px] font-medium tracking-[0.15em] text-[#7A5F35] uppercase transition-all">
+              <ShieldCheck className="w-4 h-4 text-[#B8955A] flex-shrink-0" />
               <span>Private Sanctuary</span>
             </div>
-            <div className="flex items-center gap-3.5 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30">
-              <Sparkles className="w-3.5 h-3.5 text-gold/30" />
+            <div className="flex items-center gap-2.5 px-4 py-2 bg-[#B8955A]/5 border border-[#B8955A]/15 rounded-full text-[13px] lg:text-[14px] font-medium tracking-[0.15em] text-[#7A5F35] uppercase transition-all">
+              <Sparkles className="w-4 h-4 text-[#B8955A] flex-shrink-0" />
               <span>Nervous System Centered</span>
             </div>
           </motion.div>

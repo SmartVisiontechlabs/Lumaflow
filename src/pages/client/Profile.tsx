@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../providers/AuthProvider';
 import { 
   User, 
@@ -11,6 +12,7 @@ import { motion } from 'framer-motion';
 
 export default function Profile() {
   const { profile, loading, updateProfile } = useAuth();
+  const navigate = useNavigate();
   const error = null; // useAuth handles loading internally and is robust
   const [fullName, setFullName] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
@@ -143,6 +145,26 @@ export default function Profile() {
             {profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A'}
           </p>
         </div>
+      </div>
+
+      {/* Device Session Management */}
+      <div className="bg-white/40 border border-white/60 p-8 rounded-[2.5rem] shadow-luxury text-center space-y-4 relative overflow-hidden">
+        <div className="absolute top-[-20%] right-[-10%] w-[150px] h-[150px] bg-gold/5 blur-[40px] rounded-full pointer-events-none" />
+        
+        <h4 className="font-display text-lg text-text-dark tracking-tight">Device Sessions</h4>
+        <p className="text-[11px] text-text-dark/50 leading-relaxed max-w-sm mx-auto">
+          If you are on a shared computer or want to end your current session completely on this device.
+        </p>
+        <button
+          onClick={async () => {
+            const { supabase } = await import('../../lib/supabase');
+            await supabase.auth.signOut();
+            navigate('/login');
+          }}
+          className="px-6 py-4 border border-red-500/20 hover:border-red-500 bg-transparent text-red-500/80 hover:text-white hover:bg-red-500 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-700 cursor-pointer shadow-sm hover:scale-[1.01]"
+        >
+          Logout
+        </button>
       </div>
     </div>
   );

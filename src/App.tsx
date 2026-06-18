@@ -29,6 +29,14 @@ const ClientDashboard = lazy(() => import('./pages/client/Dashboard'));
 const ClientBookings = lazy(() => import('./pages/client/Bookings'));
 const ClientMembership = lazy(() => import('./pages/client/Membership'));
 const ClientProfile = lazy(() => import('./pages/client/Profile'));
+const ClientPayments = lazy(() => import('./pages/client/Payments'));
+
+// New Auth Pages
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const CheckEmailPage = lazy(() => import('./pages/auth/CheckEmailPage'));
+const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
+const LoggedOutPage = lazy(() => import('./pages/auth/LoggedOutPage'));
+import ClientProtectedRoute from './components/auth/ProtectedRoute';
 
 // Protected Route Guard
 import { Outlet } from 'react-router-dom';
@@ -82,12 +90,6 @@ const ProtectedRoute = () => {
   return isAdmin ? <Outlet /> : <Navigate to="/admin/login" replace />;
 };
 
-const ClientProtectedRoute = () => {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) return <Loading />;
-  return isAuthenticated ? <Outlet /> : <Loading />;
-};
 
 // Luxury Lumaflow Loading Screen
 const Loading = () => (
@@ -112,7 +114,7 @@ const Loading = () => (
       {/* Elegantly styled branding text with breathing animation */}
       <div className="flex flex-col items-center gap-1.5 animate-pulse text-center" style={{ animationDuration: '3s' }}>
         <h2 className="font-serif text-gold/90 tracking-[0.25em] text-sm font-light uppercase">LUMAFLOW</h2>
-        <p className="text-gold/60 font-sans text-[10px] tracking-[0.2em] font-light uppercase">Preparing Your Sanctuary...</p>
+        <p className="text-gold/60 font-sans text-[10px] tracking-[0.2em] font-light uppercase">Restoring your sanctuary...</p>
       </div>
     </div>
   </div>
@@ -174,15 +176,20 @@ export default function App() {
             </Route>
 
             {/* Client Routes */}
-            <Route path="/client/login" element={<ClientLogin />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/client/login" element={<Navigate to="/login" replace />} />
+            <Route path="/check-email" element={<CheckEmailPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/logged-out" element={<LoggedOutPage />} />
 
             <Route element={<ClientProtectedRoute />}>
-              <Route path="/client" element={<ClientLayout />}>
-                <Route index element={<Navigate to="dashboard" replace />} />
-                <Route path="dashboard" element={<ClientDashboard />} />
-                <Route path="bookings" element={<ClientBookings />} />
-                <Route path="membership" element={<ClientMembership />} />
-                <Route path="profile" element={<ClientProfile />} />
+              <Route element={<ClientLayout />}>
+                <Route path="/dashboard" element={<ClientDashboard />} />
+                <Route path="/sanctuary" element={<ClientDashboard />} />
+                <Route path="/my-rituals" element={<ClientBookings />} />
+                <Route path="/membership" element={<ClientMembership />} />
+                <Route path="/profile" element={<ClientProfile />} />
+                <Route path="/dashboard/payments" element={<ClientPayments />} />
               </Route>
             </Route>
           </Routes>

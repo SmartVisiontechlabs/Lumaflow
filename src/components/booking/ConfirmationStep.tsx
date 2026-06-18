@@ -553,21 +553,33 @@ const ConfirmationStep = () => {
                 </div>
                 
                 <div className="space-y-3">
-                  <h4 className="font-display text-3xl text-text-dark tracking-tight">
-                    Welcome Back
+                  <h4 className="font-display text-2xl md:text-3xl text-text-dark tracking-tight">
+                    We found your sanctuary account.
                   </h4>
                   <p className="text-xs text-text-dark/60 font-light leading-relaxed">
-                    We found your sanctuary account. <br />Continue to booking.
+                    You can continue your booking using your existing account, or access your sanctuary dashboard.
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setShowAuthModal(false)}
-                  className="w-full py-4 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  Continue to Booking
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex flex-col gap-4 pt-2">
+                  <button
+                    onClick={() => setShowAuthModal(false)}
+                    className="w-full py-4 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    Continue Booking
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowAuthModal(false);
+                      navigate('/login');
+                    }}
+                    className="w-full py-4 bg-white/40 border border-text-dark/10 hover:border-gold/40 text-text-dark/60 hover:text-gold rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    Access My Sanctuary
+                  </button>
+                </div>
               </div>
             </motion.div>
           </div>

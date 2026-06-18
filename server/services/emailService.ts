@@ -6,6 +6,8 @@ import { AdminNotificationEmail } from '../../src/emails/AdminNotification';
 import { Reminder24hEmail } from '../../src/emails/Reminder24h';
 import { Prep1hEmail } from '../../src/emails/Prep1h';
 import { FollowUpRitualEmail } from '../../src/emails/FollowUpRitualEmail';
+import { WelcomeEmail } from '../../src/emails/WelcomeEmail';
+import { AccessSanctuaryEmail } from '../../src/emails/AccessSanctuary';
 import { Booking } from '../types/booking';
 import { getLocalTimeForEST } from '../utils/bookingUtils';
 import { format, parse, addMinutes } from 'date-fns';
@@ -382,6 +384,83 @@ We await you in the stillness.
     } catch (error: any) {
       console.error('Error sending 1h prep email:', error);
       await this.logEmail(booking.id, 'prep_1h_critical', booking.email, 'failed', error.message);
+    }
+  },
+
+  /**
+   * Sends the luxury welcome/onboarding email to new clients
+   */
+  async sendWelcomeEmail(email: string, fullName: string, magicLink: string, booking?: Booking) {
+    try {
+      console.log('--- WELCOME EMAIL PIPELINE STARTED ---');
+      console.log('RECIPIENT:', email);
+      
+      const ritualName = booking?.selectedSession;
+      const ritualDate = booking?.selectedDate ? format(parse(booking.selectedDate, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy') : undefined;
+      const ritualTime = booking?.selectedTime ? (booking.practitionerTime || (format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST')) : undefined;
+      const sessionLink = booking?.zoomJoinUrl;
+      const sessionFormat = booking?.sessionFormat;
+
+      const result = await resend.emails.send({
+        from: `LumaFlow <${FROM_EMAIL}>`,
+        to: email,
+        replyTo: 'support@thelumaflow.com',
+        subject: 'Welcome to Lumaflow',
+        react: WelcomeEmail({
+          fullName,
+          magicLink,
+          email,
+          ritualName,
+          ritualDate,
+          ritualTime,
+          sessionLink,
+          sessionFormat
+        }),
+      });
+
+      if (result.error) {
+        console.error('WELCOME EMAIL FAILED:', result.error.message);
+        if (booking?.id) {
+          await this.logEmail(booking.id, 'welcome_email', email, 'failed', result.error.message);
+        }
+      } else {
+        console.log('[WELCOME EMAIL SENT]');
+        if (booking?.id) {
+          await this.logEmail(booking.id, 'welcome_email', email, 'sent');
+        }
+      }
+    } catch (error: any) {
+      console.error('WELCOME EMAIL PIPELINE EXCEPTION:', error.message);
+    }
+  },
+
+  /**
+   * Sends the passwordless magic login link to access the sanctuary
+   */
+  async sendMagicLinkEmail(email: string, fullName: string, magicLink: string) {
+    try {
+      console.log('--- MAGIC LINK EMAIL PIPELINE STARTED ---');
+      console.log('RECIPIENT:', email);
+
+      const result = await resend.emails.send({
+        from: `LumaFlow <${FROM_EMAIL}>`,
+        to: email,
+        replyTo: 'support@thelumaflow.com',
+        subject: 'Access Your Sanctuary',
+        react: AccessSanctuaryEmail({
+          fullName,
+          magicLink,
+          email,
+        }),
+      });
+
+      if (result.error) {
+        console.error('MAGIC LINK EMAIL FAILED:', result.error.message);
+      } else {
+        console.log('[MAGIC LINK EMAIL SENT]');
+      }
+    } catch (error: any) {
+      console.error('MAGIC LINK EMAIL PIPELINE EXCEPTION:', error.message);
     }
   }
 };

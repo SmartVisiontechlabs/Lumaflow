@@ -23,7 +23,7 @@ export const authService = {
         return { userId, isNew: false };
       }
 
-      const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/dashboard`;
+      const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`;
       let newUserId: string | null = null;
 
       if (supabaseAdmin) {
@@ -140,7 +140,7 @@ export const authService = {
   async generateMagicLink(email: string): Promise<string | null> {
     try {
       console.log(`[authService] Triggering magic login email for: ${email}`);
-      const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/client/dashboard`;
+      const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard`;
       
       const { error } = await supabase.auth.signInWithOtp({
         email,

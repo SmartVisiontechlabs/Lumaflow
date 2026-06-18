@@ -216,15 +216,23 @@ const BookingSuccess = () => {
       setMagicLinkError(null);
       try {
         console.log(`[BookingSuccess] Sending auto magic link to booking email: ${bookingEmail}`);
-        const redirectTo = `${window.location.origin}/client/dashboard`;
-        const { error: otpError } = await supabase.auth.signInWithOtp({
-          email: bookingEmail,
-          options: {
-            shouldCreateUser: true,
-            emailRedirectTo: redirectTo
-          }
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+        const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
+        
+        const response = await fetch(`${API_URL}/auth/magic-link`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: bookingEmail }),
         });
-        if (otpError) throw otpError;
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to send secure access link.');
+        }
+
         sessionStorage.setItem(sentKey, 'true');
         setMagicLinkSent(true);
       } catch (err: any) {
@@ -248,7 +256,7 @@ const BookingSuccess = () => {
         window.location.href = loginUrl;
       } else {
         console.log('[BookingSuccess] Countdown finished. Redirecting to dashboard...');
-        navigate('/client/dashboard', { replace: true });
+        navigate('/dashboard', { replace: true });
       }
       return;
     }
@@ -265,15 +273,23 @@ const BookingSuccess = () => {
     setMagicLinkSending(true);
     setMagicLinkError(null);
     try {
-      const redirectTo = `${window.location.origin}/client/dashboard`;
-      const { error } = await supabase.auth.signInWithOtp({
-        email: bookingData.email,
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: redirectTo
-        }
+      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+      const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
+      
+      const response = await fetch(`${API_URL}/auth/magic-link`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: bookingData.email }),
       });
-      if (error) throw error;
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send secure access link.');
+      }
+
       setMagicLinkSent(true);
       const sentKey = `magic_link_sent_for_${bookingData.id}`;
       sessionStorage.setItem(sentKey, 'true');
@@ -384,25 +400,18 @@ Preparation Checklist:
   const handleEnterSanctuary = () => {
     resetBooking();
     if (isAuthenticated || hasSession) {
-      navigate('/client/dashboard');
-    } else if (loginUrl) {
-      window.location.href = loginUrl;
+      navigate('/dashboard');
     } else {
-      const mailUrl = getMailClientUrl(bookingData?.email);
-      if (mailUrl) {
-        window.open(mailUrl, '_blank');
-      } else {
-        window.open('https://mail.google.com', '_blank');
-      }
+      navigate('/login');
     }
   };
 
   const handleViewBooking = () => {
     resetBooking();
     if (isAuthenticated || hasSession) {
-      navigate('/client/bookings');
-    } else if (loginUrl) {
-      window.location.href = loginUrl;
+      navigate('/my-rituals');
+    } else {
+      navigate('/login');
     }
   };
 
@@ -437,23 +446,18 @@ Preparation Checklist:
           </div>
 
           <div className="space-y-4">
-            <h1 className="font-display text-5xl md:text-7xl text-text-dark tracking-tight leading-tight">
-              {(isAuthenticated || hasSession) ? (
-                <>Welcome <span className="italic text-gold">Home</span></>
-              ) : isNewUser ? (
-                <>Sanctuary <span className="italic text-gold">Ready</span></>
-              ) : (
-                <>Sanctuary <span className="italic text-gold">Secured</span></>
-              )}
+            <h1 className="font-display text-4xl md:text-6xl text-text-dark tracking-tight leading-tight">
+              Your Sanctuary Has Been Created
             </h1>
-            <p className="font-display text-2xl md:text-3xl text-text-dark/80 italic font-light">
-              {(isAuthenticated || hasSession) 
-                ? "Your sanctuary is active" 
-                : isNewUser 
-                ? "Your Sanctuary Is Ready" 
-                : "Welcome back to your sanctuary"}
+            <p className="font-display text-xl md:text-2xl text-gold italic font-light">
+              We've sent a secure access link to your email.
             </p>
-            <div className="flex flex-col items-center gap-3">
+            {bookingData?.email && (
+              <p className="font-mono text-xs text-text-dark/40">
+                Inbox: {bookingData.email}
+              </p>
+            )}
+            <div className="flex flex-col items-center gap-3 pt-4">
               <span className="text-[10px] font-bold text-text-dark/30 uppercase tracking-[0.5em]">Booking Reference</span>
               <span className="font-display text-4xl text-gold tracking-[0.2em]">{bookingData?.bookingReference}</span>
             </div>
@@ -774,44 +778,26 @@ Preparation Checklist:
 
         {/* Buttons Grid */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-6 max-w-2xl mx-auto pt-6">
-          {(isAuthenticated || hasSession || loginUrl) ? (
-            <>
-              <button
-                onClick={handleEnterSanctuary}
-                className="w-full sm:w-auto px-10 py-5 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury"
-              >
-                Enter My Sanctuary
-              </button>
-              
-              <button
-                onClick={handleViewBooking}
-                className="w-full sm:w-auto px-10 py-5 bg-white/60 hover:bg-white text-text-dark border border-text-dark/5 rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft"
-              >
-                View Updated Journey
-              </button>
-            </>
-          ) : (
-            <>
-              <button
-                onClick={handleEnterSanctuary}
-                className="w-full sm:w-auto px-10 py-5 bg-text-dark hover:bg-gold text-white hover:text-black rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury"
-              >
-                Open My Sanctuary
-              </button>
+          <button
+            onClick={handleEnterSanctuary}
+            className="w-full sm:w-auto px-10 py-5 bg-text-dark hover:bg-[#CBAE73] text-white hover:text-black rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury cursor-pointer"
+          >
+            Enter Sanctuary
+          </button>
 
-              <button
-                onClick={handleResendLink}
-                disabled={magicLinkSending}
-                className="w-full sm:w-auto px-10 py-5 bg-white/60 hover:bg-white text-text-dark border border-text-dark/5 rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft disabled:opacity-50"
-              >
-                {magicLinkSending ? "Sending..." : "Resend Link"}
-              </button>
-            </>
-          )}
+          <button
+            onClick={() => {
+              resetBooking();
+              navigate('/');
+            }}
+            className="w-full sm:w-auto px-10 py-5 bg-white/40 border border-text-dark/10 hover:border-gold text-text-dark rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft cursor-pointer"
+          >
+            Return Home
+          </button>
 
           <button
             onClick={handleAddToCalendar}
-            className="w-full sm:w-auto px-10 py-5 bg-[#CBAE73]/15 hover:bg-[#CBAE73] text-[#CBAE73] hover:text-black border border-[#CBAE73]/20 rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft flex items-center justify-center gap-2"
+            className="w-full sm:w-auto px-10 py-5 bg-[#CBAE73]/15 hover:bg-[#CBAE73] text-[#CBAE73] hover:text-black border border-[#CBAE73]/20 rounded-full text-[11px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-soft flex items-center justify-center gap-2 cursor-pointer"
           >
             <Calendar className="w-4 h-4" />
             Add to Calendar

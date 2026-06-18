@@ -8,7 +8,7 @@ import StepHeading from './shared/StepHeading';
 const formats = [
   {
     id: 'Virtual',
-    title: 'Virtual Sanctuary',
+    title: 'Virtual Experience',
     description: 'Deeply personal guidance for emotional release from your own home.',
     benefit: 'Private Sanctuary',
     icon: Video

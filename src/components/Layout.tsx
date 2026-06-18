@@ -4,7 +4,7 @@ import { useBookingStore } from '../store/bookingStore';
 
 import { useAuth } from '../providers/AuthProvider';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, LogOut, LayoutDashboard, Calendar, Sparkles, User, Compass, Clock, Menu, X } from 'lucide-react';
+import { ChevronDown, LogOut, LayoutDashboard, Calendar, Sparkles, User, Compass, Clock, Menu, X, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
@@ -19,34 +19,35 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
   }, [location.pathname]);
 
   const handleLogout = async () => {
+    console.log('[Layout Nav] Logout clicked, signing out and navigating to /login');
     setIsOpen(false);
     await supabase.auth.signOut();
-    navigate('/');
+    navigate('/login');
   };
 
   const navLinks = isAuthenticated
     ? [
         { name: 'Home', path: '/' },
+        { name: 'About', path: '/about' },
         { name: 'Classes', path: '/classes' },
         { name: 'Pricing', path: '/pricing' },
-        { name: 'My Sanctuary', path: '/client/dashboard' },
-        { name: 'Rituals', path: '/client/bookings' },
-        { name: 'Membership', path: '/client/membership' },
+        { name: 'My Sanctuary', path: '/dashboard' },
+        { name: 'Contact', path: '/contact' },
       ]
     : [
         { name: 'Home', path: '/' },
         { name: 'About', path: '/about' },
         { name: 'Classes', path: '/classes' },
         { name: 'Pricing', path: '/pricing' },
+        { name: 'CONTINUE YOUR JOURNEY', path: '/login' },
         { name: 'Contact', path: '/contact' },
-        { name: 'Book Ritual', path: '/book' },
       ];
 
   const menuItems = [
-    { name: 'Dashboard', path: '/client/dashboard', icon: LayoutDashboard },
-    { name: 'My Sessions', path: '/client/bookings', icon: Calendar },
-    { name: 'Membership', path: '/client/membership', icon: Sparkles },
-    { name: 'Profile', path: '/client/profile', icon: User },
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Bookings', path: '/my-rituals', icon: Calendar },
+    { name: 'Payments', path: '/dashboard/payments', icon: CreditCard },
+    { name: 'Profile', path: '/profile', icon: User },
   ];
 
   // Close dropdown on click outside helper
@@ -83,8 +84,19 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
           ))}
         </div>
 
-        <div className="flex items-center justify-end relative gap-4">
-          {isAuthenticated ? (
+        <div className="flex items-center justify-end relative gap-6">
+          {/* Always show Book Ritual gold CTA button */}
+          <button
+            onClick={() => {
+              openBooking();
+              navigate('/book');
+            }}
+            className="bg-[#CBAE73] text-black px-8 py-2.5 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-500 shadow-[0_6px_20px_rgba(203,174,115,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
+          >
+            Book Ritual
+          </button>
+
+          {isAuthenticated && (
             <div className="relative">
               <button
                 onClick={(e) => {
@@ -141,7 +153,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
                       {/* Logout */}
                       <button
                         onClick={handleLogout}
-                        className="w-full text-left flex items-center gap-4 px-6 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 hover:bg-red-500/5 hover:text-red-400 border-t border-white/5 mt-2 pt-4 transition-all duration-500 cursor-pointer"
+                        className="w-full text-left flex items-center gap-4 px-6 py-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-white/40 hover:bg-white/5 hover:text-[#CBAE73] border-t border-white/5 mt-2 pt-4 transition-all duration-500 cursor-pointer"
                       >
                         <LogOut className="w-4 h-4 text-white/10" />
                         Logout
@@ -151,13 +163,6 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
                 )}
               </AnimatePresence>
             </div>
-          ) : (
-            <button
-              onClick={openBooking}
-              className="bg-[#CBAE73] text-black px-8 py-2.5 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-500 shadow-[0_6px_20px_rgba(203,174,115,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
-            >
-              Book Ritual
-            </button>
           )}
 
           {/* Mobile Hamburger Toggle */}

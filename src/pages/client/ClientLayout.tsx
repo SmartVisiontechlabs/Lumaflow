@@ -9,7 +9,8 @@ import {
   Menu,
   X,
   Compass,
-  ArrowUpRight
+  ArrowUpRight,
+  CreditCard
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -20,15 +21,16 @@ export default function ClientLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   const navItems = [
-    { name: 'Dashboard', path: '/client/dashboard', icon: LayoutDashboard },
-    { name: 'My Bookings', path: '/client/bookings', icon: Calendar },
-    { name: 'Membership', path: '/client/membership', icon: Sparkles },
-    { name: 'My Profile', path: '/client/profile', icon: User },
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Bookings', path: '/my-rituals', icon: Calendar },
+    { name: 'Payments', path: '/dashboard/payments', icon: CreditCard },
+    { name: 'Profile', path: '/profile', icon: User },
   ];
 
   const handleLogout = async () => {
+    console.log('[ClientLayout] Logout clicked, signing out and navigating to /login');
     await supabase.auth.signOut();
-    navigate('/client/login');
+    navigate('/login');
   };
 
   const currentPathName = navItems.find(item => 
@@ -91,10 +93,10 @@ export default function ClientLayout() {
           
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-4 w-full px-6 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] text-text-dark/30 hover:text-red-400 transition-all duration-500 group"
+            className="flex items-center gap-4 w-full px-6 py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] text-text-dark/30 hover:text-[#CBAE73] transition-all duration-500 group cursor-pointer"
           >
-            <LogOut className="w-4 h-4 text-text-dark/10 group-hover:text-red-400/60 transition-colors" />
-            Sign Out
+            <LogOut className="w-4 h-4 text-text-dark/10 group-hover:text-[#CBAE73]/60 transition-colors" />
+            Logout
           </button>
         </div>
       </aside>
@@ -183,14 +185,14 @@ export default function ClientLayout() {
                   <ArrowUpRight className="w-3.5 h-3.5 text-text-dark/20" />
                 </Link>
                 <button 
-                  onClick={() => {
+                  onClick={async () => {
                     setMobileMenuOpen(false);
-                    handleLogout();
+                    await handleLogout();
                   }}
-                  className="flex items-center gap-4 w-full px-6 py-4 rounded-xl text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/30 hover:text-red-400"
+                  className="flex items-center gap-4 w-full px-6 py-4 rounded-xl text-[9px] font-bold uppercase tracking-[0.2em] text-text-dark/30 hover:text-[#CBAE73] cursor-pointer"
                 >
                   <LogOut className="w-4 h-4 text-text-dark/10" />
-                  Sign Out
+                  Logout
                 </button>
               </div>
             </motion.div>

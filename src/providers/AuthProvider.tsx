@@ -278,17 +278,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (loading) return;
 
     const path = location.pathname;
+    console.log('[AuthProvider Central Redirect Check] path:', path, 'isAuthenticated:', isAuthenticated);
 
-    if (isAuthenticated) {
-      if (path === '/client/login') {
-        console.log('[AuthProvider Central Redirect] Authenticated user on login page. Redirecting to dashboard.');
-        navigate('/client/dashboard', { replace: true });
-      }
-    } else {
-      if (path.startsWith('/client') && path !== '/client/login') {
-        console.log('[AuthProvider Central Redirect] Unauthenticated user on protected route. Redirecting to login.');
-        navigate('/client/login', { replace: true });
-      }
+    if (isAuthenticated && (path === '/login' || path === '/client/login')) {
+      console.log('[AuthProvider Central Redirect] Authenticated user on login page. Redirecting to dashboard.');
+      navigate('/dashboard', { replace: true });
     }
   }, [isAuthenticated, loading, location.pathname, navigate]);
 
@@ -306,6 +300,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refresh,
     updateProfile
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center p-6 relative font-sans selection:bg-gold/10 selection:text-gold">
+        {/* Background grain overlay */}
+        <div className="absolute inset-0 bg-grain pointer-events-none opacity-[0.03] mix-blend-overlay" />
+        
+        {/* Soft atmospheric golden glows */}
+        <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[80%] bg-gold/5 blur-[160px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[70%] bg-gold/5 blur-[140px] rounded-full pointer-events-none" />
+        
+        <div className="flex flex-col items-center gap-8 relative z-10 text-center">
+          {/* pulsing gold logo circle with breathing animation */}
+          <div className="relative w-20 h-20 flex items-center justify-center">
+            {/* Pulsing outer ring */}
+            <div className="absolute inset-0 rounded-full border border-gold/25 animate-ping opacity-60" style={{ animationDuration: '3s' }} />
+            
+            {/* Core spinning ring */}
+            <div className="absolute inset-0 rounded-full border border-transparent border-t-gold/80 border-r-gold/40 animate-spin" style={{ animationDuration: '1.2s' }} />
+            
+            {/* Center brand mark */}
+            <span className="font-serif text-lg text-gold tracking-widest font-extralight animate-pulse" style={{ animationDuration: '2s' }}>LF</span>
+          </div>
+          
+          {/* Elegantly styled branding text with breathing animation */}
+          <div className="flex flex-col items-center gap-1.5 animate-pulse text-center" style={{ animationDuration: '3s' }}>
+            <h2 className="font-serif text-gold/90 tracking-[0.25em] text-sm font-light uppercase">LUMAFLOW</h2>
+            <p className="text-gold/60 font-sans text-[10px] tracking-[0.2em] font-light uppercase">Restoring your sanctuary...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

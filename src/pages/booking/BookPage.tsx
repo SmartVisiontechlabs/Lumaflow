@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Sparkles, MapPin, Calendar, Clock, Mail, X } from 'lucide-react';
 import { useBookingFlow } from '../../hooks/useBookingFlow';
@@ -134,8 +134,14 @@ export default function BookPage() {
     fetchRecommendationMatrix();
   }, []);
 
+  const isInitialMount = useRef(true);
+
   // Redirect to home if user explicitly closes the booking flow
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     if (!isOpen) {
       navigate('/');
     }
