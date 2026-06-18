@@ -77,9 +77,9 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
           </Link>
         </div>
 
-        <div className="hidden md:flex items-center gap-10 text-[11px] font-bold uppercase tracking-[0.3em] text-white/80">
+        <div className="hidden lg:flex items-center gap-4 xl:gap-8 text-[10px] xl:text-[11px] font-bold uppercase tracking-[0.15em] xl:tracking-[0.25em] text-white/80">
           {navLinks.map(link => (
-            <Link key={link.name} to={link.path} className="relative group py-2 hover:text-[#CBAE73] transition-colors duration-500">
+            <Link key={link.name} to={link.path} className="relative group py-2 hover:text-[#CBAE73] transition-colors duration-500 whitespace-nowrap">
               {link.name}
               <span className="absolute bottom-0 left-0 w-0 h-[1.5px] bg-[#CBAE73] transition-all duration-500 group-hover:w-full" />
             </Link>
@@ -170,7 +170,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
           {/* Mobile Hamburger Toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden flex items-center justify-center p-2 text-white/80 hover:text-[#CBAE73] focus:outline-none transition-colors duration-300"
+            className="lg:hidden flex items-center justify-center p-2 text-white/80 hover:text-[#CBAE73] focus:outline-none transition-colors duration-300"
             aria-label="Toggle mobile menu"
           >
             {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -186,7 +186,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            className="md:hidden absolute top-[88px] left-0 w-full bg-[#1A1A1A]/95 border-b border-[#CBAE73]/20 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[999] flex flex-col px-8 py-6 gap-4"
+            className="lg:hidden absolute top-[88px] left-0 w-full bg-[#1A1A1A]/95 border-b border-[#CBAE73]/20 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[999] flex flex-col px-8 py-6 gap-4"
           >
             {navLinks.map((link) => (
               <Link
