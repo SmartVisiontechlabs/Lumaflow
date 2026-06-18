@@ -702,27 +702,57 @@ export default function CmsManager() {
     if (!confirm('Are you sure you want to delete this package? This will affect new client purchases.')) return;
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from('packages')
-        .delete()
-        .eq('id', id);
+      // 1. Check if package is referenced in user_packages
+      const { data: userPkgs, error: checkError1 } = await supabase
+        .from('user_packages')
+        .select('id')
+        .eq('package_id', id)
+        .limit(1);
 
-      if (error) {
-        // Check for foreign key constraint violation (Postgres code 23503 or HTTP 409)
-        if (error.code === '23503' || error.status === 409 || error.message?.toLowerCase().includes('foreign key')) {
-          console.log('Package is referenced by other records. Deactivating it instead.');
-          const { error: updateError } = await supabase
-            .from('packages')
-            .update({ is_active: false })
-            .eq('id', id);
-          
-          if (updateError) throw updateError;
-          showToast('Package is referenced by active clients. It has been deactivated to preserve their history.', 'info');
-        } else {
-          throw error;
-        }
+      if (checkError1) throw checkError1;
+
+      // 2. Check if package is referenced in bookings
+      const { data: bookingsPkgs, error: checkError2 } = await supabase
+        .from('bookings')
+        .select('id')
+        .eq('package_id', id)
+        .limit(1);
+
+      if (checkError2) throw checkError2;
+
+      const isReferenced = (userPkgs && userPkgs.length > 0) || (bookingsPkgs && bookingsPkgs.length > 0);
+
+      if (isReferenced) {
+        console.log('Package is referenced by active purchases or bookings. Deactivating it directly.');
+        const { error: updateError } = await supabase
+          .from('packages')
+          .update({ is_active: false })
+          .eq('id', id);
+        
+        if (updateError) throw updateError;
+        showToast('Package is referenced by active clients. It has been deactivated to preserve their history.', 'info');
       } else {
-        showToast('Package deleted successfully.', 'success');
+        // Safe to delete from database
+        const { error } = await supabase
+          .from('packages')
+          .delete()
+          .eq('id', id);
+
+        if (error) {
+          if (error.code === '23503' || error.status === 409) {
+            const { error: updateError } = await supabase
+              .from('packages')
+              .update({ is_active: false })
+              .eq('id', id);
+            
+            if (updateError) throw updateError;
+            showToast('Package is referenced by active clients. It has been deactivated to preserve their history.', 'info');
+          } else {
+            throw error;
+          }
+        } else {
+          showToast('Package deleted successfully.', 'success');
+        }
       }
       
       const { data } = await supabase
