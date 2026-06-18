@@ -31,7 +31,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
         { name: 'About', path: '/about' },
         { name: 'Classes', path: '/classes' },
         { name: 'Pricing', path: '/pricing' },
-        { name: 'My Sanctuary', path: '/dashboard' },
+        { name: 'CONTINUE YOUR JOURNEY', path: '/dashboard' },
         { name: 'Contact', path: '/contact' },
       ]
     : [
