@@ -32,27 +32,24 @@ export default function Home() {
     },
     "sameAs": [
       "https://www.instagram.com/lumaflow",
-      "https://open.spotify.com/user/lumaflow"
+      "https://open.spotify.com/user/lumaflow",
+      "https://g.page/lumaflow"
     ]
   };
 
-  const wellnessBusinessSchema = {
+  const professionalServiceSchema = {
     "@context": "https://schema.org",
-    "@type": "WellnessCenter",
+    "@type": "ProfessionalService",
     "name": "LumaFlow",
     "url": "https://thelumaflow.com",
     "image": "https://thelumaflow.com/og-image.png",
     "description": "Experience private breathwork, somatic healing, meditation, and nervous system restoration through personalized rituals designed to support deep healing and transformation.",
     "email": "support@thelumaflow.com",
-    "address": {
-      "@type": "PostalAddress",
-      "addressLocality": "New York",
-      "addressRegion": "NY",
-      "addressCountry": "US"
-    },
+    "areaServed": "United States",
     "sameAs": [
       "https://www.instagram.com/lumaflow",
-      "https://open.spotify.com/user/lumaflow"
+      "https://open.spotify.com/user/lumaflow",
+      "https://g.page/lumaflow"
     ],
     "hasOfferCatalog": {
       "@type": "OfferCatalog",
@@ -148,7 +145,7 @@ export default function Home() {
     "@context": "https://schema.org",
     "@type": "Review",
     "itemReviewed": {
-      "@type": "LocalBusiness",
+      "@type": "ProfessionalService",
       "name": "LumaFlow",
       "image": "https://thelumaflow.com/gold-logo.png"
     },
@@ -166,7 +163,7 @@ export default function Home() {
 
   const allSchemas = [
     organizationSchema,
-    wellnessBusinessSchema,
+    professionalServiceSchema,
     faqSchema,
     ...reviewSchemaList
   ];

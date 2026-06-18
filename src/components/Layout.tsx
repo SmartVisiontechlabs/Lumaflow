@@ -29,6 +29,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
     ? [
         { name: 'Home', path: '/' },
         { name: 'About', path: '/about' },
+        { name: 'Services', path: '/services' },
         { name: 'Classes', path: '/classes' },
         { name: 'Pricing', path: '/pricing' },
         { name: 'CONTINUE YOUR JOURNEY', path: '/dashboard' },
@@ -37,6 +38,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
     : [
         { name: 'Home', path: '/' },
         { name: 'About', path: '/about' },
+        { name: 'Services', path: '/services' },
         { name: 'Classes', path: '/classes' },
         { name: 'Pricing', path: '/pricing' },
         { name: 'CONTINUE YOUR JOURNEY', path: '/login' },
@@ -216,10 +218,14 @@ const Footer = memo(() => (
 
       <div className="flex flex-col items-center md:items-end gap-8">
         <div className="flex gap-8 text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">
+          <Link to="/" className="hover:text-gold transition-colors">Home</Link>
+          <Link to="/about" className="hover:text-gold transition-colors">About</Link>
           <Link to="/services" className="hover:text-gold transition-colors">Services</Link>
-          <a href="#" className="hover:text-gold transition-colors">Instagram</a>
-          <a href="#" className="hover:text-gold transition-colors">Spotify</a>
+          <Link to="/classes" className="hover:text-gold transition-colors">Classes</Link>
+          <Link to="/pricing" className="hover:text-gold transition-colors">Pricing</Link>
           <Link to="/contact" className="hover:text-gold transition-colors">Contact</Link>
+          <a href="https://www.instagram.com/lumaflow" target="_blank" rel="noopener noreferrer" className="hover:text-gold transition-colors">Instagram</a>
+          <a href="https://open.spotify.com/user/lumaflow" target="_blank" rel="noopener noreferrer" className="hover:text-gold transition-colors">Spotify</a>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3">
           <input
