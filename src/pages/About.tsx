@@ -35,6 +35,7 @@ export default function About() {
       <SEOMetadata 
         title="About Alanna | Founder & Somatic Guide | LumaFlow" 
         description="Meet Alanna, the founder of LumaFlow. Learn about somatic breathwork, conscious movement, and our philosophy of stillness."
+        keywords="somatic guide, breathwork founder, Alanna, LumaFlow about, conscious movement, wellness coach, trauma informed"
       />
       {/* 1. HERO SECTION */}
       <section className="relative pt-48 pb-36 px-6 bg-[#F8F5F0] overflow-hidden">

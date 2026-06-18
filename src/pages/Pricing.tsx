@@ -62,8 +62,9 @@ export default function Pricing() {
   return (
     <div className="pt-32 pb-24 px-6 max-w-7xl mx-auto min-h-screen relative">
       <SEOMetadata 
-        title="LumaFlow Pricing | Rituals & Session Packages" 
+        title="Sanctuary Investment | Rituals & Session Packages | LumaFlow" 
         description="Explore premium single breathwork sessions and multi-journey credit packages designed to restore nervous system balance."
+        keywords="breathwork pricing, somatic healing cost, wellness packages, ritual session pricing, sanctuary credit pass"
       />
       <div className="absolute top-0 right-0 w-1/2 h-96 opacity-10 -z-10 pointer-events-none">
         <img src="/pricing-image.png" alt="" className="w-full h-full object-cover mix-blend-luminosity rounded-bl-full" />

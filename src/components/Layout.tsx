@@ -85,7 +85,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
         </div>
 
         <div className="flex items-center justify-end relative gap-6">
-          {/* Always show Book Ritual gold CTA button */}
+          {/* Always show Book Session gold CTA button */}
           <button
             onClick={() => {
               openBooking();
@@ -93,7 +93,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
             }}
             className="bg-[#CBAE73] text-black px-8 py-2.5 rounded-full text-[11px] font-bold tracking-[0.2em] uppercase transition-all duration-500 shadow-[0_6px_20px_rgba(203,174,115,0.3)] hover:scale-105 active:scale-95 cursor-pointer"
           >
-            Book Ritual
+            Book Session
           </button>
 
           {isAuthenticated && (

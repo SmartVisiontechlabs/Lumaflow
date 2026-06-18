@@ -41,7 +41,11 @@ export default function Contact() {
 
   return (
     <div className="pt-36 pb-24 px-6 max-w-7xl mx-auto min-h-screen">
-      <SEOMetadata />
+      <SEOMetadata 
+        title="Contact LumaFlow | Begin Your Conversation With Stillness"
+        description="Reach out to our luxury wellness sanctuary in Soho, NY. Schedule a private consultation or send us an inquiry about somatic sessions."
+        keywords="contact LumaFlow, wellness sanctuary New York, somatic breathwork NY, customer support, schedule consultation"
+      />
       <div className="grid md:grid-cols-2 gap-16 lg:gap-24 items-center">
         
         {/* LEFT: FORM SECTION */}

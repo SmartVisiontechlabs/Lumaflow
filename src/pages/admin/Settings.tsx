@@ -198,7 +198,7 @@ const AdminSettings = () => {
     { path: '/classes', label: 'Classes & Rituals' },
     { path: '/pricing', label: 'Pricing & Memberships' },
     { path: '/contact', label: 'Contact Sanctuary' },
-    { path: '/book', label: 'Book a Ritual' }
+    { path: '/book', label: 'Book a Session' }
   ];
 
   const fetchSeoConfig = async () => {

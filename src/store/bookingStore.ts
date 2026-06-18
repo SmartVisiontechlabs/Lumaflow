@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { cmsService } from '../services/cmsService';
 import { RecommendationMatrixEntry } from '../types/cms';
+import { trackBookSessionClick, trackBookingStarted } from '../lib/analytics';
 
 export type PackageInfo = {
   id?: string;
@@ -161,6 +162,10 @@ export const useBookingStore = create<BookingState>()(
         const journeyType = options?.journeyType || '';
         const entrySource = options?.entrySource || (validPkg ? 'pricing' : options?.journeyType ? 'offering' : 'hero');
         const startStep = entrySource === 'offering' ? 2 : 1;
+
+        // Track GA4 Book Session Click and Booking Started
+        trackBookSessionClick(entrySource);
+        trackBookingStarted(validPkg?.name || 'Single Session', validPkg?.price || 45);
 
         // If a valid package is passed or journeyType is preselected, starting fresh is preferred:
         if (validPkg || journeyType) {

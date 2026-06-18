@@ -70,6 +70,16 @@ export const SEOMetadata: React.FC<SEOMetadataProps> = ({
   const keywords = dbSeo?.meta_keywords || propKeywords || defaultKeywords;
   const ogImage = dbSeo?.og_image_url || propOgImage || defaultOgImage;
 
+  // Construct absolute URL for canonical link and Open Graph
+  const canonicalUrl = `https://thelumaflow.com${location.pathname === '/' ? '' : location.pathname}`;
+
+  // Ensure ogImage is absolute
+  const ogImageUrl = ogImage.startsWith('http')
+    ? ogImage
+    : `https://thelumaflow.com${ogImage.startsWith('/') ? '' : '/'}${ogImage}`;
+
+  const googleSiteVerification = import.meta.env.VITE_GOOGLE_SITE_VERIFICATION;
+
   const schemaMarkup = typeof jsonLdSchema === 'object'
     ? JSON.stringify(jsonLdSchema)
     : jsonLdSchema;
@@ -82,11 +92,25 @@ export const SEOMetadata: React.FC<SEOMetadataProps> = ({
       {/* Meta Tags */}
       <meta name="description" content={description} />
       {keywords && <meta name="keywords" content={keywords} />}
+      {googleSiteVerification && (
+        <meta name="google-site-verification" content={googleSiteVerification} />
+      )}
+
+      {/* Canonical Link */}
+      <link rel="canonical" href={canonicalUrl} />
 
       {/* Open Graph Tags */}
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
-      <meta property="og:image" content={ogImage} />
+      <meta property="og:image" content={ogImageUrl} />
+      <meta property="og:url" content={canonicalUrl} />
+      <meta property="og:type" content="website" />
+
+      {/* Twitter Card Tags */}
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={title} />
+      <meta name="twitter:description" content={description} />
+      <meta name="twitter:image" content={ogImageUrl} />
 
       {/* Structured JSON-LD Data */}
       {schemaMarkup && (

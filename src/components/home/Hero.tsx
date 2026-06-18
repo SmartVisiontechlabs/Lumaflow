@@ -36,7 +36,7 @@ export default function Hero() {
   };
 
   const getPrimaryCtaText = () => {
-    if (!isAuthenticated) return cta_text || 'Book Ritual';
+    if (!isAuthenticated) return cta_text || 'Book Session';
     if (upcomingBooking) return 'Enter Sanctuary';
     return 'Continue Healing Journey';
   };

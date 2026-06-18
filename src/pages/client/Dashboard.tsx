@@ -20,6 +20,7 @@ import { format, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../lib/utils';
 import { supabase } from '../../lib/supabase';
+import { trackDashboardVisit } from '../../lib/analytics';
 
 // Helper to calculate Google Calendar Link
 function getGoogleCalendarUrl(booking: LiveBooking) {
@@ -102,6 +103,8 @@ export default function Dashboard() {
         setApiLoading(true);
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
+
+        trackDashboardVisit(session.user.id);
 
         const headers = { 'Authorization': `Bearer ${session.access_token}` };
         const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
@@ -433,7 +436,7 @@ export default function Dashboard() {
               to="/book"
               className="inline-flex py-4 px-10 bg-[#CBAE73] hover:bg-[#CBAE73]/90 text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury"
             >
-              Book A Ritual
+              Book A Session
             </Link>
           </div>
         )}

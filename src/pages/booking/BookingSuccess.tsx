@@ -8,6 +8,7 @@ import { useBookingStore } from '../../store/bookingStore';
 import { getLocalTimeForEST } from '../../utils/bookingUtils';
 import { useAuth } from '../../providers/AuthProvider';
 import { supabase } from '../../lib/supabase';
+import { trackBookingCompleted, trackMagicLinkRequest } from '../../lib/analytics';
 
 const formatTo12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -140,6 +141,7 @@ const BookingSuccess = () => {
           setBookingData(booking);
           setBookingReference(booking.bookingReference);
           setStatus('success');
+          trackBookingCompleted(booking.selectedSession || 'Somatic Ritual', booking.packagePrice || 0);
         } else if (sessionId) {
           const response = await paymentService.confirmPayment(sessionId);
           console.log("payment confirmation response:", response);
@@ -152,6 +154,7 @@ const BookingSuccess = () => {
             setLoginUrl(response.loginUrl);
           }
           setStatus('success');
+          trackBookingCompleted(booking.selectedSession || 'Somatic Ritual', booking.packagePrice || 0);
         }
       } catch (err: any) {
         console.error('Confirmation error:', err);
@@ -233,6 +236,7 @@ const BookingSuccess = () => {
           throw new Error(data.error || 'Failed to send secure access link.');
         }
 
+        trackMagicLinkRequest(bookingEmail);
         sessionStorage.setItem(sentKey, 'true');
         setMagicLinkSent(true);
       } catch (err: any) {
@@ -290,6 +294,7 @@ const BookingSuccess = () => {
         throw new Error(data.error || 'Failed to send secure access link.');
       }
 
+      trackMagicLinkRequest(bookingData.email);
       setMagicLinkSent(true);
       const sentKey = `magic_link_sent_for_${bookingData.id}`;
       sessionStorage.setItem(sentKey, 'true');

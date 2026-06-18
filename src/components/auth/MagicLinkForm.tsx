@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { motion } from 'framer-motion';
 import { Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { trackMagicLinkRequest } from '../../lib/analytics';
 
 export default function MagicLinkForm() {
   const [email, setEmail] = useState('');
@@ -34,6 +35,8 @@ export default function MagicLinkForm() {
       if (!response.ok) {
         throw new Error(data.error || 'The path to the sanctuary could not be opened. Please verify your email.');
       }
+
+      trackMagicLinkRequest(email.trim());
 
       // Save email and first name to sessionStorage for display on the /check-email page
       sessionStorage.setItem('auth_email_attempt', email.trim());

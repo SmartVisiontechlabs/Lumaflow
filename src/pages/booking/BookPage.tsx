@@ -165,7 +165,11 @@ export default function BookPage() {
 
   return (
     <div className="min-h-screen bg-cream relative flex flex-col pt-0 pb-20">
-      <SEOMetadata />
+      <SEOMetadata 
+        title="Book Your Ritual | Guided Somatic Alignment & Breathwork | LumaFlow"
+        description="Select your somatic journey, choose a session format (Virtual or In-Person), and book a private healing ritual."
+        keywords="book somatic breathwork, schedule private ritual, meditation booking, LumaFlow session scheduler"
+      />
       
       {/* CINEMATIC LUMINOUS BACKGROUND */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">

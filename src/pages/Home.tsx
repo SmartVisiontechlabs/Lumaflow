@@ -16,24 +16,76 @@ export default function Home() {
     fetchCMS();
   }, [fetchCMS]);
 
-  const homeSchema = {
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "LumaFlow",
+    "url": "https://thelumaflow.com",
+    "logo": "https://thelumaflow.com/gold-logo.png",
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "customer support",
+      "url": "https://thelumaflow.com/contact"
+    }
+  };
+
+  const wellnessBusinessSchema = {
     "@context": "https://schema.org",
     "@type": "WellnessCenter",
     "name": "LumaFlow",
-    "image": "https://lumaflow.com/gold-logo.png",
-    "description": "Experience high-end somatic breathwork journeys and ritual bookings designed to restore nervous system balance.",
-    "url": "https://lumaflow.com/",
+    "url": "https://thelumaflow.com",
+    "image": "https://thelumaflow.com/gold-logo.png",
+    "description": "Experience private breathwork, somatic healing, meditation, and nervous system restoration through personalized rituals designed to support deep healing and transformation.",
     "address": {
       "@type": "PostalAddress",
       "addressLocality": "New York",
       "addressRegion": "NY",
       "addressCountry": "US"
+    },
+    "hasOfferCatalog": {
+      "@type": "OfferCatalog",
+      "name": "Wellness Services",
+      "itemListElement": [
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "Breathwork"
+          }
+        },
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "Somatic Healing"
+          }
+        },
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "Meditation"
+          }
+        },
+        {
+          "@type": "Offer",
+          "itemOffered": {
+            "@type": "Service",
+            "name": "Private Ritual Sessions"
+          }
+        }
+      ]
     }
   };
 
   return (
     <>
-      <SEOMetadata jsonLdSchema={homeSchema} />
+      <SEOMetadata 
+        title="LumaFlow | Breathwork, Somatic Healing & Nervous System Restoration"
+        description="Experience private breathwork, somatic healing, meditation, and nervous system restoration through personalized rituals designed to support deep healing and transformation."
+        keywords="breathwork, somatic healing, nervous system regulation, meditation, wellness coaching, healing rituals, virtual healing sessions, trauma informed breathwork"
+        jsonLdSchema={[organizationSchema, wellnessBusinessSchema]}
+      />
       <Hero />
       <Healing />
       <AboutMe />

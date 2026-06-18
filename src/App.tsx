@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
+import { trackPageView } from './lib/analytics';
 
 // Lazy Load Pages
 const Home = lazy(() => import('./pages/Home'));
@@ -120,6 +121,16 @@ const Loading = () => (
   </div>
 );
 
+const AnalyticsTracker = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    trackPageView(location.pathname);
+  }, [location.pathname]);
+
+  return null;
+};
+
 export default function App() {
   const [authReady, setAuthReady] = useState(false);
 
@@ -146,6 +157,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <AnalyticsTracker />
       <AuthProvider>
         <Suspense fallback={<Loading />}>
           <Routes>

@@ -60,7 +60,11 @@ export default function Classes() {
 
   return (
     <div className="min-h-screen bg-cream selection:bg-gold/30">
-      <SEOMetadata />
+      <SEOMetadata 
+        title="Classes & Offerings | Somatic Breathwork & Guided Meditation | LumaFlow"
+        description="Explore somatic breathwork, mindful movement, and guided meditation classes at LumaFlow. Choose the practice that meets you where you are."
+        keywords="somatic breathwork classes, guided meditation, mindfulness offerings, wellness sessions, somatic movement"
+      />
       {/* HERO SECTION */}
       <section className="relative pt-36 pb-24 px-6 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-white via-cream to-cream pointer-events-none" />
