@@ -5,6 +5,9 @@ import { cn } from '../../lib/utils';
 import { format, parseISO } from 'date-fns';
 import StepHeading from './shared/StepHeading';
 import { getLocalTimeForEST } from '../../utils/bookingUtils';
+import { useAuth } from '../../providers/AuthProvider';
+import { bookingService } from '../../services/bookingService';
+import { motion } from 'framer-motion';
 
 const formatTo12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -24,20 +27,67 @@ const DetailsStep = () => {
     fullName, 
     email, 
     intentions, 
+    challenges,
+    desiredOutcomes,
     setUserDetails,
     nextStep, 
     prevStep,
     selectedRitual,
     selectedDate,
     selectedTime,
-    sessionFormat
+    sessionFormat,
+    journeyType,
+    selectedPackage,
+    selectedDuration,
   } = useBookingFlow();
   
   const [activeField, setActiveField] = useState<string | null>(null);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
 
-  const isFormValid = fullName.length > 2 && email.includes('@') && email.includes('.');
+  const { isAuthenticated, bookings, user } = useAuth();
+
+  const confirmedOrCompletedBookings = bookings.filter(
+    b => b.booking_status === 'confirmed' || b.booking_status === 'completed'
+  );
+  const isFirstSession = !isAuthenticated || confirmedOrCompletedBookings.length === 0;
+
+  const isFormValid = fullName.length > 2 && email.includes('@') && email.includes('.') && (!isFirstSession || (challenges.trim().length > 2 && desiredOutcomes.trim().length > 2));
 
   const parsedDate = selectedDate ? parseISO(selectedDate) : null;
+
+  const handleConfirmDetails = async () => {
+    if (!isFormValid) return;
+    setIsAutoSaving(true);
+    try {
+      const draftData = {
+        emotion: '',
+        recommendedPath: journeyType || '',
+        selectedSession: selectedRitual,
+        sessionFormat: sessionFormat,
+        duration: selectedDuration,
+        selectedDate: selectedDate,
+        selectedTime: selectedTime,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        fullName,
+        email,
+        intentions,
+        challenges: isFirstSession ? challenges : '',
+        desiredOutcomes: isFirstSession ? desiredOutcomes : '',
+        packageId: selectedPackage?.id || null,
+        packageName: selectedPackage?.name || 'Single Session',
+        packagePrice: selectedPackage?.price || null,
+        packageCredits: selectedPackage?.credits || null,
+        journeyType: journeyType || '',
+        userId: user?.id || null
+      };
+      await bookingService.createDraftBooking(draftData);
+    } catch (err) {
+      console.error('Failed to auto-save draft booking:', err);
+    } finally {
+      setIsAutoSaving(false);
+      nextStep();
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -165,6 +215,66 @@ const DetailsStep = () => {
             </label>
           </div>
 
+          {/* Conditional First-Session Intake Fields */}
+          {isFirstSession && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              transition={{ duration: 0.5 }}
+              className="space-y-6"
+            >
+              {/* Challenges */}
+              <div className="relative">
+                <div className={cn(
+                  "absolute left-6 top-6 transition-colors duration-700",
+                  activeField === 'challenges' ? "text-gold" : "text-text-dark/10"
+                )}>
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <textarea 
+                  placeholder=" "
+                  rows={3}
+                  value={challenges}
+                  onFocus={() => setActiveField('challenges')}
+                  onBlur={() => setActiveField(null)}
+                  onChange={(e) => setUserDetails({ challenges: e.target.value })}
+                  className={cn(
+                    "peer w-full pl-16 pr-6 pt-9 pb-4 bg-white/40 border border-text-dark/5 rounded-[1.8rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark resize-none leading-relaxed",
+                    challenges && "border-gold/20"
+                  )}
+                />
+                <label className="absolute left-16 top-3 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-6 peer-placeholder-shown:text-xs peer-focus:top-3 peer-focus:text-[8px]">
+                  What obstacles or tensions are you currently navigating? (Challenges)
+                </label>
+              </div>
+
+              {/* Desired Outcomes */}
+              <div className="relative">
+                <div className={cn(
+                  "absolute left-6 top-6 transition-colors duration-700",
+                  activeField === 'desiredOutcomes' ? "text-gold" : "text-text-dark/10"
+                )}>
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <textarea 
+                  placeholder=" "
+                  rows={3}
+                  value={desiredOutcomes}
+                  onFocus={() => setActiveField('desiredOutcomes')}
+                  onBlur={() => setActiveField(null)}
+                  onChange={(e) => setUserDetails({ desiredOutcomes: e.target.value })}
+                  className={cn(
+                    "peer w-full pl-16 pr-6 pt-9 pb-4 bg-white/40 border border-text-dark/5 rounded-[1.8rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark resize-none leading-relaxed",
+                    desiredOutcomes && "border-gold/20"
+                  )}
+                />
+                <label className="absolute left-16 top-3 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-6 peer-placeholder-shown:text-xs peer-focus:top-3 peer-focus:text-[8px]">
+                  What would you like to cultivate or manifest? (Desired Outcomes)
+                </label>
+              </div>
+            </motion.div>
+          )}
+
           {/* COMPACT TRUST INDICATORS */}
           <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 pt-6 border-t border-text-dark/5">
             <div className="flex items-center gap-3 text-[9px] text-text-dark/30 uppercase tracking-[0.2em] italic font-display">
@@ -181,13 +291,13 @@ const DetailsStep = () => {
 
         <div className="flex flex-col sm:flex-row gap-6">
           <button 
-            disabled={!isFormValid}
-            onClick={nextStep}
-            className="flex-grow py-5 bg-text-dark text-white rounded-full text-[11px] font-bold uppercase tracking-[0.5em] shadow-luxury hover:bg-gold transition-all duration-700 disabled:opacity-20 disabled:grayscale focus:outline-none active:scale-[0.98] group"
+            disabled={!isFormValid || isAutoSaving}
+            onClick={handleConfirmDetails}
+            className="flex-grow py-5 bg-text-dark text-white rounded-full text-[11px] font-bold uppercase tracking-[0.5em] shadow-luxury hover:bg-gold transition-all duration-700 disabled:opacity-20 disabled:grayscale focus:outline-none active:scale-[0.98] group font-semibold"
           >
             <span className="relative z-10 flex items-center justify-center gap-2">
-              Confirm Ritual 
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              {isAutoSaving ? 'Securing Sanctuary...' : 'Confirm Ritual'}
+              {!isAutoSaving && <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />}
             </span>
           </button>
         </div>

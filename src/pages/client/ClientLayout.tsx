@@ -23,6 +23,7 @@ export default function ClientLayout() {
   const navItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Bookings', path: '/my-rituals', icon: Calendar },
+    { name: 'Membership', path: '/membership', icon: Sparkles },
     { name: 'Payments', path: '/dashboard/payments', icon: CreditCard },
     { name: 'Profile', path: '/profile', icon: User },
   ];

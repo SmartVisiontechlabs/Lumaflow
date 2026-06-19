@@ -11,7 +11,9 @@ import {
   ShieldCheck,
   Database,
   Menu,
-  X
+  X,
+  TrendingUp,
+  ClipboardList
 } from 'lucide-react';
 import { adminSupabase as supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,6 +32,8 @@ export default function DashboardLayout() {
     { name: 'Bookings', path: '/admin/bookings', icon: BookOpen },
     { name: 'Calendar', path: '/admin/calendar', icon: Calendar },
     { name: 'Clients', path: '/admin/clients', icon: Users },
+    { name: 'Finance', path: '/admin/finance', icon: TrendingUp },
+    { name: 'Waitlist', path: '/admin/waitlist', icon: ClipboardList },
     { name: 'Content CMS', path: '/admin/cms', icon: Database },
     { name: 'Settings', path: '/admin/settings', icon: Settings },
   ];

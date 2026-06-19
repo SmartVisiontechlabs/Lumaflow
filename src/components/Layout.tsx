@@ -32,7 +32,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
         { name: 'Services', path: '/services' },
         { name: 'Classes', path: '/classes' },
         { name: 'Pricing', path: '/pricing' },
-        { name: 'CONTINUE YOUR JOURNEY', path: '/dashboard' },
+        { name: 'Sanctuary', path: '/dashboard' },
         { name: 'Contact', path: '/contact' },
       ]
     : [
@@ -41,7 +41,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
         { name: 'Services', path: '/services' },
         { name: 'Classes', path: '/classes' },
         { name: 'Pricing', path: '/pricing' },
-        { name: 'CONTINUE YOUR JOURNEY', path: '/login' },
+        { name: 'Sanctuary', path: '/login' },
         { name: 'Contact', path: '/contact' },
       ];
 
@@ -77,7 +77,7 @@ const Nav = memo(({ openBooking }: { openBooking: () => void }) => {
           </Link>
         </div>
 
-        <div className="hidden lg:flex items-center gap-4 xl:gap-8 text-[10px] xl:text-[11px] font-bold uppercase tracking-[0.15em] xl:tracking-[0.25em] text-white/80">
+        <div className="hidden lg:flex items-center gap-3 xl:gap-6 text-[10px] xl:text-[11px] font-bold uppercase tracking-[0.12em] xl:tracking-[0.2em] text-white/80">
           {navLinks.map(link => (
             <Link key={link.name} to={link.path} className="relative group py-2 hover:text-[#CBAE73] transition-colors duration-500 whitespace-nowrap">
               {link.name}

@@ -84,11 +84,28 @@ Preparation Checklist:
 }
 
 export default function Dashboard() {
-  const { bookings, loading: authLoading, profile } = useAuth();
-  
   // API fetched states
+  interface TimelineItem {
+    id: string;
+    ritualName: string;
+    date: string;
+    time: string;
+    duration: number;
+    format: string;
+    status: 'completed' | 'upcoming';
+  }
+
+  interface CreditStats {
+    total_credits: number;
+    used_credits: number;
+    remaining_credits: number;
+  }
+
+  const { loading: authLoading, profile } = useAuth();
+  
   const [upcomingBooking, setUpcomingBooking] = useState<LiveBooking | null>(null);
-  const [stats, setStats] = useState({ completedRituals: 0, remainingCredits: 0, upcomingBookings: 0 });
+  const [credits, setCredits] = useState<CreditStats>({ total_credits: 0, used_credits: 0, remaining_credits: 0 });
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [apiLoading, setApiLoading] = useState(true);
 
   // Countdown timers
@@ -110,18 +127,19 @@ export default function Dashboard() {
         const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
         const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
-        const [upcomingRes, statsRes] = await Promise.all([
+        const [upcomingRes, journeyRes] = await Promise.all([
           fetch(`${API_URL}/client/upcoming-booking`, { headers }),
-          fetch(`${API_URL}/client/journey-stats`, { headers })
+          fetch(`${API_URL}/client/journey`, { headers })
         ]);
 
         if (upcomingRes.ok) {
           const upcomingData = await upcomingRes.json();
           setUpcomingBooking(upcomingData.upcomingBooking);
         }
-        if (statsRes.ok) {
-          const statsData = await statsRes.json();
-          setStats(statsData);
+        if (journeyRes.ok) {
+          const journeyData = await journeyRes.json();
+          setCredits(journeyData.credits);
+          setTimeline(journeyData.timeline);
         }
       } catch (err) {
         console.error('[Dashboard] Error loading API data:', err);
@@ -212,39 +230,11 @@ export default function Dashboard() {
     );
   }
 
-  // Filter completed and past bookings for the Ritual Chronology
-  const pastBookings = bookings.filter((b) => {
-    if (b.booking_status === 'cancelled') return true;
-    if (upcomingBooking && b.id === upcomingBooking.id) return false;
-    const tz = b.timezone || 'America/New_York';
-    const startUTC = fromZonedTime(`${b.selected_date}T${b.selected_time}:00`, tz);
-    const durationMs = (b.duration || 60) * 60 * 1000;
-    return startUTC.getTime() + durationMs <= new Date().getTime();
-  });
-
-  const timelineItems = pastBookings.map((pb) => ({
-    ritualName: pb.selected_session,
-    date: pb.selected_date,
-    time: pb.selected_time,
-    format: pb.session_format,
-    isCompleted: pb.booking_status === 'completed',
-    isCancelled: pb.booking_status === 'cancelled'
-  }));
+  const completedSessions = timeline
+    .filter((item) => item.status === 'completed')
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const firstName = profile?.full_name ? profile.full_name.split(' ')[0] : 'Member';
-
-  // State Chips Helper
-  const getChipStyle = (item: typeof timelineItems[0]) => {
-    if (item.isCancelled) {
-      return "bg-red-500/5 border border-red-500/20 text-red-400 text-[8px] font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full";
-    }
-    return "bg-[#CBAE73]/5 border border-[#CBAE73]/15 text-[#CBAE73]/70 text-[8px] font-bold uppercase tracking-widest px-3.5 py-1.5 rounded-full";
-  };
-
-  const getChipLabel = (item: typeof timelineItems[0]) => {
-    if (item.isCancelled) return "Sanctuary Released";
-    return "Restoration Complete";
-  };
 
   return (
     <div className="space-y-12 pb-24 pt-4 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -436,138 +426,157 @@ export default function Dashboard() {
               to="/book"
               className="inline-flex py-4 px-10 bg-[#CBAE73] hover:bg-[#CBAE73]/90 text-black rounded-full text-[10px] font-bold uppercase tracking-[0.3em] transition-all duration-500 shadow-luxury"
             >
-              Book A Session
+              Book A Ritual
             </Link>
           </div>
         )}
       </div>
 
-      {/* FEATURE 2: Journey Statistics Card directly below Upcoming Session */}
-      <div className="space-y-6 text-left">
-        <h3 className="font-display text-2xl text-text-dark font-light tracking-tight">Your Journey</h3>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1: Completed Rituals */}
-          <div className="bg-white/40 border border-white/60 p-8 rounded-[2rem] shadow-luxury flex flex-col justify-between min-h-[140px] relative overflow-hidden group">
-            <div className="absolute top-[-20%] right-[-10%] w-[120px] h-[120px] bg-gold/5 blur-[35px] rounded-full pointer-events-none" />
-            <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-[0.2em]">
-              Completed Rituals
-            </span>
-            <div className="flex justify-between items-end mt-4">
-              <span className="text-5xl font-display text-text-dark leading-none font-light">
-                {stats.completedRituals}
+      {/* FEATURE 2: Luxury Membership Credits Card */}
+      <div className="max-w-xl mx-auto w-full">
+        <div className="relative bg-gradient-to-br from-[#1C1C1C] via-[#2A261D] to-[#141414] border border-[#CBAE73]/30 rounded-[2.5rem] p-8 sm:p-10 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] overflow-hidden text-left group">
+          <div className="absolute top-[-50%] right-[-30%] w-[350px] h-[350px] bg-gradient-to-br from-[#CBAE73]/15 to-transparent blur-[80px] rounded-full pointer-events-none transition-opacity duration-700" />
+          <div className="absolute bottom-[-20%] left-[-10%] w-[200px] h-[200px] bg-gold/5 blur-[50px] rounded-full pointer-events-none" />
+          
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <span className="text-[9px] font-bold text-[#CBAE73] uppercase tracking-[0.3em]">
+                LumaFlow Membership
               </span>
-              <CheckCircle className="w-6 h-6 text-gold/40" />
+              <p className="text-[10px] text-white/40 font-light font-sans tracking-wide">
+                Nervous System Restoration Balance
+              </p>
             </div>
-            <p className="text-[9px] font-semibold text-text-dark/30 uppercase tracking-wider mt-3">
-              Total somatic completions
-            </p>
+            <Sparkles className="w-5 h-5 text-[#CBAE73]/60" />
           </div>
 
-          {/* Card 2: Remaining Credits */}
-          <div className="bg-white/40 border border-white/60 p-8 rounded-[2rem] shadow-luxury flex flex-col justify-between min-h-[140px] relative overflow-hidden group">
-            <div className="absolute top-[-20%] right-[-10%] w-[120px] h-[120px] bg-gold/5 blur-[35px] rounded-full pointer-events-none" />
-            <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-[0.2em]">
+          <div className="my-8 flex items-baseline gap-4">
+            <span className="text-6xl font-display text-[#CBAE73] font-light tracking-tight">
+              {credits.remaining_credits}
+            </span>
+            <span className="text-xs text-white/50 font-light tracking-wide">
               Remaining Credits
             </span>
-            <div className="flex justify-between items-end mt-4">
-              <span className="text-5xl font-display text-text-dark leading-none font-light">
-                {stats.remainingCredits}
-              </span>
-              <CreditCard className="w-6 h-6 text-gold/40" />
-            </div>
-            <p className="text-[9px] font-semibold text-text-dark/30 uppercase tracking-wider mt-3">
-              Sanctuary balances ready to book
-            </p>
           </div>
 
-          {/* Card 3: Upcoming Rituals */}
-          <div className="bg-white/40 border border-white/60 p-8 rounded-[2rem] shadow-luxury flex flex-col justify-between min-h-[140px] relative overflow-hidden group">
-            <div className="absolute top-[-20%] right-[-10%] w-[120px] h-[120px] bg-gold/5 blur-[35px] rounded-full pointer-events-none" />
-            <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-[0.2em]">
-              Upcoming Rituals
-            </span>
-            <div className="flex justify-between items-end mt-4">
-              <span className="text-5xl font-display text-text-dark leading-none font-light">
-                {stats.upcomingBookings}
-              </span>
-              <Calendar className="w-6 h-6 text-gold/40" />
+          <div className="border-t border-white/5 pt-6 grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-white/30">Total Allocated</p>
+              <p className="text-lg text-white/80 font-light font-display mt-0.5">{credits.total_credits}</p>
             </div>
-            <p className="text-[9px] font-semibold text-text-dark/30 uppercase tracking-wider mt-3">
-              Appointed upcoming journeys
-            </p>
+            <div>
+              <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-white/30">Credits Used</p>
+              <p className="text-lg text-[#CBAE73]/85 font-light font-display mt-0.5">{credits.used_credits}</p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 3. Ritual Chronology and Sub-Details */}
+      {/* FEATURE 3: Ritual History Table and Ritual Journey Timeline */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
         
-        {/* Left Column: Past Ritual Chronology (7 cols) */}
+        {/* Left Column: Ritual History Table (7 cols) */}
         <div className="lg:col-span-7 bg-white/30 border border-white/60 p-8 sm:p-10 rounded-[2.5rem] shadow-luxury backdrop-blur-md space-y-6">
           <div className="space-y-1 text-left flex justify-between items-center">
             <div>
-              <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Ritual Chronology</h3>
-              <p className="text-xs text-text-dark/40 font-light mt-0.5">Your progress through the LumaFlow transformation paths.</p>
+              <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Ritual History</h3>
+              <p className="text-xs text-text-dark/40 font-light mt-0.5">Your past completed restoration sessions.</p>
             </div>
             <History className="w-5 h-5 text-gold/40" />
           </div>
 
-          <div className="space-y-4 custom-scrollbar max-h-[460px] overflow-y-auto pr-2">
-            {timelineItems.length > 0 ? (
-              timelineItems.map((item, idx) => (
-                <div 
-                  key={idx} 
-                  className="bg-white/40 border border-white/60 p-5 rounded-2xl hover:shadow-luxury transition-all duration-300 flex flex-col gap-3.5 text-left group"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <h4 className={cn(
-                      "text-xs font-bold text-text-dark/80 group-hover:text-text-dark transition-colors duration-300", 
-                      item.isCancelled && "line-through opacity-50"
-                    )}>
-                      {item.ritualName}
-                    </h4>
-                    <span className={getChipStyle(item)}>
-                      {getChipLabel(item)}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between border-t border-gold/5 pt-3.5 text-[9px] text-text-dark/40 font-medium">
-                    <span>{formatBookingDate(item.date)}</span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-gold/60" />
-                      {formatBookingTime(item.time)} ({item.format})
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-16">
-                <p className="text-xs text-text-dark/30 italic">No ritual history found. Reserve your first session to begin the timeline.</p>
-              </div>
-            )}
+          <div className="overflow-x-auto custom-scrollbar max-h-[460px] overflow-y-auto pr-2">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="border-b border-text-dark/5 text-[9px] font-bold uppercase tracking-wider text-text-dark/40">
+                  <th className="pb-3 font-semibold">Date</th>
+                  <th className="pb-3 font-semibold">Ritual</th>
+                  <th className="pb-3 font-semibold">Duration</th>
+                  <th className="pb-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-text-dark/5 text-xs text-text-dark/70 font-medium">
+                {completedSessions.length > 0 ? (
+                  completedSessions.map((session) => (
+                    <tr key={session.id} className="hover:bg-white/10 transition-colors duration-200">
+                      <td className="py-4 font-sans text-text-dark/50 whitespace-nowrap">{formatBookingDate(session.date)}</td>
+                      <td className="py-4 text-text-dark/80 font-display font-light text-sm">{session.ritualName}</td>
+                      <td className="py-4 font-sans text-text-dark/60 whitespace-nowrap">{session.duration} min ({session.format})</td>
+                      <td className="py-4">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest bg-gold/5 border border-gold/10 text-[#CBAE73]">
+                          Completed
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="py-12 text-center text-text-dark/30 italic">
+                      No ritual history found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Right Column: Healing Sanctuary Guide (5 cols) */}
+        {/* Right Column: Ritual Journey Timeline (5 cols) */}
         <div className="lg:col-span-5 bg-white/30 border border-white/60 p-8 sm:p-10 rounded-[2.5rem] shadow-luxury backdrop-blur-md space-y-6">
           <div className="flex items-center gap-3 text-left">
             <div className="w-8 h-8 bg-gold/10 rounded-full flex items-center justify-center">
               <Compass className="w-4 h-4 text-gold animate-breathe" />
             </div>
-            <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Sanctuary Compass</h3>
+            <h3 className="font-display text-2xl text-text-dark tracking-tight font-light">Ritual Journey</h3>
           </div>
           
-          <div className="space-y-4 text-xs text-text-dark/70 leading-relaxed font-medium text-left">
-            <p>
-              Your dashboard aggregates all booking references and active credits. You can always view completed somatic breathwork sessions and payments directly in the portal.
-            </p>
-            <p>
-              If your next session is Virtual, the <strong>Join Session</strong> button will activate 15 minutes prior to the appointed hour. Please check your audio headphones and device compatibility beforehand.
-            </p>
-            <p>
-              If your next session is In-Person, we request that you arrive at our Soho Lounge 10 minutes early to settle in and enjoy a warm herbal tea before your ritual begins.
-            </p>
+          <p className="text-xs text-text-dark/40 font-light mt-0.5 text-left">Chronological path of your transformation journey.</p>
+          
+          <div className="relative pl-6 border-l border-[#CBAE73]/20 space-y-8 text-left py-2 max-h-[460px] overflow-y-auto custom-scrollbar pr-2">
+            {timeline.length > 0 ? (
+              timeline.map((item, idx) => {
+                const isCompleted = item.status === 'completed';
+                return (
+                  <div key={item.id || idx} className="relative group">
+                    {/* Circle Node */}
+                    <div className={cn(
+                      "absolute left-[-31px] top-0.5 w-4 h-4 rounded-full border flex items-center justify-center transition-all duration-300",
+                      isCompleted 
+                        ? "bg-[#CBAE73] border-[#CBAE73] text-black shadow-[0_0_8px_rgba(203,174,115,0.4)]"
+                        : "bg-[#1C1C1C] border-[#CBAE73]/60 text-[#CBAE73]"
+                    )}>
+                      {isCompleted ? (
+                        <span className="text-[10px] font-bold leading-none select-none">✓</span>
+                      ) : (
+                        <span className="text-[8px] font-bold leading-none select-none">○</span>
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="space-y-1">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline gap-1">
+                        <h4 className={cn(
+                          "text-xs font-bold transition-colors duration-300",
+                          isCompleted ? "text-text-dark/85" : "text-gold"
+                        )}>
+                          {item.ritualName}
+                        </h4>
+                        <span className="text-[9px] text-text-dark/40 font-medium whitespace-nowrap">
+                          {formatBookingDate(item.date)}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-text-dark/50 font-light">
+                        {item.duration} min • {item.format} • {isCompleted ? 'Completed' : 'Upcoming'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="py-8 text-center text-text-dark/30 italic">
+                Your journey will commence with your first booking.
+              </div>
+            )}
           </div>
 
           <div className="pt-6 border-t border-text-dark/5 flex flex-col gap-3">
@@ -575,14 +584,8 @@ export default function Dashboard() {
               to="/book"
               className="w-full py-4.5 px-6 bg-text-dark hover:bg-gold text-white text-center rounded-xl text-[10px] font-bold uppercase tracking-[0.25em] transition-all duration-500 shadow-button"
             >
-              Book New Session
+              Book A Ritual
             </Link>
-            <a
-              href="/pricing"
-              className="w-full py-4 px-6 bg-white/50 hover:bg-white text-text-dark/60 text-center rounded-xl text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-500 border border-text-dark/5 shadow-soft"
-            >
-              Explore Packages
-            </a>
           </div>
         </div>
 
@@ -590,3 +593,4 @@ export default function Dashboard() {
     </div>
   );
 }
+

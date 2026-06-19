@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { stripe } from '../config/stripe';
 import { bookingService } from '../services/bookingService';
 import { authService } from '../services/authService';
-import { supabaseAdmin } from '../config/supabase';
+import { supabase, supabaseAdmin } from '../config/supabase';
 import { fromZonedTime } from 'date-fns-tz';
 import { zoomService } from '../services/zoomService';
 import { emailService } from '../services/emailService';
@@ -76,6 +76,117 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
     const meta = session.metadata;
     if (!meta) {
       throw new Error('No metadata found in Stripe session');
+    }
+
+    if (meta.purchaseType === 'package_purchase') {
+      console.log(`[confirmPaymentSession] Processing direct package purchase: ${meta.packageName}`);
+      
+      const { data: existingPkg, error: pkgQueryErr } = await supabaseAdmin
+        .from('user_packages')
+        .select('*')
+        .eq('stripe_payment_id', session_id)
+        .maybeSingle();
+
+      if (pkgQueryErr) {
+        console.error('[confirmPaymentSession] Error checking for existing user_package:', pkgQueryErr);
+      }
+
+      if (existingPkg) {
+        console.log('[confirmPaymentSession] Package purchase is already processed in DB:', session_id);
+        
+        let loginUrl: string | undefined = undefined;
+        try {
+          const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/membership`;
+          const autoLogin = await authService.generateAutoLoginLink(meta.email, redirectTo);
+          if (autoLogin) loginUrl = autoLogin;
+        } catch (e) {
+          console.error('[confirmPaymentSession] Error generating auto login link:', e);
+        }
+
+        return {
+          booking: {
+            id: existingPkg.id,
+            email: meta.email,
+            fullName: meta.fullName,
+            packageName: meta.packageName,
+            packagePrice: parseFloat(meta.packagePrice || '0'),
+            packageCredits: parseInt(meta.packageCredits || '0'),
+            purchaseType: 'package_purchase'
+          },
+          isNew: false,
+          loginUrl
+        };
+      }
+
+      console.log(`[confirmPaymentSession] Provisioning account for direct package purchase: ${meta.email}`);
+      const { userId, isNew } = await authService.provisionUserAccount(meta.email, meta.fullName);
+      
+      let loginUrl: string | undefined = undefined;
+      try {
+        const redirectTo = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/membership`;
+        const autoLogin = await authService.generateAutoLoginLink(meta.email, redirectTo);
+        if (autoLogin) loginUrl = autoLogin;
+      } catch (e) {
+        console.error('[confirmPaymentSession] Error generating auto login link:', e);
+      }
+
+      const credits = parseInt(meta.packageCredits || '0');
+      const validDays = parseInt(meta.validDays || '30');
+      const expiryDate = new Date();
+      expiryDate.setDate(expiryDate.getDate() + validDays);
+
+      const { data: userPkg, error: upErr } = await supabaseAdmin
+        .from('user_packages')
+        .insert({
+          user_email: meta.email,
+          package_id: meta.packageId || null,
+          stripe_payment_id: session_id,
+          total_credits: credits,
+          remaining_credits: credits,
+          used_credits: 0,
+          expires_at: expiryDate.toISOString(),
+          status: 'active'
+        })
+        .select()
+        .single();
+
+      if (upErr) {
+        console.error('[confirmPaymentSession] Error inserting user_package:', upErr);
+        throw upErr;
+      }
+
+      console.log('[confirmPaymentSession] Successfully provisioned user_package.');
+
+      if (userId) {
+        await supabaseAdmin.rpc('create_or_update_membership_credits', {
+          p_user_id: userId,
+          p_email: meta.email,
+          p_total_credits: credits,
+          p_remaining_credits: credits
+        });
+        console.log('[confirmPaymentSession] Successfully updated membership credits.');
+      }
+
+      const dummyBooking = {
+        id: userPkg.id,
+        email: meta.email,
+        fullName: meta.fullName,
+        packageName: meta.packageName,
+        packagePrice: parseFloat(meta.packagePrice || '0'),
+        packageCredits: credits,
+        purchaseType: 'package_purchase'
+      };
+
+      if (isNew) {
+        const welcomeLink = loginUrl || `${process.env.FRONTEND_URL || 'http://localhost:3000'}/membership`;
+        await emailService.sendWelcomeEmail(meta.email, meta.fullName, welcomeLink);
+      }
+
+      return {
+        booking: dummyBooking,
+        isNew,
+        loginUrl
+      };
     }
 
     // 3. Auto account creation / profile check
@@ -396,6 +507,73 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
 }
 
 export const paymentController = {
+  async createPackageCheckoutSession(req: Request, res: Response) {
+    let { packageId, email, fullName, userId } = req.body;
+    
+    fullName = sanitizeInput(fullName);
+
+    try {
+      const dbClient = supabaseAdmin || supabase;
+      const { data: selectedPackage, error: pkgErr } = await dbClient
+        .from('packages')
+        .select('*')
+        .eq('id', packageId)
+        .maybeSingle();
+
+      if (pkgErr || !selectedPackage) {
+        return res.status(404).json({ error: 'Selected wellness package not found.' });
+      }
+
+      const packagePrice = selectedPackage.price;
+      const packageName = selectedPackage.name;
+      const packageCredits = selectedPackage.credits || selectedPackage.total_credits || 1;
+      const validDays = selectedPackage.valid_days || (selectedPackage.validity_months * 30) || 30;
+
+      console.log('--- STRIPE PACKAGE CHECKOUT SESSION CREATION ---');
+      console.log('User Email:', email);
+      console.log('Full Name:', fullName);
+      console.log('Package:', packageName);
+      console.log('Price:', packagePrice);
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `${packageName} Pass`,
+                description: `${packageCredits} session credit pass valid for ${validDays} days`,
+              },
+              unit_amount: packagePrice * 100, // Price in cents
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        success_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/booking/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/membership?booking_cancelled=true`,
+        metadata: {
+          purchaseType: 'package_purchase',
+          packageId: selectedPackage.id,
+          packageName,
+          packagePrice: packagePrice.toString(),
+          packageCredits: packageCredits.toString(),
+          validDays: validDays.toString(),
+          email,
+          fullName,
+          userId: userId || '',
+        },
+      });
+
+      console.log('Created Stripe Package Checkout Session ID:', session.id);
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error('Stripe Package Session Error:', error);
+      res.status(500).json({ error: `Failed to initialize package payment: ${error.message || error}` });
+    }
+  },
+
   async createCheckoutSession(req: Request, res: Response) {
     let { 
       bookingId,

@@ -8,7 +8,7 @@ import { useBookingStore } from '../../store/bookingStore';
 import { getLocalTimeForEST } from '../../utils/bookingUtils';
 import { useAuth } from '../../providers/AuthProvider';
 import { supabase } from '../../lib/supabase';
-import { trackBookingCompleted, trackMagicLinkRequest } from '../../lib/analytics';
+import { trackBookingCompleted, trackMagicLinkRequest, trackPurchase, trackPackagePurchase } from '../../lib/analytics';
 
 const formatTo12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -142,6 +142,12 @@ const BookingSuccess = () => {
           setBookingReference(booking.bookingReference);
           setStatus('success');
           trackBookingCompleted(booking.selectedSession || 'Somatic Ritual', booking.packagePrice || 0);
+          trackPurchase(
+            booking.stripe_payment_id || booking.bookingReference || 'N/A',
+            booking.packagePrice || 0,
+            booking.bookingReference || 'N/A',
+            booking.selectedSession || 'Somatic Session'
+          );
         } else if (sessionId) {
           const response = await paymentService.confirmPayment(sessionId);
           console.log("payment confirmation response:", response);
@@ -155,6 +161,22 @@ const BookingSuccess = () => {
           }
           setStatus('success');
           trackBookingCompleted(booking.selectedSession || 'Somatic Ritual', booking.packagePrice || 0);
+          
+          if (booking.purchaseType === 'package_purchase') {
+            trackPackagePurchase(
+              booking.packageName || 'Package',
+              booking.id || 'N/A',
+              booking.packageCredits || 0,
+              booking.packagePrice || 0
+            );
+          } else {
+            trackPurchase(
+              booking.stripe_payment_id || booking.bookingReference || sessionId || 'N/A',
+              booking.packagePrice || 0,
+              booking.bookingReference || 'N/A',
+              booking.selectedSession || 'Somatic Session'
+            );
+          }
         }
       } catch (err: any) {
         console.error('Confirmation error:', err);

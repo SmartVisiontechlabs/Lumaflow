@@ -40,6 +40,8 @@ const ConfirmationStep = () => {
     fullName,
     email, 
     intentions,
+    challenges,
+    desiredOutcomes,
     lastBookingReference,
     isSubmitting,
     setUserDetails,
@@ -63,6 +65,13 @@ const ConfirmationStep = () => {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicatePkgName, setDuplicatePkgName] = useState('');
 
+  const confirmedOrCompletedBookings = bookings.filter(
+    b => b.booking_status === 'confirmed' || b.booking_status === 'completed'
+  );
+  const isFirstSession = !isAuthenticated || confirmedOrCompletedBookings.length === 0;
+
+  const isFormValid = fullName.trim().length > 2 && email.includes('@') && email.includes('.') && (!isFirstSession || (challenges.trim().length > 2 && desiredOutcomes.trim().length > 2));
+
   const handleEmailBlur = async () => {
     setActiveField(null);
     if (!email || !email.includes('@') || !email.includes('.')) return;
@@ -77,6 +86,33 @@ const ConfirmationStep = () => {
       if (res.exists) {
         setOtpError(null);
         setShowAuthModal(true);
+      } else {
+        // Guest user - save draft since they entered a valid email
+        if (fullName) {
+          const draftData = {
+            emotion: emotionalState,
+            recommendedPath: journeyType || '',
+            selectedSession: selectedRitual,
+            sessionFormat: sessionFormat,
+            duration: selectedDuration,
+            selectedDate: selectedDate,
+            selectedTime: selectedTime,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            fullName,
+            email,
+            intentions,
+            challenges: isFirstSession ? challenges : '',
+            desiredOutcomes: isFirstSession ? desiredOutcomes : '',
+            packageId: selectedPackage?.id || null,
+            packageName: selectedPackage?.name || 'Single Session',
+            packagePrice: selectedPackage?.price || null,
+            packageCredits: selectedPackage?.credits || null,
+            journeyType,
+            userId: null
+          };
+          console.log('[ConfirmationStep] Auto-saving guest draft on blur:', draftData);
+          await bookingService.createDraftBooking(draftData);
+        }
       }
     } catch (e) {
       console.error('Error verifying email status:', e);
@@ -89,16 +125,12 @@ const ConfirmationStep = () => {
         (ap) => ap.package_id === selectedPackage.id && ap.remaining_credits > 0
       );
       if (activeDuplicate) {
-        setDuplicatePkgName(selectedPackage.name);
+        setDuplicatePkgName(activeDuplicate.package_name);
         setShowDuplicateModal(true);
-        return true;
       }
     }
     return false;
   };
-
-
-
 
   const bookableCredits = remainingCredits;
 
@@ -112,13 +144,47 @@ const ConfirmationStep = () => {
     }
   }, [isAuthenticated, profile, setUserDetails]);
 
+  // Auto-save draft booking if user is authenticated and details are complete
+  React.useEffect(() => {
+    if (isAuthenticated && fullName && email && selectedDate && selectedTime) {
+      const autoSaveDraft = async () => {
+        try {
+          const draftData = {
+            emotion: emotionalState,
+            recommendedPath: journeyType || '',
+            selectedSession: selectedRitual,
+            sessionFormat: sessionFormat,
+            duration: selectedDuration,
+            selectedDate: selectedDate,
+            selectedTime: selectedTime,
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+            fullName,
+            email,
+            intentions,
+            challenges: isFirstSession ? challenges : '',
+            desiredOutcomes: isFirstSession ? desiredOutcomes : '',
+            packageId: selectedPackage?.id || null,
+            packageName: selectedPackage?.name || 'Single Session',
+            packagePrice: selectedPackage?.price || null,
+            packageCredits: selectedPackage?.credits || null,
+            journeyType,
+            userId: profile?.id || user?.id || null
+          };
+          console.log('[ConfirmationStep] Auto-saving authenticated draft...', draftData);
+          await bookingService.createDraftBooking(draftData);
+        } catch (err) {
+          console.error('[ConfirmationStep] Auto-save draft failed:', err);
+        }
+      };
+      autoSaveDraft();
+    }
+  }, [isAuthenticated, fullName, email, selectedDate, selectedTime, selectedRitual]);
+
   React.useEffect(() => {
     if (isAuthenticated && activePackages && selectedPackage) {
       checkDuplicatePlan(activePackages);
     }
   }, [isAuthenticated, activePackages, selectedPackage]);
-
-  const isFormValid = fullName.trim().length > 2 && email.includes('@') && email.includes('.');
 
   const handleSecureBooking = async () => {
     if (lastBookingReference || !isFormValid) return;
@@ -138,6 +204,8 @@ const ConfirmationStep = () => {
         fullName,
         email,
         intentions,
+        challenges: isFirstSession ? challenges : '',
+        desiredOutcomes: isFirstSession ? desiredOutcomes : '',
         packageId: selectedPackage?.id || null,
         packageName: selectedPackage?.name || 'Single Session',
         packagePrice: selectedPackage?.price || null,
@@ -173,6 +241,8 @@ const ConfirmationStep = () => {
           fullName,
           email,
           intentions,
+          challenges: isFirstSession ? challenges : '',
+          desiredOutcomes: isFirstSession ? desiredOutcomes : '',
           selectedPackage,
           journeyType
         });
@@ -427,6 +497,66 @@ const ConfirmationStep = () => {
                   Primary Intention
                 </label>
               </div>
+
+              {/* Conditional First-Session Intake Fields */}
+              {isFirstSession && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  transition={{ duration: 0.5 }}
+                  className="space-y-6"
+                >
+                  {/* Challenges */}
+                  <div className="relative">
+                    <div className={cn(
+                      "absolute left-6 top-6 transition-colors duration-700",
+                      activeField === 'challenges' ? "text-gold" : "text-text-dark/10"
+                    )}>
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <textarea 
+                      placeholder=" "
+                      rows={3}
+                      value={challenges}
+                      onFocus={() => setActiveField('challenges')}
+                      onBlur={() => setActiveField(null)}
+                      onChange={(e) => setUserDetails({ challenges: e.target.value })}
+                      className={cn(
+                        "peer w-full pl-16 pr-6 pt-9 pb-4 bg-white/40 border border-text-dark/5 rounded-[1.8rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark resize-none leading-relaxed",
+                        challenges && "border-gold/20"
+                      )}
+                    />
+                    <label className="absolute left-16 top-3 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-6 peer-placeholder-shown:text-xs peer-focus:top-3 peer-focus:text-[8px]">
+                      What obstacles or tensions are you currently navigating? (Challenges)
+                    </label>
+                  </div>
+
+                  {/* Desired Outcomes */}
+                  <div className="relative">
+                    <div className={cn(
+                      "absolute left-6 top-6 transition-colors duration-700",
+                      activeField === 'desiredOutcomes' ? "text-gold" : "text-text-dark/10"
+                    )}>
+                      <MessageSquare className="w-5 h-5" />
+                    </div>
+                    <textarea 
+                      placeholder=" "
+                      rows={3}
+                      value={desiredOutcomes}
+                      onFocus={() => setActiveField('desiredOutcomes')}
+                      onBlur={() => setActiveField(null)}
+                      onChange={(e) => setUserDetails({ desiredOutcomes: e.target.value })}
+                      className={cn(
+                        "peer w-full pl-16 pr-6 pt-9 pb-4 bg-white/40 border border-text-dark/5 rounded-[1.8rem] focus:outline-none focus:border-gold/30 focus:bg-white transition-all text-sm font-light text-text-dark resize-none leading-relaxed",
+                        desiredOutcomes && "border-gold/20"
+                      )}
+                    />
+                    <label className="absolute left-16 top-3 text-[8px] font-bold uppercase tracking-[0.3em] text-text-dark/30 transition-all duration-700 peer-placeholder-shown:top-6 peer-placeholder-shown:text-xs peer-focus:top-3 peer-focus:text-[8px]">
+                      What would you like to cultivate or manifest? (Desired Outcomes)
+                    </label>
+                  </div>
+                </motion.div>
+              )}
             </div>
           </div>
 

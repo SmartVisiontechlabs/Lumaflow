@@ -872,37 +872,43 @@ export const bookingService = {
           });
         }
       }
-    }
-
-    if (updateData.bookingStatus === 'cancelled') {
+     if (updateData.bookingStatus === 'cancelled') {
       const { data: currentBooking } = await writeClient
         .from('bookings')
         .select('booking_status, used_package_credit, user_id, email, selected_date, selected_time')
         .eq('id', id)
         .single();
       
-      if (currentBooking && currentBooking.booking_status !== 'cancelled' && currentBooking.booking_status !== 'completed' && currentBooking.used_package_credit) {
-        // Calculate hours difference from session start
-        const now = new Date();
-        const sessionStart = new Date(`${currentBooking.selected_date}T${currentBooking.selected_time}:00`);
-        const diffMs = sessionStart.getTime() - now.getTime();
-        const diffHours = diffMs / (1000 * 60 * 60);
+      if (currentBooking && currentBooking.booking_status !== 'cancelled' && currentBooking.booking_status !== 'completed') {
+        if (currentBooking.used_package_credit) {
+          // Calculate hours difference from session start
+          const now = new Date();
+          const sessionStart = new Date(`${currentBooking.selected_date}T${currentBooking.selected_time}:00`);
+          const diffMs = sessionStart.getTime() - now.getTime();
+          const diffHours = diffMs / (1000 * 60 * 60);
 
-        if (diffHours >= 24) {
-          console.log(`[bookingService] Early cancellation detected (>= 24h). Refund 1 credit atomically.`);
-          const { data: refundSuccess, error: refundErr } = await writeClient.rpc('refund_booking_credit', {
-            p_booking_id: id
-          });
-          if (refundErr) {
-            console.error('[bookingService] Error executing refund_booking_credit RPC:', refundErr.message);
+          if (diffHours >= 24) {
+            console.log(`[bookingService] Early cancellation detected (>= 24h). Refund 1 credit atomically.`);
+            const { data: refundSuccess, error: refundErr } = await writeClient.rpc('refund_booking_credit', {
+              p_booking_id: id
+            });
+            if (refundErr) {
+              console.error('[bookingService] Error executing refund_booking_credit RPC:', refundErr.message);
+            } else {
+              console.log('[bookingService] refund_booking_credit RPC returned:', refundSuccess);
+              dbUpdate.used_package_credit = false;
+            }
           } else {
-            console.log('[bookingService] refund_booking_credit RPC returned:', refundSuccess);
-            dbUpdate.used_package_credit = false;
+            console.log(`[bookingService] Late cancellation detected (< 24h). Do not refund, and do not deduct credit twice.`);
           }
-        } else {
-          console.log(`[bookingService] Late cancellation detected (< 24h). Do not refund, and do not deduct credit twice.`);
         }
+
+        // Trigger waitlist alert for this date
+        emailService.notifyWaitlistForDate(currentBooking.selected_date).catch(err => {
+          console.error('[bookingService] Failed to notify waitlist on cancellation:', err);
+        });
       }
+    }
     }
 
     dbUpdate.updated_at = new Date().toISOString();

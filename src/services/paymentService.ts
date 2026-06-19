@@ -27,6 +27,30 @@ export const paymentService = {
     }
   },
 
+  async createPackageCheckoutSession(pkgData: { packageId: string; email: string; fullName: string; userId?: string }) {
+    try {
+      const response = await fetch(`${API_URL}/payments/create-package-checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(pkgData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Package Payment API Error:', errorText);
+        throw new Error(errorText || 'Failed to initialize package payment.');
+      }
+
+      const { url } = await response.json();
+      return url;
+    } catch (error) {
+      console.error('Package Payment Session Error:', error);
+      throw error;
+    }
+  },
+
   async confirmPayment(sessionId: string) {
     const endpoint = `${API_URL}/payments/confirm`;
     console.log("CONFIRM PAYMENT START");

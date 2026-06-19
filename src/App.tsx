@@ -21,8 +21,10 @@ const DashboardOverview = lazy(() => import('./pages/admin/DashboardOverview'));
 const AdminBookings = lazy(() => import('./pages/admin/Bookings'));
 const CalendarManager = lazy(() => import('./pages/admin/CalendarManager'));
 const ClientManager = lazy(() => import('./pages/admin/ClientManager'));
+const FinanceDashboard = lazy(() => import('./pages/admin/FinanceDashboard'));
 const CmsManager = lazy(() => import('./pages/admin/CmsManager'));
 const AdminSettings = lazy(() => import('./pages/admin/Settings'));
+const WaitlistManager = lazy(() => import('./pages/admin/WaitlistManager'));
 
 // Client Portal Imports
 const ClientLogin = lazy(() => import('./pages/client/ClientLogin'));
@@ -184,6 +186,8 @@ export default function App() {
                 <Route path="bookings" element={<AdminBookings />} />
                 <Route path="calendar" element={<CalendarManager />} />
                 <Route path="clients" element={<ClientManager />} />
+                <Route path="finance" element={<FinanceDashboard />} />
+                <Route path="waitlist" element={<WaitlistManager />} />
                 <Route path="cms" element={<CmsManager />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>

@@ -1,6 +1,7 @@
 import { supabase, supabaseAdmin } from '../config/supabase';
 import { getAvailableSlots, getLocalTimeForEST, PROVIDER_TIMEZONE } from '../utils/bookingUtils';
 import { formatInTimeZone } from 'date-fns-tz';
+import { emailService } from './emailService';
 
 export const availabilityService = {
   /**
@@ -145,12 +146,28 @@ export const availabilityService = {
    */
   async unblockSlot(id: string) {
     const client = supabaseAdmin || supabase;
+    
+    // Fetch the blocked slot first to get the date
+    const { data: slot } = await client
+      .from('blocked_slots')
+      .select('blocked_date')
+      .eq('id', id)
+      .maybeSingle();
+
     const { error } = await client
       .from('blocked_slots')
       .delete()
       .eq('id', id);
 
     if (error) throw error;
+
+    if (slot?.blocked_date) {
+      console.log(`[availabilityService] Slot unblocked on ${slot.blocked_date}. Triggering waitlist notification.`);
+      emailService.notifyWaitlistForDate(slot.blocked_date).catch(err => {
+        console.error('[availabilityService] Failed to notify waitlist on unblock:', err);
+      });
+    }
+
     return { success: true };
   },
 

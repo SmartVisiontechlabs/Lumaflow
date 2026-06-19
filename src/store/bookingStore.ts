@@ -46,6 +46,8 @@ export type BookingState = {
   fullName: string;
   email: string;
   intentions: string;
+  challenges: string;
+  desiredOutcomes: string;
 
   // Production Engine State
   lastBookingReference: string | null;
@@ -72,10 +74,57 @@ export type BookingState = {
   setRecommendedDuration: (duration: number) => void;
   setDate: (date: string) => void;
   setTime: (time: string) => void;
-  setUserDetails: (details: { fullName?: string; email?: string; intentions?: string }) => void;
+  setUserDetails: (details: { fullName?: string; email?: string; intentions?: string; challenges?: string; desiredOutcomes?: string }) => void;
   setSelectedPackage: (pkg: PackageInfo | null) => void;
   resumeFromDraftBooking: (draft: any) => void;
 };
+
+export function parseIntakeFields(intentionsStr: string) {
+  let intentions = intentionsStr || '';
+  let challenges = '';
+  let desiredOutcomes = '';
+
+  const journeyRegex = /^\[Journey:\s*([^\]]+)\]\s*/;
+  const journeyMatch = intentions.match(journeyRegex);
+  if (journeyMatch) {
+    intentions = intentions.replace(journeyRegex, '');
+  }
+
+  const intentionsPrefix = 'Intentions: ';
+  const challengesPrefix = 'Challenges: ';
+  const outcomesPrefix = 'Desired Outcomes: ';
+
+  if (intentions.includes(intentionsPrefix) || intentions.includes(challengesPrefix) || intentions.includes(outcomesPrefix)) {
+    const lines = intentions.split('\n');
+    let currentField = 'intentions';
+    let intAccum: string[] = [];
+    let chalAccum: string[] = [];
+    let outAccum: string[] = [];
+
+    for (const line of lines) {
+      if (line.startsWith(intentionsPrefix)) {
+        currentField = 'intentions';
+        intAccum.push(line.substring(intentionsPrefix.length));
+      } else if (line.startsWith(challengesPrefix)) {
+        currentField = 'challenges';
+        chalAccum.push(line.substring(challengesPrefix.length));
+      } else if (line.startsWith(outcomesPrefix)) {
+        currentField = 'outcomes';
+        outAccum.push(line.substring(outcomesPrefix.length));
+      } else {
+        if (currentField === 'intentions') intAccum.push(line);
+        else if (currentField === 'challenges') chalAccum.push(line);
+        else if (currentField === 'outcomes') outAccum.push(line);
+      }
+    }
+
+    intentions = intAccum.join('\n').trim();
+    challenges = chalAccum.join('\n').trim();
+    desiredOutcomes = outAccum.join('\n').trim();
+  }
+
+  return { intentions, challenges, desiredOutcomes };
+}
 
 export const useBookingStore = create<BookingState>()(
   persist(
@@ -104,6 +153,8 @@ export const useBookingStore = create<BookingState>()(
       fullName: '',
       email: '',
       intentions: '',
+      challenges: '',
+      desiredOutcomes: '',
       lastBookingReference: null,
       isSubmitting: false,
       recommendationMatrix: null,
@@ -147,6 +198,8 @@ export const useBookingStore = create<BookingState>()(
         fullName: '',
         email: '',
         intentions: '',
+        challenges: '',
+        desiredOutcomes: '',
         lastBookingReference: null,
         isSubmitting: false,
       }),
@@ -192,6 +245,8 @@ export const useBookingStore = create<BookingState>()(
             fullName: '',
             email: '',
             intentions: '',
+            challenges: '',
+            desiredOutcomes: '',
             lastActivityTimestamp: now,
             lastBookingReference: null,
             isSubmitting: false,
@@ -227,6 +282,8 @@ export const useBookingStore = create<BookingState>()(
             fullName: '',
             email: '',
             intentions: '',
+            challenges: '',
+            desiredOutcomes: '',
             lastActivityTimestamp: now,
             lastBookingReference: null,
             isSubmitting: false,
@@ -302,7 +359,8 @@ export const useBookingStore = create<BookingState>()(
         const selectedTime = draft.selectedTime || draft.selected_time || '';
         const fullName = draft.fullName || draft.full_name || '';
         const email = draft.email || '';
-        const intentions = draft.intentions || '';
+        const rawIntentions = draft.intentions || '';
+        const { intentions, challenges, desiredOutcomes } = parseIntakeFields(rawIntentions);
 
         set({
           journeyType,
@@ -317,6 +375,8 @@ export const useBookingStore = create<BookingState>()(
           fullName,
           email,
           intentions,
+          challenges,
+          desiredOutcomes,
           showResumePrompt: true,
           lastActivityTimestamp: Date.now()
         });

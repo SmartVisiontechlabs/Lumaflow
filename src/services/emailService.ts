@@ -123,6 +123,10 @@ export const emailService = {
           date: format(parse(booking.selectedDate, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy'),
           timeEST: timeESTFormatted,
           timeLocal: timeLocal,
+          sessionFormat: booking.sessionFormat || 'Virtual',
+          zoomJoinUrl: booking.zoomJoinUrl,
+          zoomMeetingId: booking.zoomMeetingId,
+          meetingPassword: booking.meetingPassword,
         }),
       });
 

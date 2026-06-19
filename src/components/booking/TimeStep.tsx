@@ -8,6 +8,8 @@ import StepHeading from './shared/StepHeading';
 import { getAvailableSlots } from '../../utils/bookingUtils';
 import { bookingService } from '../../services/bookingService';
 import { AvailabilitySlot } from '../../types/booking';
+import { supabase } from '../../lib/supabase';
+import { trackWaitlistJoin } from '../../lib/analytics';
 
 const formatTo12Hour = (time24: string): string => {
   if (!time24) return '';
@@ -31,13 +33,73 @@ const TimeStep = () => {
     setDate,
     selectedDuration,
     nextStep, 
-    prevStep 
+    prevStep,
+    selectedRitual
   } = useBookingFlow();
 
   const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFindingNext, setIsFindingNext] = useState(false);
   const [nextDateInfo, setNextDateInfo] = useState<{ date: string; count: number } | null>(null);
+
+  // Waitlist States
+  const [waitlistName, setWaitlistName] = useState('');
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistPrefTime, setWaitlistPrefTime] = useState('Any Time');
+  const [waitlistSubmitStatus, setWaitlistSubmitStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [waitlistError, setWaitlistError] = useState('');
+
+  // Prefill logged in user info
+  useEffect(() => {
+    const prefillUser = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setWaitlistEmail(session.user.email || '');
+          const { data: profile } = await supabase
+            .from('user_profiles')
+            .select('full_name')
+            .eq('id', session.user.id)
+            .single();
+          if (profile?.full_name) {
+            setWaitlistName(profile.full_name);
+          }
+        }
+      } catch (e) {
+        console.error('Error prefilling waitlist user:', e);
+      }
+    };
+    prefillUser();
+  }, []);
+
+  const handleJoinWaitlist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!waitlistName || !waitlistEmail) {
+      setWaitlistError('Name and email are required');
+      return;
+    }
+    setWaitlistSubmitStatus('submitting');
+    setWaitlistError('');
+    try {
+      const { error } = await supabase.from('waitlist_entries').insert({
+        name: waitlistName,
+        email: waitlistEmail,
+        preferred_date: selectedDate,
+        preferred_time: waitlistPrefTime,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setWaitlistSubmitStatus('success');
+      trackWaitlistJoin(selectedDate, waitlistPrefTime, selectedRitual || 'Somatic Session');
+    } catch (err: any) {
+      console.error('[TimeStep] Waitlist submission error:', err);
+      setWaitlistError(err.message || 'Failed to join waitlist. Please try again.');
+      setWaitlistSubmitStatus('error');
+    }
+  };
 
   useEffect(() => {
     const fetchSlots = async () => {
@@ -243,11 +305,7 @@ const TimeStep = () => {
                 ))}
               </div>
             ) : (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="max-w-2xl mx-auto"
-              >
+              <div className="space-y-8 max-w-xl mx-auto">
                 {isFindingNext ? (
                   <div className="text-center py-12 space-y-4">
                     <motion.div 
@@ -258,33 +316,126 @@ const TimeStep = () => {
                       Seeking next available moment...
                     </motion.div>
                   </div>
-                ) : nextDateInfo ? (
-                  <div className="bg-gold/[0.03] border border-gold/10 rounded-[3rem] p-12 text-center space-y-8 backdrop-blur-sm">
-                    <div className="space-y-4">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.5em] text-gold/60">Next Opportunity</p>
-                      <h4 className="font-display text-4xl text-text-dark">
-                        {format(parseISO(nextDateInfo.date), 'EEEE, MMMM do')}
-                      </h4>
-                      <p className="text-sm text-text-dark/40 italic font-display">
-                        “{nextDateInfo.count} ritual openings awaiting your presence.”
-                      </p>
-                    </div>
-                    
-                    <button
-                      onClick={() => setDate(nextDateInfo.date)}
-                      className="px-12 py-5 bg-text-dark text-white rounded-full text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-gold transition-all duration-700 shadow-luxury group"
-                    >
-                      Explore This Date
-                    </button>
-                  </div>
                 ) : (
-                  <div className="text-center py-12">
-                    <p className="text-sm text-text-dark/40 italic font-display">
-                      “The sanctuary is heavily held at this time. Please explore a different week.”
-                    </p>
-                  </div>
+                  <>
+                    {nextDateInfo && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-gold/[0.03] border border-gold/10 rounded-[2rem] p-6 text-center space-y-4 backdrop-blur-sm"
+                      >
+                        <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-gold/60">Next Opportunity</p>
+                        <h4 className="font-display text-xl text-text-dark">
+                          {format(parseISO(nextDateInfo.date), 'EEEE, MMMM do')}
+                        </h4>
+                        <button
+                          onClick={() => setDate(nextDateInfo.date)}
+                          className="px-8 py-3 bg-text-dark text-white rounded-full text-[9px] font-bold uppercase tracking-[0.4em] hover:bg-gold transition-all duration-700 shadow-luxury cursor-pointer"
+                        >
+                          Explore This Date
+                        </button>
+                      </motion.div>
+                    )}
+                    
+                    <motion.div
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white/40 backdrop-blur-md border border-gold/15 rounded-[2.5rem] p-8 shadow-luxury space-y-6"
+                    >
+                      <div className="text-center space-y-2">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold">Ritual Full</p>
+                        <h3 className="font-display text-2xl text-text-dark">Join the Waitlist</h3>
+                        <p className="text-xs text-text-dark/50 font-light max-w-sm mx-auto">
+                          This date is fully booked. Share your details to be notified immediately of any ritual cancellations.
+                        </p>
+                      </div>
+                      
+                      {waitlistSubmitStatus === 'success' ? (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="text-center py-6 space-y-4"
+                        >
+                          <div className="w-12 h-12 bg-gold/10 border border-gold/20 rounded-full flex items-center justify-center mx-auto">
+                            <svg className="w-5 h-5 text-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-gold">Resonance Registered</p>
+                            <p className="text-xs text-text-dark/60 font-light">
+                              We will contact you at <strong className="font-semibold text-text-dark">{waitlistEmail}</strong> if an opening occurs.
+                            </p>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <form onSubmit={handleJoinWaitlist} className="space-y-4">
+                          <div className="grid grid-cols-1 gap-3">
+                            <input
+                              type="text"
+                              placeholder="What should we call you?"
+                              value={waitlistName}
+                              onChange={(e) => setWaitlistName(e.target.value)}
+                              className="w-full px-6 py-4 bg-white/40 border border-[#3A3A3A]/10 rounded-full focus:outline-none focus:border-gold/50 focus:bg-white transition-all text-xs font-light tracking-wide text-text-dark"
+                              required
+                            />
+                            <input
+                              type="email"
+                              placeholder="Where can we reach you?"
+                              value={waitlistEmail}
+                              onChange={(e) => setWaitlistEmail(e.target.value)}
+                              className="w-full px-6 py-4 bg-white/40 border border-[#3A3A3A]/10 rounded-full focus:outline-none focus:border-gold/50 focus:bg-white transition-all text-xs font-light tracking-wide text-text-dark"
+                              required
+                            />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="relative">
+                                <input
+                                  type="text"
+                                  value={parsedDate ? format(parsedDate, 'MMMM do, yyyy') : ''}
+                                  disabled
+                                  className="w-full px-6 py-4 bg-black/[0.03] border border-transparent rounded-full text-xs font-light tracking-wide text-text-dark/40 cursor-not-allowed"
+                                />
+                              </div>
+                              <div className="relative">
+                                <select
+                                  value={waitlistPrefTime}
+                                  onChange={(e) => setWaitlistPrefTime(e.target.value)}
+                                  className="w-full px-6 py-4 bg-white/40 border border-[#3A3A3A]/10 rounded-full focus:outline-none focus:border-gold/50 focus:bg-white transition-all text-xs font-light tracking-wide text-text-dark appearance-none cursor-pointer"
+                                >
+                                  <option value="Any Time">Any Time</option>
+                                  <option value="Morning (8am - 12pm)">Morning (8am - 12pm)</option>
+                                  <option value="Afternoon (12pm - 4pm)">Afternoon (12pm - 4pm)</option>
+                                </select>
+                                <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-text-dark/40">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {waitlistError && (
+                            <p className="text-[10px] text-red-500/80 font-bold uppercase tracking-wider text-center">
+                              {waitlistError}
+                            </p>
+                          )}
+
+                          <motion.button
+                            type="submit"
+                            disabled={waitlistSubmitStatus === 'submitting'}
+                            whileHover={{ scale: 1.01 }}
+                            whileTap={{ scale: 0.99 }}
+                            className="w-full py-4 bg-text-dark text-white rounded-full text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-gold transition-all duration-700 shadow-luxury disabled:opacity-50 cursor-pointer"
+                          >
+                            {waitlistSubmitStatus === 'submitting' ? 'Registering Resonance...' : 'Request Alignment'}
+                          </motion.button>
+                        </form>
+                      )}
+                    </motion.div>
+                  </>
                 )}
-              </motion.div>
+              </div>
             )}
           </div>
         )}

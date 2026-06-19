@@ -27,11 +27,11 @@ export const reminderScheduler = {
       return;
     }
 
-    // 1. Fetch upcoming confirmed bookings
+    // 1. Fetch active, completed, and draft bookings
     const { data: bookings, error } = await supabase
       .from('bookings')
       .select('*')
-      .eq('booking_status', 'confirmed');
+      .in('booking_status', ['confirmed', 'completed', 'draft']);
 
     if (error) {
       console.error('Scheduler DB Error:', error);
@@ -62,37 +62,43 @@ export const reminderScheduler = {
         reminderSent: rawBooking.reminder_sent,
       };
 
-      const sessionStartTime = fromZonedTime(`${booking.selectedDate} ${booking.selectedTime}:00`, PROVIDER_TIMEZONE);
+      if (booking.bookingStatus === 'confirmed') {
+        const sessionStartTime = fromZonedTime(`${booking.selectedDate} ${booking.selectedTime}:00`, PROVIDER_TIMEZONE);
 
-      // --- 24-HOUR REMINDER CHECK ---
-      const reminder24hThreshold = subDays(sessionStartTime, 1);
-      if (config.reminder24h && isBefore(reminder24hThreshold, now) && isBefore(now, sessionStartTime)) {
-        await this.triggerEmailIfMissing(booking, 'reminder_24h', () => emailService.sendReminder24h(booking));
-      }
+        // --- 24-HOUR REMINDER CHECK ---
+        const reminder24hThreshold = subDays(sessionStartTime, 1);
+        if (config.reminder24h && isBefore(reminder24hThreshold, now) && isBefore(now, sessionStartTime)) {
+          await this.triggerEmailIfMissing(booking, 'reminder_24h', () => emailService.sendReminder24h(booking));
+        }
 
-      // --- 1-HOUR PREP CHECK ---
-      const prep1hThreshold = subHours(sessionStartTime, 1);
-      if (config.prep1h && isBefore(prep1hThreshold, now) && isBefore(now, sessionStartTime)) {
-        await this.triggerEmailIfMissing(booking, 'prep_1h', () => emailService.sendPrep1h(booking));
+        // --- 1-HOUR PREP CHECK ---
+        const prep1hThreshold = subHours(sessionStartTime, 1);
+        if (config.prep1h && isBefore(prep1hThreshold, now) && isBefore(now, sessionStartTime)) {
+          await this.triggerEmailIfMissing(booking, 'prep_1h', () => emailService.sendPrep1h(booking));
 
-        // --- FUTURE WHATSAPP INTEGRATION PLACEHOLDER ---
-        // TODO: Once the Twilio / WhatsApp Business API credentials are set up,
-        // send an automated WhatsApp reminder to client with the join details.
-        // Expected payload example:
-        // const payload = {
-        //   to: booking.phoneNumber, // (Need to ensure phone number exists in schema/input)
-        //   template: 'prep_1h_reminder',
-        //   variables: [booking.fullName, booking.selectedSession, booking.zoomJoinUrl || 'Soho Sanctuary']
-        // };
-        // await whatsappService.send(payload);
-        console.log(`[WhatsApp Reminder Pending] WhatsApp automation placeholder for ${booking.fullName} (${booking.bookingReference})`);
-      }
+          // --- FUTURE WHATSAPP INTEGRATION PLACEHOLDER ---
+          // TODO: Once the Twilio / WhatsApp Business API credentials are set up,
+          // send an automated WhatsApp reminder to client with the join details.
+          console.log(`[WhatsApp Reminder Pending] WhatsApp automation placeholder for ${booking.fullName} (${booking.bookingReference})`);
+        }
 
-      // --- MARK AS COMPLETED CHECK ---
-      // If session ended more than 1 hour ago
-      const completionThreshold = addHours(sessionStartTime, 2); // Assuming max duration is 120m
-      if (isBefore(completionThreshold, now)) {
-        await this.markAsCompleted(booking);
+        // --- MARK AS COMPLETED CHECK ---
+        // If session ended more than 1 hour ago
+        const completionThreshold = addHours(sessionStartTime, 2); // Assuming max duration is 120m
+        if (isBefore(completionThreshold, now)) {
+          await this.markAsCompleted(booking);
+        }
+      } else if (booking.bookingStatus === 'completed') {
+        // --- POST SESSION FOLLOW-UP CHECK ---
+        await this.triggerEmailIfMissing(booking, 'post_session_followup', () => emailService.sendPostSessionFollowUp(booking));
+      } else if (booking.bookingStatus === 'draft') {
+        // --- ABANDONED BOOKING RECOVERY CHECK ---
+        if (booking.email && booking.fullName) {
+          const draftAgeHours = (now.getTime() - new Date(booking.createdAt).getTime()) / (1000 * 60 * 60);
+          if (draftAgeHours >= 24) {
+            await this.triggerEmailIfMissing(booking, 'abandoned_recovery', () => emailService.sendAbandonedRecovery(booking));
+          }
+        }
       }
     }
 

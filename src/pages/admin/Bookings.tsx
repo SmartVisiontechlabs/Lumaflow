@@ -23,6 +23,53 @@ import { adminService } from '../../services/adminService';
 import { followUpMap } from '../../data/recommendationMap';
 import { Sparkles, Send } from 'lucide-react';
 
+export function parseIntakeFields(intentionsStr: string) {
+  let intentions = intentionsStr || '';
+  let challenges = '';
+  let desiredOutcomes = '';
+
+  const journeyRegex = /^\[Journey:\s*([^\]]+)\]\s*/;
+  const journeyMatch = intentions.match(journeyRegex);
+  if (journeyMatch) {
+    intentions = intentions.replace(journeyRegex, '');
+  }
+
+  const intentionsPrefix = 'Intentions: ';
+  const challengesPrefix = 'Challenges: ';
+  const outcomesPrefix = 'Desired Outcomes: ';
+
+  if (intentions.includes(intentionsPrefix) || intentions.includes(challengesPrefix) || intentions.includes(outcomesPrefix)) {
+    const lines = intentions.split('\n');
+    let currentField = 'intentions';
+    let intAccum: string[] = [];
+    let chalAccum: string[] = [];
+    let outAccum: string[] = [];
+
+    for (const line of lines) {
+      if (line.startsWith(intentionsPrefix)) {
+        currentField = 'intentions';
+        intAccum.push(line.substring(intentionsPrefix.length));
+      } else if (line.startsWith(challengesPrefix)) {
+        currentField = 'challenges';
+        chalAccum.push(line.substring(challengesPrefix.length));
+      } else if (line.startsWith(outcomesPrefix)) {
+        currentField = 'outcomes';
+        outAccum.push(line.substring(outcomesPrefix.length));
+      } else {
+        if (currentField === 'intentions') intAccum.push(line);
+        else if (currentField === 'challenges') chalAccum.push(line);
+        else if (currentField === 'outcomes') outAccum.push(line);
+      }
+    }
+
+    intentions = intAccum.join('\n').trim();
+    challenges = chalAccum.join('\n').trim();
+    desiredOutcomes = outAccum.join('\n').trim();
+  }
+
+  return { intentions, challenges, desiredOutcomes };
+}
+
 const AdminBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -489,10 +536,36 @@ const AdminBookings = () => {
                 {/* Intentions */}
                 <div className="space-y-4">
                   <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/20 italic">Soul's Intention</p>
-                  <div className="bg-white border border-text-dark/5 rounded-[2rem] p-8 shadow-sm">
-                    <p className="text-sm text-text-dark/60 font-light leading-relaxed font-display italic">
-                      “{selectedBooking.intentions || 'No specific intentions noted for this journey.'}”
-                    </p>
+                  <div className="bg-white border border-text-dark/5 rounded-[2rem] p-8 shadow-sm space-y-4">
+                    {(() => {
+                      const { intentions, challenges, desiredOutcomes } = parseIntakeFields(selectedBooking.intentions);
+                      return (
+                        <>
+                          <div>
+                            <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold/80 mb-1">Intentions</p>
+                            <p className="text-sm text-text-dark/60 font-light leading-relaxed font-display italic">
+                              “{intentions || 'No specific intentions noted.'}”
+                            </p>
+                          </div>
+                          {challenges && (
+                            <div className="border-t border-text-dark/5 pt-3">
+                              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold/80 mb-1">Current Challenges</p>
+                              <p className="text-sm text-text-dark/60 font-light leading-relaxed font-display italic">
+                                “{challenges}”
+                              </p>
+                            </div>
+                          )}
+                          {desiredOutcomes && (
+                            <div className="border-t border-text-dark/5 pt-3">
+                              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-gold/80 mb-1">Desired Outcomes</p>
+                              <p className="text-sm text-text-dark/60 font-light leading-relaxed font-display italic">
+                                “{desiredOutcomes}”
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 

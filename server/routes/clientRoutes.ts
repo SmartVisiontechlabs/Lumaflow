@@ -37,7 +37,7 @@ router.get('/upcoming-booking', requireSession, async (req: AuthenticatedRequest
 
     const now = new Date();
     const activeBookings = bookings.filter((b: any) => {
-      if (b.booking_status === 'cancelled') return false;
+      if (b.booking_status !== 'confirmed') return false;
       const tz = b.timezone || 'America/New_York';
       const startUTC = fromZonedTime(`${b.selected_date}T${b.selected_time}:00`, tz);
       const durationMs = (b.duration || 60) * 60 * 1000;
@@ -196,6 +196,100 @@ router.get('/payments', requireSession, async (req: AuthenticatedRequest, res: R
     return res.json(payments);
   } catch (err: any) {
     console.error('[payments] Unexpected error:', err);
+    return res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// 4. GET /api/client/journey
+router.get('/journey', requireSession, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const profile = req.profile;
+    if (!profile) {
+      return res.status(401).json({ error: 'Profile not found in session' });
+    }
+
+    // A. Fetch membership credits from membership_credits
+    const { data: credits, error: creditsErr } = await supabaseAdmin
+      .from('membership_credits')
+      .select('total_credits, used_credits, remaining_credits')
+      .eq('user_id', profile.id)
+      .maybeSingle();
+
+    if (creditsErr) {
+      console.error('[journey] Error fetching credits:', creditsErr);
+    }
+
+    // B. Fetch bookings
+    const { data: bookings, error: bookingsErr } = await supabaseAdmin
+      .from('bookings')
+      .select('*')
+      .or(`user_id.eq.${profile.id},email.eq.${profile.email}`);
+
+    if (bookingsErr) {
+      console.error('[journey] Error fetching bookings:', bookingsErr);
+      return res.status(500).json({ error: 'Failed to retrieve bookings' });
+    }
+
+    const now = new Date();
+    
+    // Completed rituals (status = completed, or status = confirmed in the past)
+    const completed = (bookings || [])
+      .filter((b: any) => {
+        if (b.booking_status === 'completed') return true;
+        if (b.booking_status !== 'confirmed') return false;
+        
+        const tz = b.timezone || 'America/New_York';
+        const startUTC = fromZonedTime(`${b.selected_date}T${b.selected_time}:00`, tz);
+        const durationMs = (b.duration || 60) * 60 * 1000;
+        return startUTC.getTime() + durationMs <= now.getTime();
+      })
+      .map((b: any) => ({
+        id: b.id,
+        ritualName: b.selected_session,
+        date: b.selected_date,
+        time: b.selected_time,
+        duration: b.duration || 60,
+        format: b.session_format,
+        status: 'completed'
+      }));
+
+    // Upcoming rituals (status = confirmed and in the future)
+    const upcoming = (bookings || [])
+      .filter((b: any) => {
+        if (b.booking_status !== 'confirmed') return false;
+        
+        const tz = b.timezone || 'America/New_York';
+        const startUTC = fromZonedTime(`${b.selected_date}T${b.selected_time}:00`, tz);
+        const durationMs = (b.duration || 60) * 60 * 1000;
+        return startUTC.getTime() + durationMs > now.getTime();
+      })
+      .map((b: any) => ({
+        id: b.id,
+        ritualName: b.selected_session,
+        date: b.selected_date,
+        time: b.selected_time,
+        duration: b.duration || 60,
+        format: b.session_format,
+        status: 'upcoming'
+      }));
+
+    // Sort chronologically (oldest first)
+    completed.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    upcoming.sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Aggregate into a timeline (progression: past completed first, then future upcoming)
+    const timeline = [...completed, ...upcoming];
+
+    return res.json({
+      credits: credits || {
+        total_credits: 0,
+        used_credits: 0,
+        remaining_credits: 0
+      },
+      timeline
+    });
+  } catch (err: any) {
+    console.error('[journey] Unexpected error:', err);
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });

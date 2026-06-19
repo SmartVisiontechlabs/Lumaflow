@@ -8,6 +8,9 @@ import { Prep1hEmail } from '../../src/emails/Prep1h';
 import { FollowUpRitualEmail } from '../../src/emails/FollowUpRitualEmail';
 import { WelcomeEmail } from '../../src/emails/WelcomeEmail';
 import { AccessSanctuaryEmail } from '../../src/emails/AccessSanctuary';
+import { PostSessionFollowUpEmail } from '../../src/emails/PostSessionFollowUp';
+import { AbandonedBookingRecoveryEmail } from '../../src/emails/AbandonedBookingRecovery';
+import { WaitlistAlertEmail } from '../../src/emails/WaitlistAlert';
 import { Booking } from '../types/booking';
 import { getLocalTimeForEST } from '../utils/bookingUtils';
 import { format, parse, addMinutes } from 'date-fns';
@@ -319,6 +322,10 @@ If you need support, reply to this email.
           date: format(parse(booking.selectedDate, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy'),
           timeEST: timeESTFormatted,
           timeLocal: timeLocal,
+          sessionFormat: booking.sessionFormat || 'Virtual',
+          zoomJoinUrl: booking.zoomJoinUrl,
+          zoomMeetingId: booking.zoomMeetingId,
+          meetingPassword: booking.meetingPassword,
         }),
       });
 
@@ -330,6 +337,71 @@ If you need support, reply to this email.
     } catch (error: any) {
       console.error('Error sending 24h reminder:', error);
       await this.logEmail(booking.id, 'reminder_24h_critical', booking.email, 'failed', error.message);
+    }
+  },
+
+  /**
+   * Sends post session follow-up with reflection prompt and rebook link
+   */
+  async sendPostSessionFollowUp(booking: Booking) {
+    console.log(`--- EMAIL ATTEMPT: Post Session Follow-Up for ${booking.bookingReference} ---`);
+    try {
+      const result = await resend.emails.send({
+        from: `LumaFlow <${FROM_EMAIL}>`,
+        to: booking.email,
+        subject: 'Gratitude for your somatic journey ✨',
+        react: PostSessionFollowUpEmail({
+          fullName: booking.fullName,
+          ritual: booking.selectedSession,
+          rebookUrl: 'https://thelumaflow.com/book',
+        }),
+      });
+
+      if (result.error) {
+        await this.logEmail(booking.id, 'post_session_followup', booking.email, 'failed', result.error.message);
+      } else {
+        await this.logEmail(booking.id, 'post_session_followup', booking.email, 'sent');
+      }
+    } catch (error: any) {
+      console.error('Error sending post session follow-up:', error);
+      await this.logEmail(booking.id, 'post_session_followup_critical', booking.email, 'failed', error.message);
+    }
+  },
+
+  /**
+   * Sends abandoned booking recovery email
+   */
+  async sendAbandonedRecovery(booking: Booking) {
+    console.log(`--- EMAIL ATTEMPT: Abandoned Booking Recovery for ${booking.bookingReference} ---`);
+    try {
+      const timeESTFormatted = booking.selectedTime 
+        ? (format(parse(booking.selectedTime, 'HH:mm', new Date()), 'hh:mm a') + ' EST')
+        : null;
+      const dateFormatted = booking.selectedDate
+        ? format(parse(booking.selectedDate, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy')
+        : null;
+
+      const result = await resend.emails.send({
+        from: `LumaFlow <${FROM_EMAIL}>`,
+        to: booking.email,
+        subject: 'Your sanctuary reservation is waiting ✨',
+        react: AbandonedBookingRecoveryEmail({
+          fullName: booking.fullName,
+          ritual: booking.selectedSession,
+          date: dateFormatted,
+          timeEST: timeESTFormatted,
+          resumeUrl: 'https://thelumaflow.com/book',
+        }),
+      });
+
+      if (result.error) {
+        await this.logEmail(booking.id, 'abandoned_recovery', booking.email, 'failed', result.error.message);
+      } else {
+        await this.logEmail(booking.id, 'abandoned_recovery', booking.email, 'sent');
+      }
+    } catch (error: any) {
+      console.error('Error sending abandoned recovery email:', error);
+      await this.logEmail(booking.id, 'abandoned_recovery_critical', booking.email, 'failed', error.message);
     }
   },
 
@@ -461,6 +533,84 @@ We await you in the stillness.
       }
     } catch (error: any) {
       console.error('MAGIC LINK EMAIL PIPELINE EXCEPTION:', error.message);
+    }
+  },
+
+  /**
+   * Sends waitlist alert email to a client
+   */
+  async sendWaitlistAlert(recipientEmail: string, recipientName: string, date: string, timePreference: string) {
+    try {
+      console.log('--- WAITLIST EMAIL PIPELINE STARTED ---');
+      console.log('RECIPIENT:', recipientEmail);
+
+      const result = await resend.emails.send({
+        from: `LumaFlow <${FROM_EMAIL}>`,
+        to: recipientEmail,
+        replyTo: 'support@thelumaflow.com',
+        subject: '✨ A Somatic Ritual Space Has Opened',
+        react: WaitlistAlertEmail({
+          fullName: recipientName,
+          preferredDate: date,
+          preferredTime: timePreference,
+          bookUrl: 'https://thelumaflow.com/book',
+        }),
+      });
+
+      if (result.error) {
+        console.error('WAITLIST EMAIL FAILED:', result.error.message);
+      } else {
+        console.log('[WAITLIST EMAIL SENT]');
+      }
+    } catch (error: any) {
+      console.error('WAITLIST EMAIL PIPELINE EXCEPTION:', error.message);
+    }
+  },
+
+  /**
+   * Notifies all waitlisted clients for a given date
+   */
+  async notifyWaitlistForDate(date: string, time?: string) {
+    try {
+      console.log(`[Waitlist Notification] Checking waitlist for date: ${date}`);
+      // Query waitlist entries
+      const { data: entries, error } = await supabase
+        .from('waitlist_entries')
+        .select('*')
+        .eq('preferred_date', date)
+        .eq('notified', false);
+
+      if (error) {
+        console.error('[Waitlist Notification] Error querying waitlist:', error);
+        return;
+      }
+
+      if (!entries || entries.length === 0) {
+        console.log(`[Waitlist Notification] No waitlist entries found for date: ${date}`);
+        return;
+      }
+
+      console.log(`[Waitlist Notification] Found ${entries.length} waitlist entries to notify.`);
+
+      for (const entry of entries) {
+        const formattedDate = format(parse(date, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy');
+        await this.sendWaitlistAlert(entry.email, entry.name, formattedDate, entry.preferred_time);
+      }
+
+      // Mark as notified
+      const entryIds = entries.map(e => e.id);
+      const { error: updateError } = await supabase
+        .from('waitlist_entries')
+        .update({ notified: true })
+        .in('id', entryIds);
+
+      if (updateError) {
+        console.error('[Waitlist Notification] Error marking entries as notified:', updateError);
+      } else {
+        console.log(`[Waitlist Notification] Marked ${entries.length} entries as notified.`);
+      }
+    } catch (err: any) {
+      console.error('[Waitlist Notification] Critical error notifying waitlist:', err);
     }
   }
 };

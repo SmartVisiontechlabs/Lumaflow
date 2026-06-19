@@ -90,3 +90,68 @@ export const trackMagicLinkRequest = (email: string) => {
 export const trackDashboardVisit = (userId?: string) => {
   trackEvent('dashboard_visit', 'Engagement', userId || 'anonymous');
 };
+
+export const trackPurchase = (
+  transactionId: string, 
+  value: number, 
+  bookingReference: string, 
+  ritualName: string
+) => {
+  if (typeof window === 'undefined' || !GA_MEASUREMENT_ID) return;
+  initGA();
+  if (window.gtag) {
+    window.gtag('event', 'purchase', {
+      transaction_id: transactionId,
+      value: value,
+      currency: 'USD',
+      booking_reference: bookingReference,
+      ritual_name: ritualName,
+      items: [{
+        item_name: ritualName,
+        price: value,
+        quantity: 1
+      }]
+    });
+  }
+};
+
+export const trackPackagePurchase = (
+  packageName: string,
+  packageId: string,
+  credits: number,
+  value: number
+) => {
+  if (typeof window === 'undefined' || !GA_MEASUREMENT_ID) return;
+  initGA();
+  if (window.gtag) {
+    window.gtag('event', 'purchase_package', {
+      package_name: packageName,
+      package_id: packageId,
+      credits: credits,
+      value: value,
+      currency: 'USD',
+      items: [{
+        item_name: packageName,
+        item_id: packageId,
+        price: value,
+        quantity: 1
+      }]
+    });
+  }
+};
+
+export const trackWaitlistJoin = (
+  preferredDate: string,
+  preferredTime: string,
+  sessionType: string
+) => {
+  if (typeof window === 'undefined' || !GA_MEASUREMENT_ID) return;
+  initGA();
+  if (window.gtag) {
+    window.gtag('event', 'waitlist_joined', {
+      preferred_date: preferredDate,
+      preferred_time: preferredTime,
+      session_type: sessionType
+    });
+  }
+};

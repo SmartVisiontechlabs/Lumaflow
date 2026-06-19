@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { supabase, supabaseAdmin } from '../config/supabase';
 import { requireSession, adminAuth } from '../middleware/authMiddleware';
+import { fromZonedTime } from 'date-fns-tz';
+import { format, parse } from 'date-fns';
+import { emailService } from '../services/emailService';
 
 const router = Router();
 
@@ -200,6 +203,309 @@ router.post('/change-password', requireSession, adminAuth, async (req, res) => {
   } catch (err: any) {
     console.error(`[ADMIN PASSWORD UPDATE FAILED] Server error:`, err);
     return res.status(500).json({ error: err.message || 'Server error updating password' });
+  }
+});
+
+/**
+ * GET /api/admin/finance
+ * Returns detailed financial dashboard metrics, booking analytics, client KPIs, and monthly revenue data.
+ */
+router.get('/finance', requireSession, adminAuth, async (req, res) => {
+  try {
+    const dbClient = supabaseAdmin || supabase;
+
+    // 1. Fetch all bookings with pricing and creation dates
+    const { data: bookings, error: bookingsErr } = await dbClient
+      .from('bookings')
+      .select('package_price, created_at, booking_status, selected_date, selected_time, timezone, duration, stripe_payment_id, user_id, email, payment_status');
+
+    if (bookingsErr) {
+      console.error('[admin/finance] Error retrieving bookings:', bookingsErr);
+      return res.status(500).json({ error: 'Failed to retrieve booking transactions' });
+    }
+
+    // 2. Fetch all user profiles to compute client counts
+    const { data: profiles, error: profilesErr } = await dbClient
+      .from('user_profiles')
+      .select('id, email, role');
+
+    if (profilesErr) {
+      console.error('[admin/finance] Error retrieving profiles:', profilesErr);
+      return res.status(500).json({ error: 'Failed to retrieve client profiles' });
+    }
+
+    // 3. Fetch user packages and packages for membership metrics
+    const { data: userPackages, error: upErr } = await dbClient
+      .from('user_packages')
+      .select('*');
+
+    if (upErr) {
+      console.warn('[admin/finance] Error retrieving user packages:', upErr);
+    }
+
+    const { data: packagesList, error: pkgListErr } = await dbClient
+      .from('packages')
+      .select('*');
+
+    if (pkgListErr) {
+      console.warn('[admin/finance] Error retrieving packages list:', pkgListErr);
+    }
+
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // Financial Metrics init
+    let revenueToday = 0;
+    let revenueMonth = 0;
+    let revenueYear = 0;
+    let totalRevenue = 0;
+
+    const monthlyDataMap: Record<string, number> = {};
+    let revenuePrevMonth = 0;
+
+    const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
+
+    // Booking Metrics init
+    let upcomingSessions = 0;
+    let completedSessions = 0;
+    let cancelledSessions = 0;
+
+    const clientBookingCounts: Record<string, number> = {};
+
+    for (const b of (bookings || [])) {
+      const isPaid = b.payment_status === 'paid';
+      const isStripeCash = b.stripe_payment_id && b.stripe_payment_id !== 'credit_booking';
+
+      // Sum up cash payments for revenue metrics
+      if (isPaid && isStripeCash) {
+        const price = Number(b.package_price) || 0;
+        const createdDate = new Date(b.created_at);
+        const createdYear = createdDate.getFullYear();
+        const createdMonth = createdDate.getMonth();
+        const createdDayStr = createdDate.toISOString().split('T')[0];
+
+        totalRevenue += price;
+
+        if (createdDayStr === todayStr) {
+          revenueToday += price;
+        }
+        if (createdYear === currentYear && createdMonth === currentMonth) {
+          revenueMonth += price;
+        }
+        if (createdYear === prevMonthDate.getFullYear() && createdMonth === prevMonthDate.getMonth()) {
+          revenuePrevMonth += price;
+        }
+        if (createdYear === currentYear) {
+          revenueYear += price;
+        }
+
+        const monthKey = `${createdYear}-${String(createdMonth + 1).padStart(2, '0')}`;
+        monthlyDataMap[monthKey] = (monthlyDataMap[monthKey] || 0) + price;
+      }
+
+      // Compute booking counts
+      if (b.booking_status === 'completed') {
+        completedSessions++;
+      } else if (b.booking_status === 'cancelled') {
+        cancelledSessions++;
+      } else if (b.booking_status === 'confirmed') {
+        const tz = b.timezone || 'America/New_York';
+        const startUTC = fromZonedTime(`${b.selected_date}T${b.selected_time}:00`, tz);
+        const durationMs = (b.duration || 60) * 60 * 1000;
+        if (startUTC.getTime() + durationMs > now.getTime()) {
+          upcomingSessions++;
+        } else {
+          completedSessions++; // Confirmed past bookings count as completed
+        }
+      }
+
+      // Track active client booking counts
+      if (b.booking_status === 'confirmed' || b.booking_status === 'completed') {
+        const clientKey = b.user_id || b.email.toLowerCase();
+        clientBookingCounts[clientKey] = (clientBookingCounts[clientKey] || 0) + 1;
+      }
+    }
+
+    // Growth percentage calculation
+    let growthPercent = 0;
+    if (revenuePrevMonth > 0) {
+      growthPercent = Number((((revenueMonth - revenuePrevMonth) / revenuePrevMonth) * 100).toFixed(1));
+    } else if (revenueMonth > 0) {
+      growthPercent = 100;
+    }
+
+    // Client Metrics calculation
+    const clients = (profiles || []).filter((p: any) => p.role === 'client');
+    const totalClients = clients.length;
+    let activeClients = 0;
+    let returningClients = 0;
+
+    for (const key of Object.keys(clientBookingCounts)) {
+      const count = clientBookingCounts[key];
+      if (count >= 1) activeClients++;
+      if (count >= 2) returningClients++;
+    }
+
+    // Historical monthly data (last 6 months) for chart
+    const monthlyAnalytics = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(currentYear, currentMonth - i, 1);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString(undefined, { month: 'short', year: '2-digit' });
+      monthlyAnalytics.push({
+        month: label,
+        revenue: monthlyDataMap[key] || 0
+      });
+    }
+
+    // Membership Metrics calculation
+    const packagesMap = new Map(packagesList?.map(p => [p.id, p]) || []);
+    let activePackagesCount = 0;
+    let expiredPackagesCount = 0;
+    let creditsUsed = 0;
+    let creditsRemaining = 0;
+    let packageRevenue = 0;
+
+    for (const up of (userPackages || [])) {
+      const isExpired = up.expires_at ? new Date(up.expires_at) <= now : false;
+      if (up.status === 'active' && !isExpired) {
+        activePackagesCount++;
+      } else {
+        expiredPackagesCount++;
+      }
+
+      creditsUsed += Number(up.used_credits) || 0;
+      creditsRemaining += Number(up.remaining_credits) || 0;
+
+      const pkg = up.package_id ? (packagesMap.get(up.package_id) as any) : null;
+      const price = pkg ? Number(pkg.price) : 0;
+      packageRevenue += price;
+    }
+
+    return res.json({
+      revenue: {
+        today: revenueToday,
+        month: revenueMonth,
+        year: revenueYear,
+        total: totalRevenue,
+        previousMonth: revenuePrevMonth,
+        growthPercent
+      },
+      bookings: {
+        upcoming: upcomingSessions,
+        completed: completedSessions,
+        cancelled: cancelledSessions
+      },
+      clients: {
+        total: totalClients,
+        active: activeClients,
+        returning: returningClients
+      },
+      monthlyAnalytics,
+      membershipAnalytics: {
+        activePackagesCount,
+        expiredPackagesCount,
+        creditsUsed,
+        creditsRemaining,
+        packageRevenue
+      }
+    });
+  } catch (err: any) {
+    console.error('[admin/finance] Server error:', err);
+    return res.status(500).json({ error: err.message || 'Internal server error fetching finance stats' });
+  }
+});
+
+/**
+ * GET /api/admin/waitlist
+ * Returns all waitlist entries, ordered by preferred_date and created_at.
+ */
+router.get('/waitlist', requireSession, adminAuth, async (req, res) => {
+  try {
+    const dbClient = supabaseAdmin || supabase;
+    const { data, error } = await dbClient
+      .from('waitlist_entries')
+      .select('*')
+      .order('preferred_date', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('[Admin Waitlist API] Error fetching waitlist:', error);
+      return res.status(500).json({ error: 'Failed to fetch waitlist entries' });
+    }
+
+    return res.status(200).json(data);
+  } catch (err: any) {
+    console.error('[Admin Waitlist API] Server error:', err);
+    return res.status(500).json({ error: err.message || 'Server error fetching waitlist' });
+  }
+});
+
+/**
+ * POST /api/admin/waitlist/:id/notify
+ * Manually notifies a specific waitlist entry and marks it as notified = true.
+ */
+router.post('/waitlist/:id/notify', requireSession, adminAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const dbClient = supabaseAdmin || supabase;
+    const { data: entry, error: fetchErr } = await dbClient
+      .from('waitlist_entries')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !entry) {
+      console.warn(`[Admin Waitlist API] Waitlist entry not found: ${id}`);
+      return res.status(404).json({ error: 'Waitlist entry not found' });
+    }
+
+    // Call emailService.sendWaitlistAlert
+    const formattedDate = format(parse(entry.preferred_date, 'yyyy-MM-dd', new Date()), 'MMMM do, yyyy');
+    await emailService.sendWaitlistAlert(entry.email, entry.name, formattedDate, entry.preferred_time);
+
+    // Mark as notified in db
+    const { error: updateError } = await dbClient
+      .from('waitlist_entries')
+      .update({ notified: true })
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('[Admin Waitlist API] Error marking entry as notified:', updateError);
+      return res.status(500).json({ error: 'Failed to update waitlist entry status' });
+    }
+
+    return res.status(200).json({ success: true, message: 'Waitlist client notified successfully' });
+  } catch (err: any) {
+    console.error('[Admin Waitlist API] Server error:', err);
+    return res.status(500).json({ error: err.message || 'Server error notifying waitlist client' });
+  }
+});
+
+/**
+ * DELETE /api/admin/waitlist/:id
+ * Removes a waitlist entry.
+ */
+router.delete('/waitlist/:id', requireSession, adminAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const dbClient = supabaseAdmin || supabase;
+    const { error } = await dbClient
+      .from('waitlist_entries')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('[Admin Waitlist API] Error deleting waitlist entry:', error);
+      return res.status(500).json({ error: 'Failed to delete waitlist entry' });
+    }
+
+    return res.status(200).json({ success: true, message: 'Waitlist entry removed' });
+  } catch (err: any) {
+    console.error('[Admin Waitlist API] Server error:', err);
+    return res.status(500).json({ error: err.message || 'Server error deleting waitlist entry' });
   }
 });
 
