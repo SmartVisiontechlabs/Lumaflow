@@ -327,7 +327,10 @@ const AdminBookings = () => {
                 filteredBookings.map((booking) => (
                   <tr 
                     key={booking.id} 
-                    onClick={() => setSelectedBooking(booking)}
+                    onClick={() => {
+                      console.log("BOOKING SELECTED:", booking);
+                      setSelectedBooking(booking);
+                    }}
                     className="group hover:bg-white/80 transition-all duration-500 cursor-pointer"
                   >
                     <td className="px-10 py-8">
