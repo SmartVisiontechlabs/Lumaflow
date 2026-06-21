@@ -29,6 +29,26 @@ import { adminSupabase as supabase } from '../../lib/supabase';
 import { cn } from '../../lib/utils';
 import { Toast, ToastType } from '../../components/ui/Toast';
 
+const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
+
+const getAuthHeaders = async () => {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  try {
+    if (supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+    }
+  } catch (e) {
+    console.error('Calendar auth token extraction error:', e);
+  }
+  return headers;
+};
+
 const CalendarManager = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -60,16 +80,16 @@ const CalendarManager = () => {
       const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
       const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
       
-      const { data, error } = await supabase
-        .from('blocked_slots')
-        .select('*')
-        .gte('blocked_date', start)
-        .lte('blocked_date', end);
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/availability/blocked?start=${start}&end=${end}`, {
+        headers
+      });
       
-      if (error) {
-        console.warn('Blocked slots table missing or unreachable:', error);
-        return;
+      if (!response.ok) {
+        throw new Error('Failed to retrieve sanctuary blocks');
       }
+      
+      const data = await response.json();
       if (data) setBlockedDates(data);
     } catch (error) {
       console.error('Error fetching blocked dates:', error);
@@ -85,17 +105,22 @@ const CalendarManager = () => {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const timeRange = startTime ? (endTime ? `${startTime}-${endTime}` : startTime) : null;
       
-      const { error } = await supabase
-        .from('blocked_slots')
-        .insert({
-          blocked_date: dateStr,
-          blocked_time: timeRange,
-          reason: reason || 'Sanctuary maintenance',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/availability/block`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          date: dateStr,
+          time: timeRange,
+          reason: reason || 'Sanctuary maintenance'
+        })
+      });
       
-      if (error) throw error;
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to block date');
+      }
+      
       showToast('Sanctuary stillness manifested', 'success');
       fetchBlockedDates();
       setSelectedDate(null);
@@ -112,12 +137,17 @@ const CalendarManager = () => {
 
   const handleUnblockDate = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('blocked_slots')
-        .delete()
-        .eq('id', id);
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/availability/block/${id}`, {
+        method: 'DELETE',
+        headers
+      });
       
-      if (error) throw error;
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to restore availability');
+      }
+      
       showToast('Sanctuary availability restored', 'success');
       fetchBlockedDates();
     } catch (error) {
