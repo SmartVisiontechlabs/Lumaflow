@@ -211,7 +211,7 @@ export default function Hero() {
           >
             <div className="flex items-center gap-2.5 px-4 py-2 bg-[#B8955A]/5 border border-[#B8955A]/15 rounded-full text-[13px] lg:text-[14px] font-medium tracking-[0.15em] text-[#7A5F35] uppercase transition-all">
               <ShieldCheck className="w-4 h-4 text-[#B8955A] flex-shrink-0" />
-              <span>Private Sanctuary</span>
+              <span>Private Session</span>
             </div>
             <div className="flex items-center gap-2.5 px-4 py-2 bg-[#B8955A]/5 border border-[#B8955A]/15 rounded-full text-[13px] lg:text-[14px] font-medium tracking-[0.15em] text-[#7A5F35] uppercase transition-all">
               <Sparkles className="w-4 h-4 text-[#B8955A] flex-shrink-0" />
