@@ -84,6 +84,8 @@ const AdminBookings = () => {
   const [adminNote, setAdminNote] = useState('');
   const [isSendingFollowUp, setIsSendingFollowUp] = useState(false);
   const [showSuccessState, setShowSuccessState] = useState(false);
+  const [isProvisioningZoom, setIsProvisioningZoom] = useState(false);
+
 
   // Toast state
   const [toast, setToast] = useState<{ message: string; type: ToastType; isVisible: boolean }>({
@@ -242,7 +244,40 @@ const AdminBookings = () => {
     }
   };
 
+  const handleProvisionZoom = async () => {
+    if (!selectedBooking) return;
+    setIsProvisioningZoom(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
+
+      const response = await fetch(`${API_URL}/admin/bookings/${selectedBooking.id}/provision-zoom`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        }
+      });
+
+      const resData = await response.json();
+      if (!response.ok) {
+        throw new Error(resData.error || 'Failed to provision Zoom meeting');
+      }
+
+      showToast('Zoom meeting provisioned successfully', 'success');
+      setSelectedBooking(resData.booking);
+      fetchBookings();
+    } catch (error: any) {
+      console.error('Error provisioning Zoom:', error);
+      showToast(error.message || 'Failed to provision Zoom', 'error');
+    } finally {
+      setIsProvisioningZoom(false);
+    }
+  };
+
   const filteredBookings = bookings.filter(booking => {
+
     const matchesSearch = 
       booking.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       booking.booking_reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -509,6 +544,26 @@ const AdminBookings = () => {
                       </div>
 
                       <div className="flex flex-col gap-3 pt-2">
+                        {(!selectedBooking.zoom_meeting_id || selectedBooking.zoom_status !== 'success') ? (
+                          <button
+                            onClick={handleProvisionZoom}
+                            disabled={isProvisioningZoom}
+                            className="w-full py-4 bg-gold text-white text-center rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-text-dark transition-all duration-700 shadow-luxury flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            {isProvisioningZoom ? 'Provisioning Zoom...' : 'Provision Zoom Meeting'}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={handleProvisionZoom}
+                            disabled={isProvisioningZoom}
+                            className="w-full py-4 bg-white border border-text-dark/10 text-text-dark text-center rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-cream transition-all duration-500 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            {isProvisioningZoom ? 'Regenerating Zoom...' : 'Regenerate Zoom Meeting'}
+                          </button>
+                        )}
+
                         {selectedBooking.zoom_start_url && (
                           <a
                             href={selectedBooking.zoom_start_url}
@@ -532,6 +587,7 @@ const AdminBookings = () => {
                           </a>
                         )}
                       </div>
+
                     </div>
                   </div>
                 )}

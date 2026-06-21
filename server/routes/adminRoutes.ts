@@ -540,4 +540,78 @@ router.delete('/waitlist/:id', requireSession, adminAuth, async (req, res) => {
   }
 });
 
+/**
+ * POST /api/admin/bookings/:id/provision-zoom
+ * Manually provisions or regenerates a Zoom meeting for a virtual booking.
+ */
+router.post('/bookings/:id/provision-zoom', requireSession, adminAuth, async (req, res) => {
+  const { id } = req.params;
+  console.log(`[MANUAL ZOOM PROVISIONING] Booking ID: ${id}`);
+
+  try {
+    const dbClient = supabaseAdmin || supabase;
+
+    // 1. Fetch the booking
+    const { data: booking, error: fetchErr } = await dbClient
+      .from('bookings')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !booking) {
+      console.warn(`[Manual Zoom API] Booking not found: ${id}`);
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (booking.session_format?.toLowerCase() !== 'virtual') {
+      return res.status(400).json({ error: 'Only virtual sessions can have Zoom meetings provisioned' });
+    }
+
+    // 2. Parse date-time
+    const dateStr = booking.selected_date; // 'YYYY-MM-DD'
+    const timeStr = booking.selected_time; // 'HH:MM'
+    const dateTimeStr = `${dateStr} ${timeStr}`;
+    const zonedStart = fromZonedTime(dateTimeStr, 'America/New_York');
+
+    // 3. Call Zoom service to create meeting
+    const zoomResult = await createZoomMeeting({
+      topic: `${booking.selected_session || 'Healing Session'} with Alanna`,
+      startTime: zonedStart.toISOString(),
+      duration: Number(booking.duration || 60),
+    });
+
+    // 4. Update the booking row
+    const { data: updatedBooking, error: updateErr } = await dbClient
+      .from('bookings')
+      .update({
+        zoom_meeting_id: zoomResult.meetingId,
+        zoom_join_url: zoomResult.joinUrl,
+        zoom_start_url: zoomResult.hostUrl,
+        meeting_password: zoomResult.password,
+        meeting_type: '2',
+        calendar_status: 'scheduled',
+        zoom_status: 'success',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateErr) {
+      console.error('[Manual Zoom API] Error updating booking:', updateErr);
+      return res.status(500).json({ error: 'Failed to save Zoom details in database' });
+    }
+
+    console.log(`[Manual Zoom API] Successfully provisioned Zoom for ${booking.booking_reference}`);
+    return res.status(200).json({
+      success: true,
+      booking: updatedBooking
+    });
+  } catch (err: any) {
+    console.error('[Manual Zoom API] Server error:', err);
+    return res.status(500).json({ error: err.message || 'Server error provisioning Zoom meeting' });
+  }
+});
+
 export default router;
+
