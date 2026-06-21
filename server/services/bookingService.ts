@@ -357,16 +357,21 @@ export const bookingService = {
     let credits = bookingData.packageCredits ? Number(bookingData.packageCredits) : 1;
     let packageName = bookingData.packageName || 'Single Session';
     
-    const nameLower = packageName.toLowerCase();
-    if (nameLower.includes('sanctuary') || nameLower.includes('10-class') || nameLower.includes('pass') || nameLower.includes('ten')) {
-      credits = 10;
-      packageName = 'Sanctuary';
-    } else if (nameLower.includes('starter') || nameLower.includes('intro') || nameLower.includes('journey')) {
-      credits = 3;
-      packageName = 'Starter';
-    } else if (nameLower.includes('single') || nameLower.includes('drop-in') || nameLower.includes('one')) {
-      credits = 1;
-      packageName = 'Single';
+    if (bookingData.packageId) {
+      try {
+        const { data: pkgData } = await writeClient
+          .from('packages')
+          .select('credits, total_credits, name')
+          .eq('id', bookingData.packageId)
+          .maybeSingle();
+
+        if (pkgData) {
+          credits = pkgData.credits || pkgData.total_credits || credits;
+          packageName = pkgData.name || packageName;
+        }
+      } catch (e) {
+        console.error('[bookingService] Error querying packages table for database-driven values:', e);
+      }
     }
 
     if (bookingData.packageId && credits >= 1) {

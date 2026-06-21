@@ -371,44 +371,32 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
       // Provision credits if they purchased a package
       let credits = existingBooking.packageCredits ? Number(existingBooking.packageCredits) : 1;
       let packageName = existingBooking.packageName || 'Single Session';
-      
-      const nameLower = packageName.toLowerCase();
-      if (nameLower.includes('sanctuary') || nameLower.includes('10-class') || nameLower.includes('pass') || nameLower.includes('ten')) {
-        credits = 10;
-        packageName = 'Sanctuary';
-      } else if (nameLower.includes('starter') || nameLower.includes('intro') || nameLower.includes('journey')) {
-        credits = 3;
-        packageName = 'Starter';
-      } else if (nameLower.includes('single') || nameLower.includes('drop-in') || nameLower.includes('one')) {
-        credits = 1;
-        packageName = 'Single';
-      }
-
       let validityMonths = 1;
-      if (nameLower.includes('sanctuary') || nameLower.includes('10-class') || nameLower.includes('pass') || nameLower.includes('ten')) {
-        validityMonths = 3;
+
+      if (existingBooking.packageId) {
+        try {
+          const { data: pkgData } = await supabaseAdmin
+            .from('packages')
+            .select('credits, total_credits, name, validity_months')
+            .eq('id', existingBooking.packageId)
+            .maybeSingle();
+
+          if (pkgData) {
+            credits = pkgData.credits || pkgData.total_credits || credits;
+            packageName = pkgData.name || packageName;
+            validityMonths = pkgData.validity_months || validityMonths;
+          }
+        } catch (e) {
+          console.error('[confirmPaymentSession] Error querying packages table for database-driven values:', e);
+        }
       }
 
       if (existingBooking.packageId && credits >= 1) {
         console.log(`[confirmPaymentSession] Package purchased: ${packageName}. Provisioning ${credits} credits...`);
         
-        let expiresAt: string | null = null;
-        try {
-          const { data: pkgData } = await supabaseAdmin
-            .from('packages')
-            .select('validity_months')
-            .eq('id', existingBooking.packageId)
-            .maybeSingle();
-          
-          const months = pkgData?.validity_months || validityMonths;
-          const expiryDate = new Date();
-          expiryDate.setMonth(expiryDate.getMonth() + months);
-          expiresAt = expiryDate.toISOString();
-        } catch (e) {
-          const expiryDate = new Date();
-          expiryDate.setMonth(expiryDate.getMonth() + validityMonths);
-          expiresAt = expiryDate.toISOString();
-        }
+        const expiryDate = new Date();
+        expiryDate.setMonth(expiryDate.getMonth() + validityMonths);
+        const expiresAt = expiryDate.toISOString();
 
         // Insert user_packages: deduct first session credit immediately!
         await supabaseAdmin.from('user_packages').insert({

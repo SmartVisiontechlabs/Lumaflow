@@ -23,6 +23,11 @@ interface AdminNotificationProps {
   timeLocal?: string;
   googleCalendarUrl?: string;
   icsDataUri?: string;
+  sessionFormat?: string;
+  zoomJoinUrl?: string | null;
+  zoomStartUrl?: string | null;
+  zoomMeetingId?: string | null;
+  meetingPassword?: string | null;
 }
 
 export const AdminNotificationEmail = ({
@@ -38,6 +43,11 @@ export const AdminNotificationEmail = ({
   timeLocal,
   googleCalendarUrl,
   icsDataUri,
+  sessionFormat = 'Virtual',
+  zoomJoinUrl,
+  zoomStartUrl,
+  zoomMeetingId,
+  meetingPassword,
 }: AdminNotificationProps) => (
   <EmailLayout previewTextText={`Admin Ops: New Booking - ${fullName}`}>
     <Section style={contentSection}>
@@ -79,8 +89,19 @@ export const AdminNotificationEmail = ({
           <Text style={value}>{emotion}</Text>
         </Column>
         <Column>
+          <Text style={label}>Format</Text>
+          <Text style={value}>{sessionFormat}</Text>
+        </Column>
+      </Row>
+
+      <Row style={detailRow}>
+        <Column>
           <Text style={label}>Booking Reference</Text>
           <Text style={value}>{reference}</Text>
+        </Column>
+        <Column>
+          <Text style={label}>Selected Date</Text>
+          <Text style={value}>{date}</Text>
         </Column>
       </Row>
 
@@ -97,18 +118,53 @@ export const AdminNotificationEmail = ({
         )}
       </Row>
 
-      <Row style={detailRow}>
-        <Column>
-          <Text style={label}>Selected Date</Text>
-          <Text style={value}>{date}</Text>
-        </Column>
-      </Row>
-
       <Section style={{ marginTop: '20px' }}>
         <Text style={label}>Intentions</Text>
         <Text style={intentionsText}>“{intentions}”</Text>
       </Section>
     </Section>
+
+    {/* Section 1.5: Zoom Credentials (for Virtual sessions) */}
+    {sessionFormat.toLowerCase() === 'virtual' && (zoomJoinUrl || zoomStartUrl || zoomMeetingId) && (
+      <Section style={card}>
+        <Text style={cardTitle}>Zoom Meeting Details</Text>
+        <Text style={{ ...value, marginBottom: '20px', fontStyle: 'italic', opacity: 0.8 }}>
+          This is a virtual session. You can start the meeting as host or join as client.
+        </Text>
+        
+        {zoomStartUrl && (
+          <Section style={{ textAlign: 'center' as const, marginTop: '20px', marginBottom: '20px' }}>
+            <Button style={goldButton} href={zoomStartUrl}>
+              Start Zoom Meeting (Host)
+            </Button>
+          </Section>
+        )}
+
+        <Row style={detailRow}>
+          {zoomMeetingId && (
+            <Column style={{ width: '50%' }}>
+              <Text style={label}>Meeting ID</Text>
+              <Text style={{ ...value, fontFamily: 'monospace' }}>{zoomMeetingId}</Text>
+            </Column>
+          )}
+          {meetingPassword && (
+            <Column style={{ width: '50%' }}>
+              <Text style={label}>Passcode</Text>
+              <Text style={{ ...value, fontFamily: 'monospace' }}>{meetingPassword}</Text>
+            </Column>
+          )}
+        </Row>
+
+        {zoomJoinUrl && (
+          <Section style={{ marginTop: '10px' }}>
+            <Text style={label}>Client Join Link</Text>
+            <Link href={zoomJoinUrl} style={{ color: '#CBAE73', fontSize: '13px', textDecoration: 'underline' }}>
+              {zoomJoinUrl}
+            </Link>
+          </Section>
+        )}
+      </Section>
+    )}
 
     {/* Section 2: Calendar Actions */}
     {(googleCalendarUrl || icsDataUri) && (

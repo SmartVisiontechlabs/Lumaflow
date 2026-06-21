@@ -234,9 +234,14 @@ If you need support, reply to this email.
               date: booking.selectedDate,
               timeEST: timeESTFormatted,
               reference: booking.bookingReference,
-
+              timeLocal: timeLocal,
               googleCalendarUrl,
               icsDataUri,
+              sessionFormat: booking.sessionFormat || 'Virtual',
+              zoomJoinUrl: booking.zoomJoinUrl,
+              zoomStartUrl: booking.zoomStartUrl,
+              zoomMeetingId: booking.zoomMeetingId,
+              meetingPassword: booking.meetingPassword,
             }),
           });
 
