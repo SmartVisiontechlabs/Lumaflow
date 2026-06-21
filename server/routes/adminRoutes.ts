@@ -4,6 +4,7 @@ import { requireSession, adminAuth } from '../middleware/authMiddleware';
 import { fromZonedTime } from 'date-fns-tz';
 import { format, parse } from 'date-fns';
 import { emailService } from '../services/emailService';
+import { createZoomMeeting } from '../services/zoomService';
 
 const router = Router();
 
@@ -203,6 +204,36 @@ router.post('/change-password', requireSession, adminAuth, async (req, res) => {
   } catch (err: any) {
     console.error(`[ADMIN PASSWORD UPDATE FAILED] Server error:`, err);
     return res.status(500).json({ error: err.message || 'Server error updating password' });
+  }
+});
+
+/**
+ * GET /api/admin/test-zoom
+ * Secure diagnostic endpoint to test real Zoom Server-to-Server OAuth and meeting API creation.
+ */
+router.get('/test-zoom', requireSession, adminAuth, async (req, res) => {
+  console.log('[ADMIN TEST-ZOOM] Received request to test Zoom API...');
+  try {
+    const defaultStartTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const zoomResult = await createZoomMeeting({
+      topic: 'LumaFlow Diagnostic Test Meeting',
+      startTime: defaultStartTime,
+      duration: 60,
+    }, true); // true = throwOnError, so we can capture the raw exception
+
+    console.log('[ADMIN TEST-ZOOM] Success:', zoomResult);
+    return res.status(200).json({
+      success: true,
+      message: 'Zoom meeting created successfully',
+      meeting: zoomResult
+    });
+  } catch (err: any) {
+    console.error('[ADMIN TEST-ZOOM] Error:', err.message || err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Unknown error occurred during Zoom meeting creation',
+      stack: err.stack
+    });
   }
 });
 

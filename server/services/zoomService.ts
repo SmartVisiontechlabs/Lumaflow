@@ -9,10 +9,10 @@ let tokenExpiresAt = 0;
  * Throws a descriptive error if any required variables are missing.
  */
 function validateZoomEnv() {
-  const accountId = process.env.ZOOM_ACCOUNT_ID;
-  const clientId = process.env.ZOOM_CLIENT_ID;
-  const clientSecret = process.env.ZOOM_CLIENT_SECRET;
-  const userEmail = process.env.ZOOM_USER_EMAIL;
+  const accountId = process.env.ZOOM_ACCOUNT_ID?.trim();
+  const clientId = process.env.ZOOM_CLIENT_ID?.trim();
+  const clientSecret = process.env.ZOOM_CLIENT_SECRET?.trim();
+  const userEmail = process.env.ZOOM_USER_EMAIL?.trim();
 
   const missing = [];
   if (!accountId) missing.push('ZOOM_ACCOUNT_ID');
@@ -34,9 +34,9 @@ function validateZoomEnv() {
 export async function getZoomAccessToken(): Promise<string> {
   validateZoomEnv();
 
-  const accountId = process.env.ZOOM_ACCOUNT_ID;
-  const clientId = process.env.ZOOM_CLIENT_ID;
-  const clientSecret = process.env.ZOOM_CLIENT_SECRET;
+  const accountId = process.env.ZOOM_ACCOUNT_ID?.trim() || '';
+  const clientId = process.env.ZOOM_CLIENT_ID?.trim() || '';
+  const clientSecret = process.env.ZOOM_CLIENT_SECRET?.trim() || '';
 
   // Use cached token if valid (with 60-second buffer)
   if (cachedToken && Date.now() < tokenExpiresAt - 60000) {
@@ -46,18 +46,21 @@ export async function getZoomAccessToken(): Promise<string> {
 
   console.log('🔄 [Zoom Service] Requesting fresh Server-to-Server OAuth Access Token...');
   const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+  const oauthUrl = `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${accountId}`;
+
+  console.log(`[ZOOM DEBUG] OAuth Request URL: ${oauthUrl}`);
+  console.log(`[ZOOM DEBUG] OAuth Auth Header Prefix: Basic ${authHeader.substring(0, 10)}...`);
   
   try {
-    const response = await fetch(
-      `https://zoom.us/oauth/token?grant_type=account_credentials&account_id=${accountId}`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${authHeader}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-      }
-    );
+    const response = await fetch(oauthUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${authHeader}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+
+    console.log(`[ZOOM DEBUG] OAuth Response Status: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -66,7 +69,9 @@ export async function getZoomAccessToken(): Promise<string> {
       throw new Error(detailedError);
     }
 
-    const data: any = await response.json();
+    const responseText = await response.text();
+    console.log(`[ZOOM DEBUG] OAuth Response Body: ${responseText}`);
+    const data = JSON.parse(responseText);
     cachedToken = data.access_token;
     tokenExpiresAt = Date.now() + (data.expires_in * 1000);
 
@@ -89,48 +94,54 @@ interface CreateZoomMeetingParams {
 /**
  * Creates a Zoom Meeting using the configured zoom account.
  */
-export async function createZoomMeeting(params: CreateZoomMeetingParams) {
+export async function createZoomMeeting(params: CreateZoomMeetingParams, throwOnError = false) {
   try {
     validateZoomEnv();
-    const userEmail = process.env.ZOOM_USER_EMAIL;
+    const userEmail = process.env.ZOOM_USER_EMAIL?.trim() || '';
     const accessToken = await getZoomAccessToken();
 
     console.log(`🎬 [Zoom Service] Creating meeting: "${params.topic}" for ${params.startTime} (${params.duration} mins)`);
     
-    const response = await fetch(
-      `https://api.zoom.us/v2/users/${userEmail}/meetings`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          topic: params.topic,
-          type: 2, // Scheduled meeting
-          start_time: params.startTime,
-          duration: params.duration,
-          timezone: 'America/New_York',
-          settings: {
-            host_video: true,
-            participant_video: true,
-            waiting_room: true,
-            auto_recording: 'none',
-            approval_type: 0, // Automatically approve
-            registration_type: 1, // Register once to attend any occurrences
-          },
-        }),
-      }
-    );
+    const requestUrl = `https://api.zoom.us/v2/users/${userEmail}/meetings`;
+    const requestBody = {
+      topic: params.topic,
+      type: 2, // Scheduled meeting
+      start_time: params.startTime,
+      duration: params.duration,
+      timezone: 'America/New_York',
+      settings: {
+        host_video: true,
+        participant_video: true,
+        waiting_room: true,
+        auto_recording: 'none',
+        approval_type: 0, // Automatically approve
+        registration_type: 1, // Register once to attend any occurrences
+      },
+    };
+
+    console.log(`[ZOOM DEBUG] Meeting Request URL: ${requestUrl}`);
+    console.log(`[ZOOM DEBUG] Meeting Request Body: ${JSON.stringify(requestBody, null, 2)}`);
+
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log(`[ZOOM DEBUG] Meeting Response Status: ${response.status} ${response.statusText}`);
+    const responseText = await response.text();
+    console.log(`[ZOOM DEBUG] Meeting Response Body: ${responseText}`);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      const detailedError = `Zoom API Error (${response.status} ${response.statusText}): ${errorText}`;
+      const detailedError = `Zoom API Error (${response.status} ${response.statusText}): ${responseText}`;
       console.error(`❌ [Zoom Service] Meeting creation failed: ${detailedError}`);
       throw new Error(detailedError);
     }
 
-    const data: any = await response.json();
+    const data = JSON.parse(responseText);
     console.log(`✅ [Zoom Service] Zoom meeting successfully created (ID: ${data.id})`);
     
     return {
@@ -141,6 +152,10 @@ export async function createZoomMeeting(params: CreateZoomMeetingParams) {
       startTime: data.start_time,
     };
   } catch (error: any) {
+    console.error(`❌ [Zoom Service] createZoomMeeting exception: ${error.message || error}`);
+    if (throwOnError) {
+      throw error;
+    }
     console.warn(`⚠️ [Zoom Service] Zoom API failed: ${error.message || error}. Generating mock Zoom meeting fallback.`);
     const mockMeetingId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
     const mockPassword = Math.random().toString(36).substring(2, 8).toUpperCase();
