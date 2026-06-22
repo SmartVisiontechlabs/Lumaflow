@@ -21,15 +21,12 @@ async function getAuthHeaders() {
   
   const { data: { session } } = await supabase.auth.getSession();
   
-  console.log('CMS Session:', session);
-  
   if (!session || !session.access_token) {
     throw new Error('No authorization header provided');
   }
   
   headers['Authorization'] = `Bearer ${session.access_token}`;
   
-  console.log('CMS Headers:', headers);
   return headers;
 }
 

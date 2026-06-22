@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
+import { logger } from '../../utils/logger';
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate();
@@ -19,20 +20,20 @@ export default function AuthCallbackPage() {
         const code = params.get('code');
         const next = params.get('next') || '/dashboard';
 
-        console.log('[AuthCallback] Exchanging authorization code:', { code, next });
+        logger.log('[AuthCallback] Exchanging authorization code:', { hasCode: !!code, next });
 
         if (code) {
           try {
             const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
             if (exchangeError) throw exchangeError;
-            console.log('[AuthCallback] Successfully exchanged code for session.');
+            logger.log('[AuthCallback] Successfully exchanged code for session.');
           } catch (exchangeErr: any) {
-            console.warn('[AuthCallback] Code exchange failed, checking for active session:', exchangeErr);
+            logger.warn('[AuthCallback] Code exchange failed, checking for active session:', exchangeErr);
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
               throw exchangeErr;
             }
-            console.log('[AuthCallback] Active session found despite exchange error. Proceeding.');
+            logger.log('[AuthCallback] Active session found despite exchange error. Proceeding.');
           }
           
           // Force auth provider to load profile/membership data
@@ -40,25 +41,25 @@ export default function AuthCallbackPage() {
 
           // Wait for React state updates in AuthProvider to propagate before navigating
           setTimeout(() => {
-            console.log('[AuthCallback] Navigating to:', next);
+            logger.log('[AuthCallback] Navigating to:', next);
             navigate(next, { replace: true });
           }, 100);
         } else {
           // If code is not present, we might already have a session due to client-side detection.
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
-            console.log('[AuthCallback] Session already active. Redirecting to dashboard.');
+            logger.log('[AuthCallback] Session already active. Redirecting to dashboard.');
             await refresh();
             setTimeout(() => {
               navigate(next, { replace: true });
             }, 100);
           } else {
-            console.warn('[AuthCallback] No authorization code or active session found in callback url.');
+            logger.warn('[AuthCallback] No authorization code or active session found in callback url.');
             setErrorMsg('No secure session token was provided. Please return to login.');
           }
         }
       } catch (err: any) {
-        console.error('[AuthCallback] Exchange error:', err);
+        logger.error('[AuthCallback] Exchange error:', err);
         setErrorMsg(err.message || 'Failed to exchange authorization credentials. Please try signing in again.');
       }
     };

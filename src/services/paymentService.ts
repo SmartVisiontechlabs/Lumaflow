@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
@@ -14,7 +16,7 @@ export const paymentService = {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Payment API Error:', errorText);
+        logger.error('Payment API Error:', errorText);
 
         throw new Error(errorText || 'Failed to initialize payment.');
       }
@@ -22,7 +24,7 @@ export const paymentService = {
       const { url } = await response.json();
       return url;
     } catch (error) {
-      console.error('Payment Session Error:', error);
+      logger.error('Payment Session Error:', error);
       throw error;
     }
   },
@@ -39,23 +41,21 @@ export const paymentService = {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Package Payment API Error:', errorText);
+        logger.error('Package Payment API Error:', errorText);
         throw new Error(errorText || 'Failed to initialize package payment.');
       }
 
       const { url } = await response.json();
       return url;
     } catch (error) {
-      console.error('Package Payment Session Error:', error);
+      logger.error('Package Payment Session Error:', error);
       throw error;
     }
   },
 
   async confirmPayment(sessionId: string) {
     const endpoint = `${API_URL}/payments/confirm`;
-    console.log("CONFIRM PAYMENT START");
-    console.log("sessionId", sessionId);
-    console.log("endpoint", endpoint);
+    logger.log('[paymentService] Confirming payment session...');
 
     try {
       const response = await fetch(endpoint, {
@@ -66,25 +66,23 @@ export const paymentService = {
         body: JSON.stringify({ session_id: sessionId }),
       });
 
-      console.log("response", response);
-
       if (!response.ok) {
         let errorMessage = 'Failed to confirm ritual payment.';
         try {
           const errorData = await response.json();
-          console.log("error response body", errorData);
+          logger.log('[paymentService] Error response received');
           errorMessage = errorData.error || errorMessage;
         } catch (jsonErr) {
-          console.error("Failed to parse error response JSON", jsonErr);
+          logger.error('[paymentService] Failed to parse error response JSON', jsonErr);
         }
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      console.log("confirmPayment success data:", data);
+      logger.log('[paymentService] Payment confirmed successfully');
       return data;
     } catch (error) {
-      console.error('Payment Confirmation Error:', error);
+      logger.error('[paymentService] Payment Confirmation Error:', error);
       throw error;
     }
   }

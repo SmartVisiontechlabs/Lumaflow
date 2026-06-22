@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { logger } from '../../utils/logger';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Loader2, Sparkles, Calendar, Clock, Mail, ChevronRight, Copy, Check, MapPin, Video, Info } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
@@ -83,10 +84,7 @@ const BookingSuccess = () => {
 
   useEffect(() => {
     const confirmBooking = async () => {
-      console.log("SUCCESS PAGE PARAMS");
-      console.log("searchParams", searchParams.toString());
-      console.log("sessionId", sessionId);
-      console.log("ref", ref);
+      logger.log("[BookingSuccess] Confirming booking with params:", { hasSessionId: !!sessionId, hasRef: !!ref });
 
       if (hasConfirmed.current) return;
 
@@ -100,7 +98,7 @@ const BookingSuccess = () => {
 
       try {
         if (ref) {
-          console.log(`[confirmBooking] Fetching booking by reference: ${ref}`);
+          logger.log(`[confirmBooking] Fetching booking by reference: ${ref}`);
           const { data: dbBooking, error: fetchErr } = await supabase
             .from('bookings')
             .select('*')
@@ -108,12 +106,12 @@ const BookingSuccess = () => {
             .maybeSingle();
 
           if (fetchErr) {
-            console.error('Error fetching booking by reference:', fetchErr);
+            logger.error('Error fetching booking by reference:', fetchErr);
             throw new Error(fetchErr.message);
           }
 
           if (!dbBooking) {
-            console.error('No booking found for reference:', ref);
+            logger.error('No booking found for reference:', ref);
             throw new Error(`Could not locate booking records for reference ${ref}`);
           }
 
@@ -150,9 +148,9 @@ const BookingSuccess = () => {
           );
         } else if (sessionId) {
           const response = await paymentService.confirmPayment(sessionId);
-          console.log("payment confirmation response:", response);
+          logger.log("[BookingSuccess] Payment confirmation response received");
           const booking = response.booking || response;
-          console.log("extracted booking object:", booking);
+          logger.log("[BookingSuccess] Extracted booking reference:", booking?.bookingReference);
           setIsNewUser(response.isNew ?? false);
           setBookingData(booking);
           setBookingReference(booking.bookingReference);
@@ -179,7 +177,7 @@ const BookingSuccess = () => {
           }
         }
       } catch (err: any) {
-        console.error('Confirmation error:', err);
+        logger.error('Confirmation error:', err);
         setStatus('error');
         setError(err.message || 'Failed to confirm your ritual.');
       }
@@ -202,11 +200,11 @@ const BookingSuccess = () => {
       const currentSessionEmail = user?.email;
       const sessionExists = isAuthenticated || hasSession;
 
-      console.log(`[BookingSuccess] Evaluating Session Decision Tree:`, {
+      logger.log(`[BookingSuccess] Evaluating Session Decision Tree:`, {
         sessionExists,
-        currentSessionEmail,
-        bookingEmail,
-        loginUrl
+        currentSessionEmail: currentSessionEmail ? maskEmail(currentSessionEmail) : null,
+        bookingEmail: bookingEmail ? maskEmail(bookingEmail) : null,
+        hasLoginUrl: !!loginUrl
       });
 
       // 1. Session Exists & Matches? Or do we have loginUrl?
@@ -221,7 +219,7 @@ const BookingSuccess = () => {
 
       // If session exists but email is wrong, sign out first
       if (sessionExists && currentSessionEmail && currentSessionEmail.toLowerCase() !== bookingEmail.toLowerCase()) {
-        console.log('[BookingSuccess] Wrong session detected. Signing out...');
+        logger.log('[BookingSuccess] Wrong session detected. Signing out...');
         await supabase.auth.signOut();
         setHasSession(false);
         return;
@@ -240,7 +238,7 @@ const BookingSuccess = () => {
       setMagicLinkSending(true);
       setMagicLinkError(null);
       try {
-        console.log(`[BookingSuccess] Sending auto magic link to booking email: ${bookingEmail}`);
+        logger.log(`[BookingSuccess] Sending auto magic link to booking email`);
         const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
         const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
         
@@ -262,7 +260,7 @@ const BookingSuccess = () => {
         sessionStorage.setItem(sentKey, 'true');
         setMagicLinkSent(true);
       } catch (err: any) {
-        console.error('[BookingSuccess] Error triggering auto magic link:', err);
+        logger.error('[BookingSuccess] Error triggering auto magic link:', err);
         setMagicLinkError(err.message || 'Failed to send secure access link.');
       } finally {
         setMagicLinkSending(false);
@@ -278,10 +276,10 @@ const BookingSuccess = () => {
     if (redirectCount <= 0) {
       resetBooking();
       if (loginUrl) {
-        console.log('[BookingSuccess] Countdown finished. Logging in programmatically via loginUrl...');
+        logger.log('[BookingSuccess] Countdown finished. Logging in programmatically via loginUrl...');
         window.location.href = loginUrl;
       } else {
-        console.log('[BookingSuccess] Countdown finished. Redirecting to dashboard...');
+        logger.log('[BookingSuccess] Countdown finished. Redirecting to dashboard...');
         navigate('/dashboard', { replace: true });
       }
       return;
@@ -321,7 +319,7 @@ const BookingSuccess = () => {
       const sentKey = `magic_link_sent_for_${bookingData.id}`;
       sessionStorage.setItem(sentKey, 'true');
     } catch (err: any) {
-      console.error('Error resending magic link:', err);
+      logger.error('Error resending magic link:', err);
       setMagicLinkError(err.message || 'Failed to send secure access link.');
     } finally {
       setMagicLinkSending(false);
