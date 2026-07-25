@@ -25,6 +25,8 @@ interface BookingConfirmationProps {
   zoomJoinUrl?: string | null;
   zoomMeetingId?: string | null;
   meetingPassword?: string | null;
+  meetingProvider?: string | null;
+  meetingUrl?: string | null;
 }
 
 export const BookingConfirmationEmail = ({
@@ -42,6 +44,8 @@ export const BookingConfirmationEmail = ({
   zoomJoinUrl,
   zoomMeetingId,
   meetingPassword,
+  meetingProvider = 'GOOGLE_MEET',
+  meetingUrl,
 }: BookingConfirmationProps) => (
   <EmailLayout previewTextText="Your sanctuary has been reserved ✨">
     {/* SECTION 1: Luxury Banner */}
@@ -100,8 +104,10 @@ export const BookingConfirmationEmail = ({
           {sessionFormat.toLowerCase() === 'virtual' ? (
             <>
               <Text style={label}>Access Link</Text>
-              {zoomJoinUrl ? (
-                <a href={zoomJoinUrl} style={link}>Join Session</a>
+              {(meetingUrl || zoomJoinUrl) ? (
+                <a href={meetingUrl || zoomJoinUrl || '#'} style={link}>
+                  {meetingProvider === 'ZOOM' ? 'Join Zoom' : 'Join Google Meet'}
+                </a>
               ) : (
                 <Text style={value}>Sent in email guide</Text>
               )}
@@ -116,21 +122,19 @@ export const BookingConfirmationEmail = ({
       </Row>
     </Section>
 
-    {/* SECTION: Zoom Credentials Card */}
-    {sessionFormat.toLowerCase() === 'virtual' && (zoomJoinUrl || zoomMeetingId) && (
+    {/* SECTION: Virtual Access Credentials Card */}
+    {sessionFormat.toLowerCase() === 'virtual' && (meetingUrl || zoomJoinUrl) && (
       <Section style={card}>
         <Heading style={cardTitle}>Virtual Access Details</Heading>
         <Text style={bodyText}>
-          Your live session will take place via Zoom. Use the details below when it is time to connect.
+          Your live session will take place via {meetingProvider === 'ZOOM' ? 'Zoom' : 'Google Meet'}. Click below to enter the virtual sanctuary.
         </Text>
-        {zoomJoinUrl && (
-          <Section style={{ textAlign: 'center', marginTop: '20px', marginBottom: '20px' }}>
-            <Button style={goldButton} href={zoomJoinUrl}>
-              Join Zoom Meeting
-            </Button>
-          </Section>
-        )}
-        {zoomMeetingId && (
+        <Section style={{ textAlign: 'center', marginTop: '20px', marginBottom: '20px' }}>
+          <Button style={goldButton} href={meetingUrl || zoomJoinUrl || '#'}>
+            {meetingProvider === 'ZOOM' ? 'Join Zoom Meeting' : 'Join Google Meet'}
+          </Button>
+        </Section>
+        {meetingProvider === 'ZOOM' && zoomMeetingId && (
           <Row style={{ marginTop: '15px' }}>
             <Column style={{ width: '50%' }}>
               <Text style={label}>Meeting ID</Text>

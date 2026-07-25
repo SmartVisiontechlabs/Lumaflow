@@ -190,6 +190,7 @@ export default function App() {
                 <Route path="waitlist" element={<WaitlistManager />} />
                 <Route path="cms" element={<CmsManager />} />
                 <Route path="settings" element={<AdminSettings />} />
+                <Route path="settings/:section" element={<AdminSettings />} />
               </Route>
             </Route>
 

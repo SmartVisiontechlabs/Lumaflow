@@ -239,7 +239,7 @@ const BookingSuccess = () => {
       setMagicLinkError(null);
       try {
         logger.log(`[BookingSuccess] Sending auto magic link to booking email`);
-        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
         const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
         
         const response = await fetch(`${API_URL}/auth/magic-link`, {
@@ -297,7 +297,7 @@ const BookingSuccess = () => {
     setMagicLinkSending(true);
     setMagicLinkError(null);
     try {
-      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
       const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
       
       const response = await fetch(`${API_URL}/auth/magic-link`, {

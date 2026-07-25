@@ -53,6 +53,8 @@ Fill in the production credentials:
 - **Stripe**: Update Stripe secret keys and setup a webhook endpoint pointing to your API server URL (e.g., `https://api.thelumaflow.com/api/payments/webhook`).
 - **Resend**: Input production email API keys.
 - **URLs**: Update `VITE_API_URL` to `https://api.thelumaflow.com/api` and `FRONTEND_URL` to `https://thelumaflow.com`.
+- **Google Calendar / Meet**: Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` (must match your Google Cloud Console redirect URI, e.g., `https://api.thelumaflow.com/api/auth/google/callback`). Provide a 32-byte hexadecimal string for `GOOGLE_ENCRYPTION_KEY` to encrypt and store refresh tokens securely.
+- **Zoom**: Setup Zoom credentials if utilizing Zoom fallback configurations.
 
 ---
 
@@ -126,5 +128,8 @@ sudo certbot --nginx -d thelumaflow.com -d www.thelumaflow.com -d api.thelumaflo
 If you haven't run the migrations on your production database yet:
 1. Log into your Supabase Dashboard.
 2. Go to the **SQL Editor** tab.
-3. Open `supabase/migrations/20260520_cms_architecture.sql` from your repository, copy its entire contents, and execute them. This script will construct all required tables, enable Row Level Security, configure indexes, and populate initial seed data (default homepage sections, offerings, and the Intelligent Recommendation Matrix).
+3. Run the SQL migrations from your repository's `supabase/migrations/` directory in sequential order.
+   - Run the initial CMS architecture script (`20260520_cms_architecture.sql`).
+   - Run the remaining scripts in order (e.g., phases, zoom setup, profiles, client completed experience, and Google integration migration `20260723_google_calendar_meet.sql`).
+   These scripts will construct all required tables, enable Row Level Security policies, configure indexes, and populate initial seed data.
 

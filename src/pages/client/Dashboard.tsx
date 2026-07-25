@@ -124,7 +124,7 @@ export default function Dashboard() {
         trackDashboardVisit(session.user.id);
 
         const headers = { 'Authorization': `Bearer ${session.access_token}` };
-        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
         const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
         const [upcomingRes, journeyRes] = await Promise.all([
@@ -301,9 +301,9 @@ export default function Dashboard() {
 
               {/* Right Column: Dynamic Action Buttons */}
               <div className="flex flex-col gap-3 min-w-[200px] w-full lg:w-auto self-stretch lg:self-start justify-center">
-                {upcomingBooking.session_format.toLowerCase() === 'virtual' && upcomingBooking.zoom_join_url && (
+                {upcomingBooking.session_format.toLowerCase() === 'virtual' && (upcomingBooking.meeting_url || upcomingBooking.zoom_join_url) && (
                   <a
-                    href={canJoin ? upcomingBooking.zoom_join_url : undefined}
+                    href={canJoin ? (upcomingBooking.meeting_url || upcomingBooking.zoom_join_url) : undefined}
                     target="_blank"
                     rel="noreferrer"
                     className={cn(
@@ -314,7 +314,7 @@ export default function Dashboard() {
                     )}
                   >
                     <Video className={cn("w-4 h-4", canJoin ? "text-gold animate-pulse" : "text-text-dark/10")} />
-                    Join Session
+                    {upcomingBooking.meeting_provider === 'ZOOM' ? 'Join Zoom Session' : 'Join Google Meet'}
                     {canJoin && (
                       <span className="absolute inset-0 border border-gold/30 rounded-2xl animate-ping opacity-50 pointer-events-none" />
                     )}
@@ -384,8 +384,8 @@ export default function Dashboard() {
                         <p>Reference: {upcomingBooking.booking_reference}</p>
                         <p>Ritual: {upcomingBooking.selected_session}</p>
                         <p>Duration: {upcomingBooking.duration} Minutes</p>
-                        <p>Location: {upcomingBooking.session_format.toLowerCase() === 'virtual' ? 'Virtual (Zoom Client)' : 'LumaFlow Soho Sanctuary'}</p>
-                        {upcomingBooking.session_format.toLowerCase() === 'virtual' && upcomingBooking.zoom_meeting_id && (
+                        <p>Location: {upcomingBooking.session_format.toLowerCase() === 'virtual' ? `Virtual (${upcomingBooking.meeting_provider === 'ZOOM' ? 'Zoom Client' : 'Google Meet'})` : 'LumaFlow Soho Sanctuary'}</p>
+                        {upcomingBooking.session_format.toLowerCase() === 'virtual' && upcomingBooking.meeting_provider === 'ZOOM' && upcomingBooking.zoom_meeting_id && (
                           <>
                             <p className="border-t border-text-dark/5 pt-2 mt-2">Meeting ID: {upcomingBooking.zoom_meeting_id}</p>
                             <p>Password: {upcomingBooking.meeting_password || 'N/A'}</p>

@@ -17,6 +17,8 @@ interface Prep1hProps {
   zoomJoinUrl?: string | null;
   zoomMeetingId?: string | null;
   meetingPassword?: string | null;
+  meetingProvider?: string | null;
+  meetingUrl?: string | null;
 }
 
 export const Prep1hEmail = ({
@@ -27,6 +29,8 @@ export const Prep1hEmail = ({
   zoomJoinUrl,
   zoomMeetingId,
   meetingPassword,
+  meetingProvider = 'GOOGLE_MEET',
+  meetingUrl,
 }: Prep1hProps) => (
   <EmailLayout previewTextText="Your sanctuary ritual begins in 1 hour ✨">
     <Section style={contentSection}>
@@ -44,16 +48,16 @@ export const Prep1hEmail = ({
       <Section style={card}>
         <Heading style={cardTitle}>Virtual Sanctuary Credentials</Heading>
         <Text style={bodyText}>
-          Your live session will take place via Zoom. Click below to join when it is time.
+          Your live session will take place via {meetingProvider === 'ZOOM' ? 'Zoom' : 'Google Meet'}. Click below to join when it is time.
         </Text>
-        {zoomJoinUrl && (
+        {(meetingUrl || zoomJoinUrl) && (
           <Section style={{ textAlign: 'center', marginTop: '20px', marginBottom: '20px' }}>
-            <Button style={goldButton} href={zoomJoinUrl}>
+            <Button style={goldButton} href={meetingUrl || zoomJoinUrl || '#'}>
               Enter Virtual Sanctuary
             </Button>
           </Section>
         )}
-        {zoomMeetingId && (
+        {meetingProvider === 'ZOOM' && zoomMeetingId && (
           <Row style={{ marginTop: '15px' }}>
             <Column style={{ width: '50%' }}>
               <Text style={label}>Meeting ID</Text>

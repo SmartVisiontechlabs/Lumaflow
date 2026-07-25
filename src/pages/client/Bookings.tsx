@@ -144,29 +144,31 @@ export default function Bookings() {
                     </div>
                   </div>
 
-                  {/* Zoom Details for Virtual session */}
-                  {isVirtual && booking.zoom_join_url && (
+                  {/* Credentials for Virtual session */}
+                  {isVirtual && (booking.meeting_url || booking.zoom_join_url) && (
                     <div className="p-4 bg-white/60 rounded-2xl border border-text-dark/5 space-y-2">
                       <div className="flex items-center gap-2 text-xs font-bold text-text-dark/70">
                         <Video className="w-4 h-4 text-gold" />
-                        <span>Zoom Credentials</span>
+                        <span>{booking.meeting_provider === 'ZOOM' ? 'Zoom Credentials' : 'Google Meet Connection'}</span>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-2 text-[10px] text-text-dark/50 font-semibold uppercase tracking-wider">
-                        <div>Meeting ID:</div>
-                        <div className="text-text-dark/80 font-mono select-all">{booking.zoom_meeting_id}</div>
-                        <div>Passcode:</div>
-                        <div className="text-text-dark/80 font-mono select-all">{booking.meeting_password || 'None'}</div>
-                      </div>
+                      {booking.meeting_provider === 'ZOOM' && (
+                        <div className="grid grid-cols-2 gap-2 text-[10px] text-text-dark/50 font-semibold uppercase tracking-wider">
+                          <div>Meeting ID:</div>
+                          <div className="text-text-dark/80 font-mono select-all">{booking.zoom_meeting_id}</div>
+                          <div>Passcode:</div>
+                          <div className="text-text-dark/80 font-mono select-all">{booking.meeting_password || 'None'}</div>
+                        </div>
+                      )}
 
                       {isUpcoming && (
                         <a
-                          href={booking.zoom_join_url}
+                          href={booking.meeting_url || booking.zoom_join_url}
                           target="_blank"
                           rel="noreferrer"
                           className="mt-3 flex items-center justify-center gap-1.5 w-full py-3 bg-text-dark hover:bg-gold text-white rounded-xl text-[9px] font-bold uppercase tracking-[0.2em] transition-all duration-500"
                         >
-                          Launch Zoom Meeting
+                          {booking.meeting_provider === 'ZOOM' ? 'Launch Zoom Meeting' : 'Join Google Meet'}
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       )}

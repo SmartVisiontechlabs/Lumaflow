@@ -17,7 +17,7 @@ export default function MagicLinkForm() {
     setError(null);
 
     try {
-      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
       const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
       console.log('[MagicLinkForm] Requesting magic link redirection via backend API:', `${API_URL}/auth/magic-link`);

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { stripe } from '../config/stripe';
-import { bookingService } from '../services/bookingService';
+import { bookingService, provisionMeetingForBooking } from '../services/bookingService';
 import { authService } from '../services/authService';
 import { supabase, supabaseAdmin } from '../config/supabase';
 import { fromZonedTime } from 'date-fns-tz';
@@ -315,35 +315,26 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
       };
 
       if (isVirtual) {
-        try {
-          const providerTimezone = 'America/New_York';
-          const startUTC = fromZonedTime(`${existingBooking.selectedDate} ${existingBooking.selectedTime}:00`, providerTimezone);
+        const finalBooking = await provisionMeetingForBooking(existingBooking.id, {
+          ...existingBooking,
+          selectedDate: existingBooking.selectedDate,
+          selectedTime: existingBooking.selectedTime,
+          selectedSession: existingBooking.selectedSession,
+          fullName: existingBooking.fullName,
+          bookingReference: existingBooking.bookingReference
+        });
+        if (finalBooking) {
+          dbUpdate.zoom_meeting_id = finalBooking.zoom_meeting_id;
+          dbUpdate.zoom_join_url = finalBooking.zoom_join_url;
+          dbUpdate.zoom_start_url = finalBooking.zoom_start_url;
+          dbUpdate.meeting_password = finalBooking.meeting_password;
+          dbUpdate.zoom_status = finalBooking.zoom_status;
+          dbUpdate.calendar_status = finalBooking.calendar_status;
           
-          console.log('[confirmPaymentSession] Creating Zoom meeting for virtual session...');
-          const zoomResult = await zoomService.createZoomMeeting({
-            topic: `${existingBooking.selectedSession || 'Healing Session'} with Alanna`,
-            startTime: startUTC.toISOString(),
-            duration: Number(existingBooking.duration || 60),
-          });
-
-          dbUpdate.zoom_meeting_id = zoomResult.meetingId;
-          dbUpdate.zoom_join_url = zoomResult.joinUrl;
-          dbUpdate.zoom_start_url = zoomResult.hostUrl;
-          dbUpdate.meeting_password = zoomResult.password;
-          dbUpdate.meeting_type = '2';
-          dbUpdate.calendar_status = 'scheduled';
-          dbUpdate.zoom_status = 'success';
-          console.log('[ZOOM CREATED] Zoom meeting setup completed.');
-        } catch (zoomErr: any) {
-          console.error('[ZOOM FAILED] Zoom API failed during confirmPaymentSession:', zoomErr.message || zoomErr);
-          console.log('[ROLLBACK TRIGGERED] Zoom setup failed, proceeding without rollback.');
-          dbUpdate.zoom_status = 'needs_manual_attention';
-          dbUpdate.zoom_meeting_id = null;
-          dbUpdate.zoom_join_url = null;
-          dbUpdate.zoom_start_url = null;
-          dbUpdate.meeting_password = null;
-          dbUpdate.meeting_type = null;
-          dbUpdate.calendar_status = null;
+          dbUpdate.meeting_provider = finalBooking.meeting_provider;
+          dbUpdate.meeting_url = finalBooking.meeting_url;
+          dbUpdate.calendar_event_id = finalBooking.calendar_event_id;
+          dbUpdate.meeting_status = finalBooking.meeting_status;
         }
       }
 

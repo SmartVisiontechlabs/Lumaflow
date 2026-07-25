@@ -2,6 +2,7 @@ import { supabase, supabaseAdmin } from '../config/supabase';
 import { generateBookingReference, getSlotTimeLabels } from '../utils/bookingUtils';
 import { emailService } from './emailService';
 import { zoomService } from './zoomService';
+import { googleCalendarService } from './googleCalendarService';
 import { fromZonedTime, formatInTimeZone } from 'date-fns-tz';
 const writeClient = supabaseAdmin || supabase;
 
@@ -50,6 +51,12 @@ function mapBookingFromDb(b: any) {
     packageId: b.package_id,
     practitionerTime: b.practitioner_time,
     clientLocalTime: b.client_local_time,
+    
+    // Provider Agnostic fields
+    meetingProvider: b.meeting_provider,
+    meetingUrl: b.meeting_url,
+    calendarEventId: b.calendar_event_id,
+    meetingStatus: b.meeting_status,
   };
 }
 
@@ -199,6 +206,127 @@ async function ensureUserIntegrity(userId: string | null, email: string, fullNam
   } catch (outerErr: any) {
     console.error('[bookingService] Critical error during user self-healing validation:', outerErr.message);
     return userId;
+  }
+}
+
+/**
+ * Creates a calendar event / virtual meeting for the booking using Google Meet (default) or Zoom (fallback).
+ */
+export async function provisionMeetingForBooking(bookingId: string, bookingData: any) {
+  const writeClient = supabaseAdmin || supabase;
+  
+  // 1. Fetch any active google integrations
+  const { data: integrations, error: integrationErr } = await writeClient
+    .from('google_integrations')
+    .select('*')
+    .limit(1);
+
+  const providerTimezone = 'America/New_York';
+  const selectedDate = bookingData.selectedDate || bookingData.selected_date;
+  const selectedTime = bookingData.selectedTime || bookingData.selected_time;
+  const startUTC = fromZonedTime(`${selectedDate} ${selectedTime}:00`, providerTimezone);
+  const duration = Number(bookingData.duration || 60);
+
+  if (integrations && integrations.length > 0) {
+    // Admin has Google Calendar integration connected
+    const integration = integrations[0];
+    try {
+      console.log(`[bookingService] Creating Google Meet meeting via Google Calendar for booking: ${bookingId}...`);
+      const clientEmail = bookingData.email || bookingData.clientEmail;
+      
+      const meetResult = await googleCalendarService.createMeeting(integration.user_id, {
+        bookingId,
+        summary: `Lumaflow Session`,
+        description: `Booking Reference: ${bookingData.bookingReference || bookingData.booking_reference}\nRitual: ${bookingData.selectedSession || bookingData.selected_session}\nClient: ${bookingData.fullName || bookingData.full_name}\nNotes: ${bookingData.intentions || ''}`,
+        startTime: startUTC.toISOString(),
+        duration,
+        clientEmail,
+        practitionerEmail: integration.google_email
+      });
+
+      console.log(`[bookingService] Google Meet meeting created: ${meetResult.meetUrl}`);
+
+      const dbUpdate = {
+        meeting_provider: 'GOOGLE_MEET',
+        meeting_url: meetResult.meetUrl,
+        calendar_event_id: meetResult.eventId,
+        meeting_status: 'scheduled',
+        // Backward compatibility
+        zoom_join_url: meetResult.meetUrl,
+        zoom_meeting_id: meetResult.eventId,
+        zoom_status: 'success',
+        calendar_status: 'scheduled',
+        updated_at: new Date().toISOString()
+      };
+
+      const { data: updated, error: updateErr } = await writeClient
+        .from('bookings')
+        .update(dbUpdate)
+        .eq('id', bookingId)
+        .select()
+        .single();
+
+      if (updateErr) throw updateErr;
+      return updated;
+    } catch (gErr: any) {
+      console.error('[bookingService] Google Meet creation failed:', gErr.message || gErr);
+      // Fallback to Zoom if Google fails
+    }
+  }
+
+  // 2. Fallback to Zoom if no google integration exists or it fails
+  try {
+    console.log('[bookingService] Falling back/Defaulting to Zoom meeting creation...');
+    const zoomResult = await zoomService.createZoomMeeting({
+      topic: `${bookingData.selectedSession || bookingData.selected_session || 'Healing Session'} with Alanna`,
+      startTime: startUTC.toISOString(),
+      duration,
+    });
+
+    const dbUpdate = {
+      meeting_provider: 'ZOOM',
+      meeting_url: zoomResult.joinUrl,
+      calendar_event_id: zoomResult.meetingId,
+      meeting_status: 'scheduled',
+      // Zoom specific fields
+      zoom_meeting_id: zoomResult.meetingId,
+      zoom_join_url: zoomResult.joinUrl,
+      zoom_start_url: zoomResult.hostUrl,
+      meeting_password: zoomResult.password,
+      meeting_type: '2',
+      calendar_status: 'scheduled',
+      zoom_status: 'success',
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: updated, error: updateErr } = await writeClient
+      .from('bookings')
+      .update(dbUpdate)
+      .eq('id', bookingId)
+      .select()
+      .single();
+
+    if (updateErr) throw updateErr;
+    return updated;
+  } catch (zoomErr: any) {
+    console.error('[bookingService] Zoom fallback failed:', zoomErr.message || zoomErr);
+    
+    // Set needs manual attention status
+    const dbUpdate = {
+      meeting_provider: 'GOOGLE_MEET', // Defaults to Google Meet
+      zoom_status: 'needs_manual_attention',
+      meeting_status: 'needs_manual_attention',
+      updated_at: new Date().toISOString()
+    };
+    
+    const { data: updated } = await writeClient
+      .from('bookings')
+      .update(dbUpdate)
+      .eq('id', bookingId)
+      .select()
+      .single();
+      
+    return updated;
   }
 }
 
@@ -445,54 +573,14 @@ export const bookingService = {
     const isVirtual = bookingData.sessionFormat && bookingData.sessionFormat.toLowerCase() === 'virtual';
 
     if (isVirtual) {
-      try {
-        const providerTimezone = 'America/New_York';
-        const startUTC = fromZonedTime(`${bookingData.selectedDate} ${bookingData.selectedTime}:00`, providerTimezone);
-        
-        console.log('[bookingService] Creating Zoom meeting for virtual session...');
-        const zoomResult = await zoomService.createZoomMeeting({
-          topic: `${bookingData.selectedSession || 'Healing Session'} with Alanna`,
-          startTime: startUTC.toISOString(),
-          duration: Number(bookingData.duration || 60),
-        });
-
-        console.log('[bookingService] Updating booking record with Zoom credentials...');
-        const { data: updatedResult, error: updateError } = await supabase
-          .from('bookings')
-          .update({
-            zoom_meeting_id: zoomResult.meetingId,
-            zoom_join_url: zoomResult.joinUrl,
-            zoom_start_url: zoomResult.hostUrl,
-            meeting_password: zoomResult.password,
-            meeting_type: '2',
-            calendar_status: 'scheduled',
-            zoom_status: 'success',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', rawResult.id)
-          .select()
-          .single();
-
-        if (updateError) throw updateError;
+      const updatedResult = await provisionMeetingForBooking(rawResult.id, {
+        ...bookingData,
+        email: bookingData.email || rawResult.email,
+        fullName: bookingData.fullName || rawResult.full_name,
+        bookingReference: rawResult.booking_reference
+      });
+      if (updatedResult) {
         Object.assign(rawResult, updatedResult);
-        console.log('[ZOOM CREATED]');
-      } catch (zoomErr: any) {
-        console.error('[ZOOM FAILED] Zoom API failed during createBooking:', zoomErr.message || zoomErr);
-        console.log('[ROLLBACK TRIGGERED] Zoom meeting creation failed, proceeding with booking confirmed but needs attention.');
-        
-        const { data: updatedResult } = await supabase
-          .from('bookings')
-          .update({
-            zoom_status: 'needs_manual_attention',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', rawResult.id)
-          .select()
-          .single();
-        
-        if (updatedResult) {
-          Object.assign(rawResult, updatedResult);
-        }
       }
     }
 
@@ -684,47 +772,15 @@ export const bookingService = {
     const isVirtual = updatedBooking.session_format && updatedBooking.session_format.toLowerCase() === 'virtual';
 
     if (isVirtual) {
-      try {
-        const providerTimezone = 'America/New_York';
-        const startUTC = fromZonedTime(`${updatedBooking.selected_date} ${updatedBooking.selected_time}:00`, providerTimezone);
-        
-        console.log('[bookingService] Creating Zoom meeting for virtual credit session...');
-        const zoomResult = await zoomService.createZoomMeeting({
-          topic: `${updatedBooking.selected_session || 'Healing Session'} with Alanna`,
-          startTime: startUTC.toISOString(),
-          duration: Number(updatedBooking.duration || 60),
-        });
-
-        dbUpdate.zoom_meeting_id = zoomResult.meetingId;
-        dbUpdate.zoom_join_url = zoomResult.joinUrl;
-        dbUpdate.zoom_start_url = zoomResult.hostUrl;
-        dbUpdate.meeting_password = zoomResult.password;
-        dbUpdate.meeting_type = '2';
-        dbUpdate.calendar_status = 'scheduled';
-        dbUpdate.zoom_status = 'success';
-        console.log('[ZOOM CREATED]');
-      } catch (zoomErr: any) {
-        console.error('[ZOOM FAILED] Zoom API failed during confirmCreditBooking:', zoomErr.message || zoomErr);
-        console.log('[ROLLBACK TRIGGERED]');
-        dbUpdate.zoom_status = 'needs_manual_attention';
-        dbUpdate.zoom_meeting_id = null;
-        dbUpdate.zoom_join_url = null;
-        dbUpdate.zoom_start_url = null;
-        dbUpdate.meeting_password = null;
-        dbUpdate.meeting_type = null;
-        dbUpdate.calendar_status = null;
-      }
-
-      dbUpdate.updated_at = new Date().toISOString();
-      const { data: finalBooking, error: finalErr } = await writeClient
-        .from('bookings')
-        .update(dbUpdate)
-        .eq('id', id)
-        .select()
-        .single();
-      if (finalErr) {
-        console.error('[bookingService] Error updating booking Zoom details:', finalErr.message);
-      } else {
+      const finalBooking = await provisionMeetingForBooking(id, {
+        ...updatedBooking,
+        selectedDate: updatedBooking.selected_date,
+        selectedTime: updatedBooking.selected_time,
+        selectedSession: updatedBooking.selected_session,
+        fullName: updatedBooking.full_name,
+        bookingReference: updatedBooking.booking_reference
+      });
+      if (finalBooking) {
         Object.assign(updatedBooking, finalBooking);
       }
     }
@@ -974,36 +1030,22 @@ export const bookingService = {
       throw new Error('Cannot regenerate Zoom meeting for an in-person session.');
     }
     
-    // 3. Create Zoom meeting
-    const providerTimezone = 'America/New_York';
-    const startUTC = fromZonedTime(`${booking.selected_date} ${booking.selected_time}:00`, providerTimezone);
-    
-    console.log(`[bookingService] Regenerating Zoom meeting for booking: ${id}`);
-    const zoomResult = await zoomService.createZoomMeeting({
-      topic: `${booking.selected_session || 'Healing Session'} with Alanna`,
-      startTime: startUTC.toISOString(),
-      duration: Number(booking.duration || 60),
+    // 3. Provision meeting
+    console.log(`[bookingService] Regenerating meeting for booking: ${id}`);
+    const rawResult = await provisionMeetingForBooking(id, {
+      ...booking,
+      selectedDate: booking.selected_date,
+      selectedTime: booking.selected_time,
+      selectedSession: booking.selected_session,
+      fullName: booking.full_name,
+      bookingReference: booking.booking_reference
     });
+
+    if (!rawResult) {
+      throw new Error('Failed to regenerate meeting credentials.');
+    }
     
-    // 4. Update booking record
-    const { data: rawResult, error: updateErr } = await writeClient
-      .from('bookings')
-      .update({
-        zoom_meeting_id: zoomResult.meetingId,
-        zoom_join_url: zoomResult.joinUrl,
-        zoom_start_url: zoomResult.hostUrl,
-        meeting_password: zoomResult.password,
-        meeting_type: '2',
-        calendar_status: 'scheduled',
-        zoom_status: 'success',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
-      .select()
-      .single();
-      
-    if (updateErr) throw updateErr;
-    console.log('[ZOOM CREATED] Zoom meeting regenerated successfully.');
+    console.log('[MEETING CREATED] Meeting regenerated successfully.');
     
     const mapped = mapBookingFromDb(rawResult);
     // Send confirmation email again with Zoom details

@@ -46,6 +46,12 @@ export interface Booking {
   zoomStatus?: string | null;
   practitionerTime?: string;
   clientLocalTime?: string;
+
+  // Provider Agnostic fields
+  meetingProvider?: string | null;
+  meetingUrl?: string | null;
+  calendarEventId?: string | null;
+  meetingStatus?: string | null;
 }
 
 export interface AvailabilitySlot {

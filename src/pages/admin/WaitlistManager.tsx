@@ -51,7 +51,7 @@ const WaitlistManager = () => {
       if (!session) return;
 
       const headers = { 'Authorization': `Bearer ${session.access_token}` };
-      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
       const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
       const response = await fetch(`${API_URL}/admin/waitlist`, { headers });
@@ -76,7 +76,7 @@ const WaitlistManager = () => {
     setIsSubmitting(id);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
       const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
       const response = await fetch(`${API_URL}/admin/waitlist/${id}/notify`, {
@@ -108,7 +108,7 @@ const WaitlistManager = () => {
     setIsSubmitting(id);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+      const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
       const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
       const response = await fetch(`${API_URL}/admin/waitlist/${id}`, {

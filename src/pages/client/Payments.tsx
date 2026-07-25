@@ -34,7 +34,7 @@ export default function Payments() {
           throw new Error('No active sanctuary session found');
         }
 
-        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
         const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
         const response = await fetch(`${API_URL}/client/payments`, {

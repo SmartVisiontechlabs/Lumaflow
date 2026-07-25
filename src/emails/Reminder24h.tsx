@@ -19,6 +19,8 @@ interface ReminderProps {
   zoomJoinUrl?: string | null;
   zoomMeetingId?: string | null;
   meetingPassword?: string | null;
+  meetingProvider?: string | null;
+  meetingUrl?: string | null;
 }
 
 export const Reminder24hEmail = ({
@@ -31,6 +33,8 @@ export const Reminder24hEmail = ({
   zoomJoinUrl,
   zoomMeetingId,
   meetingPassword,
+  meetingProvider = 'GOOGLE_MEET',
+  meetingUrl,
 }: ReminderProps) => (
   <EmailLayout previewTextText="Your sanctuary awaits tomorrow ✨">
     <Section style={contentSection}>
@@ -70,16 +74,16 @@ export const Reminder24hEmail = ({
       <Section style={card}>
         <Heading style={cardTitle}>Virtual Sanctuary Access</Heading>
         <Text style={bodyText}>
-          Your live session will take place via Zoom. Click below to join when it is time.
+          Your live session will take place via {meetingProvider === 'ZOOM' ? 'Zoom' : 'Google Meet'}. Click below to join when it is time.
         </Text>
-        {zoomJoinUrl && (
+        {(meetingUrl || zoomJoinUrl) && (
           <Section style={{ textAlign: 'center', marginTop: '20px', marginBottom: '20px' }}>
-            <Button style={goldButton} href={zoomJoinUrl}>
+            <Button style={goldButton} href={meetingUrl || zoomJoinUrl || '#'}>
               Enter Virtual Sanctuary
             </Button>
           </Section>
         )}
-        {zoomMeetingId && (
+        {meetingProvider === 'ZOOM' && zoomMeetingId && (
           <Row style={{ marginTop: '15px' }}>
             <Column style={{ width: '50%' }}>
               <Text style={label}>Meeting ID</Text>

@@ -12,8 +12,10 @@ import {
   AlertCircle,
   ChevronRight,
   Clock,
-  Database
+  Database,
+  Link
 } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { adminSupabase as supabase } from '../../lib/supabase';
 import { Toast, ToastType } from '../../components/ui/Toast';
 import { cn } from '../../lib/utils';
@@ -22,7 +24,20 @@ const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
 const AdminSettings = () => {
-  const [activeSection, setActiveSection] = useState('general');
+  const { section } = useParams();
+  const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState(section || 'general');
+
+  useEffect(() => {
+    if (section) {
+      setActiveSection(section);
+    }
+  }, [section]);
+
+  const handleTabChange = (sectionId: string) => {
+    setActiveSection(sectionId);
+    navigate(`/admin/settings/${sectionId}`);
+  };
   const [isSaving, setIsSaving] = useState(false);
   const [sanctuaryEmail, setSanctuaryEmail] = useState('rituals@lumaflow.com');
 
@@ -30,6 +45,89 @@ const AdminSettings = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  // Google Calendar Integration States
+  const [googleConnection, setGoogleConnection] = useState<{ connected: boolean; email?: string; connectedAt?: string }>({
+    connected: false
+  });
+  const [isDisconnectingGoogle, setIsDisconnectingGoogle] = useState(false);
+
+  const fetchGoogleStatus = async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/integrations/google`, { headers });
+      if (response.ok) {
+        const data = await response.json();
+        setGoogleConnection(data);
+      }
+    } catch (err) {
+      console.error('Error fetching Google connection status:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchGoogleStatus();
+  }, []);
+
+  // Check URL parameters for status/error updates
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get('status');
+    const error = params.get('error');
+    const email = params.get('email');
+
+    if (status === 'success') {
+      showToast(`Google Calendar successfully connected as ${email}!`, 'success');
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+      fetchGoogleStatus();
+    } else if (error) {
+      showToast(`Google connection failed: ${decodeURIComponent(error)}`, 'error');
+      // Clear URL params
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  const handleConnectGoogle = async () => {
+    try {
+      if (supabase) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          // Redirect browser directly to oauth route
+          window.location.href = `${API_URL}/auth/google?token=${encodeURIComponent(session.access_token)}`;
+        } else {
+          showToast('Unauthorized: No active session. Please log in again.', 'error');
+        }
+      }
+    } catch (e) {
+      console.error('Error redirecting to Google OAuth:', e);
+      showToast('Failed to start Google Calendar connection', 'error');
+    }
+  };
+
+  const handleDisconnectGoogle = async () => {
+    setIsDisconnectingGoogle(true);
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/integrations/google`, {
+        method: 'DELETE',
+        headers
+      });
+
+      if (response.ok) {
+        showToast('Google Calendar disconnected successfully.', 'success');
+        setGoogleConnection({ connected: false });
+      } else {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to disconnect');
+      }
+    } catch (err: any) {
+      console.error('Error disconnecting Google Calendar:', err);
+      showToast(err.message || 'Failed to disconnect Google Calendar', 'error');
+    } finally {
+      setIsDisconnectingGoogle(false);
+    }
+  };
 
   const getAuthHeaders = async () => {
     const headers: Record<string, string> = {
@@ -427,6 +525,7 @@ const AdminSettings = () => {
     { id: 'availability', name: 'Sanctuary Hours', icon: Clock },
     { id: 'emails', name: 'Communications', icon: Mail },
     { id: 'seo', name: 'Search Engine (SEO)', icon: Globe },
+    { id: 'integrations', name: 'Integrations', icon: Link },
     { id: 'security', name: 'Access Control', icon: Shield },
   ];
 
@@ -445,7 +544,7 @@ const AdminSettings = () => {
           {sections.map((section) => (
             <button
               key={section.id}
-              onClick={() => setActiveSection(section.id)}
+              onClick={() => handleTabChange(section.id)}
               className={cn(
                 "w-full flex items-center justify-between p-6 rounded-2xl transition-all duration-500 group",
                 activeSection === section.id 
@@ -900,6 +999,114 @@ const AdminSettings = () => {
                   <button className="px-10 py-5 bg-red-400 text-white rounded-2xl text-[10px] font-bold uppercase tracking-[0.4em] hover:bg-red-500 transition-all duration-700 shadow-sm">
                     Reset Portal Security
                   </button>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'integrations' && (
+              <div className="space-y-10">
+                <div className="space-y-1">
+                  <h4 className="text-2xl font-display text-text-dark tracking-tight">Connected Portals</h4>
+                  <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-text-dark/20 italic">External system integrations</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Google Calendar Card */}
+                  <div className="bg-white border border-text-dark/5 p-10 rounded-[3rem] space-y-6 flex flex-col justify-between shadow-sm">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-3 bg-red-50 text-red-500 rounded-xl">
+                            <Link className="w-5 h-5 text-red-400" />
+                          </div>
+                          <div>
+                            <h5 className="text-xs font-bold text-text-dark uppercase tracking-widest">Google Calendar</h5>
+                            <p className="text-[9px] text-text-dark/30 uppercase tracking-[0.25em] mt-0.5">Calendar & Google Meet</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border border-text-dark/5 bg-cream/10">
+                          <span className={cn(
+                            "w-2 h-2 rounded-full",
+                            googleConnection.connected ? "bg-emerald-500 animate-pulse" : "bg-red-400"
+                          )} />
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-text-dark/60">
+                            {googleConnection.connected ? 'Connected' : 'Not Connected'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-b border-text-dark/5 py-4 my-2 space-y-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-text-dark/40 text-[10px] uppercase tracking-wider">Connected Account</span>
+                          <span className="text-text-dark font-medium select-all">
+                            {googleConnection.connected ? googleConnection.email : 'None'}
+                          </span>
+                        </div>
+                        {googleConnection.connected && googleConnection.connectedAt && (
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="text-text-dark/40 text-[10px] uppercase tracking-wider">Last Sync</span>
+                            <span className="text-text-dark font-medium">
+                              {new Date(googleConnection.connectedAt).toLocaleDateString(undefined, {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric'
+                              })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      {googleConnection.connected ? (
+                        <div className="flex gap-4">
+                          <button
+                            onClick={handleConnectGoogle}
+                            className="flex-1 py-4 bg-white border border-text-dark/5 text-text-dark rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-gold/10 transition-all duration-500 cursor-pointer text-center"
+                          >
+                            Reconnect
+                          </button>
+                          <button
+                            onClick={handleDisconnectGoogle}
+                            disabled={isDisconnectingGoogle}
+                            className="flex-1 py-4 bg-red-50 text-red-500 rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-red-100 transition-all duration-500 cursor-pointer text-center disabled:opacity-50"
+                          >
+                            {isDisconnectingGoogle ? 'Disconnecting...' : 'Disconnect'}
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleConnectGoogle}
+                          className="w-full py-5 bg-text-dark text-white rounded-2xl text-[10px] font-bold uppercase tracking-[0.3em] hover:bg-gold transition-all duration-700 shadow-sm cursor-pointer text-center"
+                        >
+                          Connect Google Calendar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Future Integrations / Stripe placeholder */}
+                  <div className="bg-white/40 border border-text-dark/5 p-10 rounded-[3rem] space-y-6 opacity-60 flex flex-col justify-between shadow-sm">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-blue-50 text-blue-500 rounded-xl">
+                          <Lock className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-text-dark uppercase tracking-widest">Stripe Portal</h5>
+                          <p className="text-[9px] text-text-dark/30 uppercase tracking-[0.25em] mt-0.5">Payments & Invoicing</p>
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-text-dark/40 leading-relaxed italic">
+                        Stripe processing is managed directly via environment parameters. Connect portal to sync customer history.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <button disabled className="w-full py-4 bg-white/40 border border-text-dark/5 text-text-dark/40 rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] cursor-not-allowed">
+                        Coming Soon
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

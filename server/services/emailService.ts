@@ -78,7 +78,7 @@ export const emailService = {
       
       const isVirtual = booking.sessionFormat?.toLowerCase() === 'virtual';
       const locationStr = isVirtual 
-        ? (booking.zoomJoinUrl || 'Zoom link details to be sent')
+        ? (booking.meetingUrl || booking.zoomJoinUrl || 'Meeting link details to be sent')
         : 'LumaFlow Sanctuary, Soho, Manhattan, NY';
 
       const rawDetails = isVirtual ? `
@@ -86,9 +86,9 @@ Client: ${booking.fullName}
 Ritual: ${booking.selectedSession}
 Reference: ${booking.bookingReference}
 
-Zoom Join Link: ${booking.zoomJoinUrl || 'Provisioning details will be sent shortly'}
-Meeting ID: ${booking.zoomMeetingId || 'N/A'}
-Password: ${booking.meetingPassword || 'N/A'}
+Meeting Link: ${booking.meetingUrl || booking.zoomJoinUrl || 'Provisioning details will be sent shortly'}
+Meeting Provider: ${booking.meetingProvider || 'GOOGLE_MEET'}
+${booking.meetingProvider === 'ZOOM' ? `Meeting ID: ${booking.zoomMeetingId || 'N/A'}\nPassword: ${booking.meetingPassword || 'N/A'}` : ''}
 
 Preparation Checklist:
 - Find a quiet, private space
@@ -159,6 +159,8 @@ END:VCALENDAR
               zoomJoinUrl: booking.zoomJoinUrl,
               zoomMeetingId: booking.zoomMeetingId,
               meetingPassword: booking.meetingPassword,
+              meetingProvider: booking.meetingProvider,
+              meetingUrl: booking.meetingUrl,
             }),
             text: `
 Your Sanctuary Has Been Reserved
@@ -174,9 +176,9 @@ Reference: ${booking.bookingReference}
 
 ${booking.sessionFormat?.toLowerCase() === 'virtual' ? `
 Access Details:
-Zoom Join Link: ${booking.zoomJoinUrl || 'Provisioning details will be sent shortly'}
-Meeting ID: ${booking.zoomMeetingId || 'N/A'}
-Password: ${booking.meetingPassword || 'N/A'}
+Meeting Link: ${booking.meetingUrl || booking.zoomJoinUrl || 'Provisioning details will be sent shortly'}
+Meeting Provider: ${booking.meetingProvider || 'GOOGLE_MEET'}
+${booking.meetingProvider === 'ZOOM' ? `Meeting ID: ${booking.zoomMeetingId || 'N/A'}\nPassword: ${booking.meetingPassword || 'N/A'}` : ''}
 
 Preparation Checklist:
 - Find a quiet, private space
@@ -331,6 +333,8 @@ If you need support, reply to this email.
           zoomJoinUrl: booking.zoomJoinUrl,
           zoomMeetingId: booking.zoomMeetingId,
           meetingPassword: booking.meetingPassword,
+          meetingProvider: booking.meetingProvider,
+          meetingUrl: booking.meetingUrl,
         }),
       });
 
@@ -430,6 +434,8 @@ If you need support, reply to this email.
           zoomJoinUrl: booking.zoomJoinUrl,
           zoomMeetingId: booking.zoomMeetingId,
           meetingPassword: booking.meetingPassword,
+          meetingProvider: booking.meetingProvider,
+          meetingUrl: booking.meetingUrl,
         }),
         text: `
 Soft Arrival
@@ -441,9 +447,9 @@ We invite you to begin your soft arrival now: disengage from screens, hydrate, a
 
 ${booking.sessionFormat?.toLowerCase() === 'virtual' ? `
 Virtual Sanctuary Credentials:
-Zoom Link: ${booking.zoomJoinUrl || 'N/A'}
-Meeting ID: ${booking.zoomMeetingId || 'N/A'}
-Password: ${booking.meetingPassword || 'N/A'}
+Meeting Link: ${booking.meetingUrl || booking.zoomJoinUrl || 'N/A'}
+Meeting Provider: ${booking.meetingProvider || 'GOOGLE_MEET'}
+${booking.meetingProvider === 'ZOOM' ? `Meeting ID: ${booking.zoomMeetingId || 'N/A'}\nPassword: ${booking.meetingPassword || 'N/A'}` : ''}
 ` : `
 Sanctuary Location:
 LumaFlow Sanctuary • Soho, Manhattan, NY

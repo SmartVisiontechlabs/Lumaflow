@@ -518,40 +518,57 @@ const AdminBookings = () => {
                   </div>
                 </div>
 
-                {/* Zoom Credentials (only if Virtual) */}
+                {/* Credentials (only if Virtual) */}
                 {selectedBooking.session_format?.toLowerCase() === 'virtual' && (
                   <div className="space-y-4">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/20 italic">Zoom Meeting Details</p>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.4em] text-text-dark/20 italic">
+                      {selectedBooking.meeting_provider === 'ZOOM' ? 'Zoom Meeting Details' : 'Google Meet Details'}
+                    </p>
                     <div className="bg-white border border-text-dark/5 rounded-[2rem] p-8 shadow-sm space-y-6">
-                      <div className="grid grid-cols-2 gap-6 text-xs border-b border-text-dark/5 pb-4">
-                        <div>
-                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Meeting ID</span>
-                          <span className="font-mono text-text-dark font-semibold select-all">{selectedBooking.zoom_meeting_id || 'Not Provisioned'}</span>
+                      {selectedBooking.meeting_provider === 'ZOOM' ? (
+                        <div className="grid grid-cols-2 gap-6 text-xs border-b border-text-dark/5 pb-4">
+                          <div>
+                            <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Meeting ID</span>
+                            <span className="font-mono text-text-dark font-semibold select-all">{selectedBooking.zoom_meeting_id || 'Not Provisioned'}</span>
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Passcode</span>
+                            <span className="font-mono text-text-dark font-semibold select-all">{selectedBooking.meeting_password || 'None'}</span>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Passcode</span>
-                          <span className="font-mono text-text-dark font-semibold select-all">{selectedBooking.meeting_password || 'None'}</span>
+                      ) : (
+                        <div className="border-b border-text-dark/5 pb-4 text-xs">
+                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Calendar Event / Meet URL</span>
+                          <span className="font-mono text-text-dark font-semibold select-all text-xs break-all">
+                            {selectedBooking.meeting_url || selectedBooking.zoom_join_url || 'Not Provisioned'}
+                          </span>
                         </div>
-                      </div>
+                      )}
 
                       <div className="grid grid-cols-2 gap-6 text-xs border-b border-text-dark/5 pb-4">
                         <div>
-                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Zoom Connection Status</span>
+                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Meeting Provider</span>
+                          <span className="font-bold text-text-dark uppercase tracking-widest text-[9px] block mt-0.5">
+                            {selectedBooking.meeting_provider || 'GOOGLE_MEET'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] font-bold text-text-dark/40 uppercase tracking-widest block mb-1">Connection Status</span>
                           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-bold uppercase tracking-wider bg-gold/10 text-gold-light border border-gold/10">
-                            {selectedBooking.zoom_status || 'pending'}
+                            {selectedBooking.meeting_status || selectedBooking.zoom_status || 'pending'}
                           </span>
                         </div>
                       </div>
 
                       <div className="flex flex-col gap-3 pt-2">
-                        {(!selectedBooking.zoom_meeting_id || selectedBooking.zoom_status !== 'success') ? (
+                        {(!selectedBooking.zoom_meeting_id && !selectedBooking.meeting_url) ? (
                           <button
                             onClick={handleProvisionZoom}
                             disabled={isProvisioningZoom}
                             className="w-full py-4 bg-gold text-white text-center rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-text-dark transition-all duration-700 shadow-luxury flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            {isProvisioningZoom ? 'Provisioning Zoom...' : 'Provision Zoom Meeting'}
+                            {isProvisioningZoom ? 'Provisioning...' : 'Provision Meeting'}
                           </button>
                         ) : (
                           <button
@@ -560,34 +577,34 @@ const AdminBookings = () => {
                             className="w-full py-4 bg-white border border-text-dark/10 text-text-dark text-center rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-cream transition-all duration-500 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            {isProvisioningZoom ? 'Regenerating Zoom...' : 'Regenerate Zoom Meeting'}
+                            {isProvisioningZoom ? 'Regenerating...' : 'Regenerate Meeting'}
                           </button>
                         )}
 
-                        {selectedBooking.zoom_start_url && (
+                        {(selectedBooking.meeting_url || selectedBooking.zoom_join_url) && (
                           <a
-                            href={selectedBooking.zoom_start_url}
+                            href={selectedBooking.meeting_url || selectedBooking.zoom_join_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full py-4 bg-gold text-white text-center rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-text-dark transition-all duration-700 shadow-luxury flex items-center justify-center gap-2"
+                            className="w-full py-4 bg-gold text-white text-center rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-text-dark transition-all duration-700 shadow-luxury flex items-center justify-center gap-2 block"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            Start Zoom Meeting (As Host)
+                            Join Meeting
                           </a>
                         )}
-                        {selectedBooking.zoom_join_url && (
+
+                        {selectedBooking.meeting_provider === 'ZOOM' && selectedBooking.zoom_start_url && (
                           <a
-                            href={selectedBooking.zoom_join_url}
+                            href={selectedBooking.zoom_start_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="w-full py-4 bg-white border border-text-dark/10 text-text-dark text-center rounded-xl text-[9px] font-bold uppercase tracking-[0.3em] hover:bg-cream transition-all duration-500 flex items-center justify-center gap-2"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
-                            Client Join Link
+                            Start Zoom Meeting (As Host)
                           </a>
                         )}
                       </div>
-
                     </div>
                   </div>
                 )}

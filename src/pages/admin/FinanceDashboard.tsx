@@ -183,7 +183,7 @@ export default function FinanceDashboard() {
         if (!session) return;
 
         const headers = { 'Authorization': `Bearer ${session.access_token}` };
-        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3005/api';
+        const rawApiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
         const API_URL = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
         const res = await fetch(`${API_URL}/admin/finance`, { headers });
