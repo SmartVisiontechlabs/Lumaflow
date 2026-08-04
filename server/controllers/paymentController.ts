@@ -205,13 +205,16 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
 
     let booking: any;
 
+    console.log(`[confirmPaymentSession] Checking existing draft bookings for Stripe Payment ID ${session_id}. Query returned:`, existingBooking ? `Booking ID ${existingBooking.id} (status: ${existingBooking.bookingStatus})` : 'null');
+
     if (existingBooking && (existingBooking.bookingStatus === 'pending_payment' || existingBooking.bookingStatus === 'draft')) {
-      console.log(`[confirmPaymentSession] Confirming existing booking draft: ${existingBooking.id}`);
+      console.log(`[confirmPaymentSession] Draft booking detected. Initiating transactional confirmation for Booking ID: ${existingBooking.id}`);
 
       let confirmSuccess = false;
       let conflictDetected = false;
 
       try {
+        console.log(`[confirmPaymentSession] Executing DB RPC confirm_booking_transactional for Booking ID ${existingBooking.id}, User ID ${userId}...`);
         const { data, error: confirmErr } = await supabaseAdmin.rpc('confirm_booking_transactional', {
           p_booking_id: existingBooking.id,
           p_user_id: userId || null,
@@ -219,6 +222,7 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
         });
 
         if (confirmErr) {
+          console.error(`[confirmPaymentSession] RPC confirm_booking_transactional failed for Booking ID ${existingBooking.id}:`, confirmErr);
           if (confirmErr.message && confirmErr.message.includes('already been booked')) {
             conflictDetected = true;
           } else {
@@ -226,8 +230,10 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
           }
         } else {
           confirmSuccess = !!data;
+          console.log(`[confirmPaymentSession] RPC confirm_booking_transactional returned success: ${confirmSuccess}`);
         }
       } catch (err: any) {
+        console.error(`[confirmPaymentSession] Exception caught during RPC confirm_booking_transactional for Booking ID ${existingBooking.id}:`, err);
         if (err.message && err.message.includes('already been booked')) {
           conflictDetected = true;
         } else {
@@ -236,8 +242,7 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
       }
 
       if (!confirmSuccess && !conflictDetected) {
-        // Lock not acquired because payment_processed was already true!
-        console.warn('[confirmPaymentSession] Payment lock already set. Retrieving latest booking.');
+        console.warn(`[confirmPaymentSession] Payment lock not acquired (possibly already confirmed). Retrieving booking record for session: ${session_id}`);
         const { data: latestBooking } = await bookingService.getBookingByPaymentId(session_id);
         return {
           booking: latestBooking,
@@ -246,7 +251,7 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
         };
       }
 
-      console.log('[PAYMENT LOCK ACQUIRED] successfully.');
+      console.log(`[confirmPaymentSession] [PAYMENT LOCK ACQUIRED] successfully. conflictDetected = ${conflictDetected}`);
 
       // If slot conflict happened but payment succeeded on Stripe, confirm anyway but flag for manual reschedule (Task 1 & Stripe instructions)
       if (conflictDetected) {
@@ -266,7 +271,10 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
           .select()
           .single();
           
-        if (forceErr) throw forceErr;
+        if (forceErr) {
+          console.error('[confirmPaymentSession] Failed to force confirm booking under conflict:', forceErr);
+          throw forceErr;
+        }
         
         const parsed = parseIntentions(forceBooking.intentions);
         booking = {
@@ -298,7 +306,7 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
           userId: forceBooking.user_id,
         };
 
-        console.log(`[BOOKING CONFIRMED] Booking ${forceBooking.id} confirmed with conflict manual attention flag.`);
+        console.log(`[confirmPaymentSession] [BOOKING CONFIRMED] Booking ${forceBooking.id} forced confirmed under conflict.`);
         await emailService.sendBookingConfirmation(booking);
         
         return {
@@ -310,11 +318,13 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
 
       // Normal path: slot confirmed successfully
       const isVirtual = existingBooking.sessionFormat && existingBooking.sessionFormat.toLowerCase() === 'virtual';
+      console.log(`[confirmPaymentSession] Booking confirmed successfully. isVirtual = ${isVirtual}`);
       const dbUpdate: any = {
         updated_at: new Date().toISOString()
       };
 
       if (isVirtual) {
+        console.log(`[confirmPaymentSession] Booking is virtual. Initiating virtual meeting provisioning for Booking ID: ${existingBooking.id}`);
         const finalBooking = await provisionMeetingForBooking(existingBooking.id, {
           ...existingBooking,
           selectedDate: existingBooking.selectedDate,
@@ -324,6 +334,7 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
           bookingReference: existingBooking.bookingReference
         });
         if (finalBooking) {
+          console.log(`[confirmPaymentSession] Virtual meeting provisioned successfully for Booking ID: ${existingBooking.id}. Mapping details to database update...`);
           dbUpdate.zoom_meeting_id = finalBooking.zoom_meeting_id;
           dbUpdate.zoom_join_url = finalBooking.zoom_join_url;
           dbUpdate.zoom_start_url = finalBooking.zoom_start_url;
@@ -335,9 +346,12 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
           dbUpdate.meeting_url = finalBooking.meeting_url;
           dbUpdate.calendar_event_id = finalBooking.calendar_event_id;
           dbUpdate.meeting_status = finalBooking.meeting_status;
+        } else {
+          console.error(`[confirmPaymentSession] provisionMeetingForBooking returned null/empty for Booking ID: ${existingBooking.id}`);
         }
       }
 
+      console.log(`[confirmPaymentSession] Performing final db update on bookings table for ID: ${existingBooking.id}...`);
       const { data: rawResult, error: updateErr } = await supabaseAdmin
         .from('bookings')
         .update(dbUpdate)
@@ -345,10 +359,16 @@ async function confirmPaymentSession(session_id: string): Promise<{ booking: any
         .select()
         .single();
 
-      if (updateErr) throw updateErr;
+      if (updateErr) {
+        console.error(`[confirmPaymentSession] Final db update failed for Booking ID: ${existingBooking.id}:`, updateErr);
+        throw updateErr;
+      }
+
+      console.log(`[confirmPaymentSession] Final database update completed for Booking ID: ${existingBooking.id}.`);
 
       // Log booking history if user_id is set
       if (userId) {
+        console.log(`[confirmPaymentSession] Logging booking history for user: ${userId}`);
         const { error: histError } = await supabaseAdmin.rpc('log_booking_history', {
           p_user_id: userId,
           p_booking_id: rawResult.id,

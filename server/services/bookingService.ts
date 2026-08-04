@@ -213,23 +213,31 @@ async function ensureUserIntegrity(userId: string | null, email: string, fullNam
  * Creates a calendar event / virtual meeting for the booking using Google Meet (default) or Zoom (fallback).
  */
 export async function provisionMeetingForBooking(bookingId: string, bookingData: any) {
+  console.log(`[bookingService] [provisionMeetingForBooking] Starting meeting provisioning for Booking ID: ${bookingId}`);
   const writeClient = supabaseAdmin || supabase;
   
   // 1. Fetch any active google integrations
+  console.log('[bookingService] Checking active Google integrations...');
   const { data: integrations, error: integrationErr } = await writeClient
     .from('google_integrations')
     .select('*')
     .limit(1);
+
+  if (integrationErr) {
+    console.error('[bookingService] Error checking Google integration status:', integrationErr);
+  }
 
   const providerTimezone = 'America/New_York';
   const selectedDate = bookingData.selectedDate || bookingData.selected_date;
   const selectedTime = bookingData.selectedTime || bookingData.selected_time;
   const startUTC = fromZonedTime(`${selectedDate} ${selectedTime}:00`, providerTimezone);
   const duration = Number(bookingData.duration || 60);
+  console.log(`[bookingService] Parsed start time UTC: ${startUTC.toISOString()}, duration: ${duration} mins`);
 
   if (integrations && integrations.length > 0) {
     // Admin has Google Calendar integration connected
     const integration = integrations[0];
+    console.log(`[bookingService] Active Google integration found for user: ${integration.user_id} (${integration.google_email})`);
     try {
       console.log(`[bookingService] Creating Google Meet meeting via Google Calendar for booking: ${bookingId}...`);
       const clientEmail = bookingData.email || bookingData.clientEmail;
@@ -244,7 +252,7 @@ export async function provisionMeetingForBooking(bookingId: string, bookingData:
         practitionerEmail: integration.google_email
       });
 
-      console.log(`[bookingService] Google Meet meeting created: ${meetResult.meetUrl}`);
+      console.log(`[bookingService] Google Meet meeting created: eventId = ${meetResult.eventId}, meetUrl = ${meetResult.meetUrl}`);
 
       const dbUpdate = {
         meeting_provider: 'GOOGLE_MEET',
@@ -259,6 +267,7 @@ export async function provisionMeetingForBooking(bookingId: string, bookingData:
         updated_at: new Date().toISOString()
       };
 
+      console.log(`[bookingService] Updating booking row ${bookingId} with Google Meet details...`);
       const { data: updated, error: updateErr } = await writeClient
         .from('bookings')
         .update(dbUpdate)
@@ -266,12 +275,20 @@ export async function provisionMeetingForBooking(bookingId: string, bookingData:
         .select()
         .single();
 
-      if (updateErr) throw updateErr;
+      if (updateErr) {
+        console.error(`[bookingService] Failed to update booking row ${bookingId} with Google Meet info:`, updateErr);
+        throw updateErr;
+      }
+      
+      console.log(`[bookingService] Booking row ${bookingId} successfully updated with Google Meet.`);
       return updated;
     } catch (gErr: any) {
-      console.error('[bookingService] Google Meet creation failed:', gErr.message || gErr);
+      console.error('[bookingService] Google Meet creation failed with error:', gErr.message || gErr);
+      console.log('[bookingService] Attempting to fall back to Zoom creation...');
       // Fallback to Zoom if Google fails
     }
+  } else {
+    console.log('[bookingService] No active Google Calendar integration connected. Defaulting directly to Zoom.');
   }
 
   // 2. Fallback to Zoom if no google integration exists or it fails
@@ -282,6 +299,8 @@ export async function provisionMeetingForBooking(bookingId: string, bookingData:
       startTime: startUTC.toISOString(),
       duration,
     });
+
+    console.log(`[bookingService] Zoom meeting created: meetingId = ${zoomResult.meetingId}, joinUrl = ${zoomResult.joinUrl}`);
 
     const dbUpdate = {
       meeting_provider: 'ZOOM',
@@ -299,6 +318,7 @@ export async function provisionMeetingForBooking(bookingId: string, bookingData:
       updated_at: new Date().toISOString()
     };
 
+    console.log(`[bookingService] Updating booking row ${bookingId} with Zoom details...`);
     const { data: updated, error: updateErr } = await writeClient
       .from('bookings')
       .update(dbUpdate)
@@ -306,10 +326,15 @@ export async function provisionMeetingForBooking(bookingId: string, bookingData:
       .select()
       .single();
 
-    if (updateErr) throw updateErr;
+    if (updateErr) {
+      console.error(`[bookingService] Failed to update booking row ${bookingId} with Zoom details:`, updateErr);
+      throw updateErr;
+    }
+    
+    console.log(`[bookingService] Booking row ${bookingId} successfully updated with Zoom details.`);
     return updated;
   } catch (zoomErr: any) {
-    console.error('[bookingService] Zoom fallback failed:', zoomErr.message || zoomErr);
+    console.error('[bookingService] Zoom fallback failed with error:', zoomErr.message || zoomErr);
     
     // Set needs manual attention status
     const dbUpdate = {
@@ -319,6 +344,7 @@ export async function provisionMeetingForBooking(bookingId: string, bookingData:
       updated_at: new Date().toISOString()
     };
     
+    console.warn(`[bookingService] Both Google and Zoom failed. Marking booking row ${bookingId} as needs_manual_attention.`);
     const { data: updated } = await writeClient
       .from('bookings')
       .update(dbUpdate)
@@ -335,13 +361,18 @@ export const bookingService = {
    * Retrieves all bookings from Supabase
    */
   async getAllBookings() {
-    const { data: rawData, error } = await supabase
+    console.log('[bookingService] Retrieving all bookings from database (admin view)...');
+    const { data: rawData, error } = await writeClient
       .from('bookings')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      console.error('[bookingService] Error in getAllBookings:', error);
+      throw error;
+    }
     
+    console.log(`[bookingService] Successfully retrieved ${rawData?.length || 0} bookings.`);
     // Map back to camelCase
     return (rawData || []).map(mapBookingFromDb);
   },
@@ -350,17 +381,26 @@ export const bookingService = {
    * Retrieves a specific booking by Stripe Payment ID
    */
   async getBookingByPaymentId(paymentId: string) {
-    const { data, error } = await supabase
+    console.log(`[bookingService] Querying booking for Stripe Payment ID: ${paymentId}`);
+    const { data, error } = await writeClient
       .from('bookings')
       .select('*')
       .eq('stripe_payment_id', paymentId)
       .maybeSingle();
 
-    if (error) return { data: null, error };
-    if (!data) return { data: null, error: null };
+    if (error) {
+      console.error(`[bookingService] Error querying booking by Payment ID (${paymentId}):`, error);
+      return { data: null, error };
+    }
+    
+    if (data) {
+      console.log(`[bookingService] Booking found for Stripe Payment ID ${paymentId}: ID = ${data.id}, status = ${data.booking_status}`);
+    } else {
+      console.log(`[bookingService] No booking found for Stripe Payment ID: ${paymentId}`);
+    }
 
     return {
-      data: mapBookingFromDb(data),
+      data: data ? mapBookingFromDb(data) : null,
       error: null
     };
   },
@@ -433,8 +473,8 @@ export const bookingService = {
       payment_processed: true, // Marked as processed because it is a direct confirmation
     };
 
-    console.log('[BOOKING INSERT]', dbData);
-    console.log('[bookingService] Inserting base booking into Supabase...');
+    console.log('[bookingService] Final DB data prepared for insert:', JSON.stringify(dbData, null, 2));
+    console.log('[bookingService] Inserting base booking into Supabase (bookings table)...');
     
     let rawResult: any;
     try {
@@ -445,26 +485,37 @@ export const bookingService = {
         .single();
 
       if (error) {
-        // Task 5: Handle unique constraint violation (duplicate webhook protection)
         if (error.code === '23505') {
-          console.warn('[bookingService] Duplicate booking insert caught via unique constraint. Fetching existing booking.');
+          console.warn(`[bookingService] Duplicate booking insert caught via unique constraint (code 23505) for Stripe Payment ID: ${bookingData.stripe_payment_id}. Attempting recovery...`);
           const { data: existing } = await this.getBookingByPaymentId(bookingData.stripe_payment_id);
-          if (existing) return existing;
+          if (existing) {
+            console.log(`[bookingService] Recovery successful. Retrieved existing booking ID: ${existing.id}`);
+            return existing;
+          } else {
+            console.error(`[bookingService] Recovery failed. Unique constraint violation occurred, but getBookingByPaymentId returned null/empty.`);
+          }
         }
+        console.error('[bookingService] Database error during insert:', error);
         throw error;
       }
       rawResult = data;
+      console.log(`[bookingService] Base booking inserted successfully. Row ID: ${rawResult.id}`);
     } catch (err: any) {
       if (err.code === '23505' && bookingData.stripe_payment_id) {
-        console.warn('[bookingService] Duplicate booking insert caught via unique constraint exception. Fetching existing booking.');
+        console.warn(`[bookingService] Duplicate booking insert caught via exception (code 23505) for Stripe Payment ID: ${bookingData.stripe_payment_id}. Attempting recovery...`);
         const { data: existing } = await this.getBookingByPaymentId(bookingData.stripe_payment_id);
-        if (existing) return existing;
+        if (existing) {
+          console.log(`[bookingService] Recovery successful from exception. Retrieved existing booking ID: ${existing.id}`);
+          return existing;
+        } else {
+          console.error(`[bookingService] Recovery failed from exception. Unique constraint exception occurred, but getBookingByPaymentId returned null/empty.`);
+        }
       }
-      console.error('Database Insertion Error:', err);
+      console.error('[bookingService] Database Insertion Exception:', err);
       throw err;
     }
 
-    console.log('[BOOKING CREATED] Base booking row successfully written.');
+    console.log(`[bookingService] [BOOKING CREATED] Base booking row successfully written with ID: ${rawResult.id}.`);
 
     // Write booking history if user_id is set
     if (bookingData.userId) {

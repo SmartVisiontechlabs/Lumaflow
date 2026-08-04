@@ -271,11 +271,16 @@ export const googleCalendarService = {
    * Creates a Google Calendar event with a Google Meet conference.
    */
   async createMeeting(userId: string, params: CalendarEventParams): Promise<CalendarEventResult> {
-    console.log(`📅 [Google Calendar Service] Creating event for booking: ${params.bookingId}`);
+    console.log(`📅 [Google Calendar Service] Creating event for booking ID: ${params.bookingId}`);
+    console.log('[Google Calendar Service] Input parameters:', JSON.stringify(params, null, 2));
+
+    console.log(`[Google Calendar Service] Fetching valid access token for user ID: ${userId}...`);
     const accessToken = await this.getValidAccessToken(userId);
+    console.log('[Google Calendar Service] Access token successfully resolved.');
 
     const start = new Date(params.startTime);
     const end = new Date(start.getTime() + params.duration * 60 * 1000);
+    console.log(`[Google Calendar Service] Computed event interval: Start = ${start.toISOString()}, End = ${end.toISOString()}`);
 
     const eventBody = {
       summary: params.summary,
@@ -304,6 +309,9 @@ export const googleCalendarService = {
     };
 
     const calendarUrl = 'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1';
+    console.log(`[Google Calendar Service] Sending POST request to Google Calendar API: ${calendarUrl}`);
+    console.log('[Google Calendar Service] Request payload body:', JSON.stringify(eventBody, null, 2));
+
     const response = await fetch(calendarUrl, {
       method: 'POST',
       headers: {
@@ -313,14 +321,17 @@ export const googleCalendarService = {
       body: JSON.stringify(eventBody),
     });
 
+    console.log(`[Google Calendar Service] Google API response status: ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`❌ [Google Calendar Service] Event creation failed: ${errText}`);
+      console.error(`❌ [Google Calendar Service] Event creation failed. Status: ${response.status}, Error body: ${errText}`);
       throw new Error(`Google Calendar API event creation failed: ${errText}`);
     }
 
     const event = await response.json();
-    console.log(`✅ [Google Calendar Service] Event created successfully: ${event.id}`);
+    console.log(`✅ [Google Calendar Service] Event created successfully in Google Calendar. Event ID: ${event.id}`);
+    console.log(`[Google Calendar Service] Event HTML Link: ${event.htmlLink}`);
 
     // Extract Google Meet Join URL
     let meetUrl = '';
@@ -341,6 +352,8 @@ export const googleCalendarService = {
       console.warn('⚠️ [Google Calendar Service] No Google Meet URL found in event payload. Generating static meet url.');
       meetUrl = `https://meet.google.com/lookup/${crypto.randomBytes(5).toString('hex')}`;
     }
+
+    console.log(`[Google Calendar Service] Resolved Meet URL: ${meetUrl}`);
 
     return {
       eventId: event.id,
